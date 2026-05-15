@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn } from 'lucide-react';
+import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn, Calendar, Clock, PlayCircle, DollarSign, Power } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function HomeView() {
   const navigate = useNavigate();
-  const { eliteKey, vipKey, adminPhone } = useApp();
+  const { eliteKey, vipKey, adminPhone, showToast } = useApp();
   const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(() => localStorage.getItem('ramito_maintenance') === 'true');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminKey, setAdminKey] = useState('');
   const [error, setError] = useState(false);
 
   const isLogged = !!localStorage.getItem('ramito_user_name');
+  const role = localStorage.getItem('ramito_user_role');
+  const isAdmin = role === 'admin_vip' || role === 'admin_elite';
 
   // Auto-Login for Master Keys
   React.useEffect(() => {
@@ -64,27 +67,66 @@ export default function HomeView() {
     <main className="relative flex-grow flex flex-col items-center min-h-[100dvh] pt-12 pb-28 px-6 overflow-hidden">
       <div className="absolute inset-0 bg-pitch opacity-20 pointer-events-none" />
       
-      {/* 1. ACCESO STAFF (AHORA ARRIBA) */}
-      <motion.div 
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm mb-6 z-10"
-      >
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setShowAdminLogin(true)}
-          className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all opacity-60 hover:opacity-100"
+      {/* 1. SECCIÓN SUPERIOR (LICENCIAS O ACCESO STAFF) */}
+      {!isAdmin ? (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm mb-6 z-10"
         >
-          <div className="w-8 h-8 rounded-lg bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20">
-            <ShieldCheck className="w-4 h-4 text-[#4be277]" />
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowAdminLogin(true)}
+            className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all opacity-60 hover:opacity-100"
+          >
+            <div className="w-8 h-8 rounded-lg bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20">
+              <ShieldCheck className="w-4 h-4 text-[#4be277]" />
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-[10px] font-black uppercase text-white">Acceso Staff</span>
+              <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">Administración</span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-[#bccbb9]/20 ml-auto" />
+          </motion.button>
+        </motion.div>
+      ) : (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm mb-6 z-10 space-y-3"
+        >
+          <div className="bg-white/[0.03] rounded-2xl p-4 flex items-center justify-between border border-[#4be277]/20 backdrop-blur-md shadow-[0_0_15px_rgba(75,226,119,0.05)]">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#4be277]/20 flex items-center justify-center">
+                <div className="w-3 h-3 bg-[#4be277] rounded-full animate-pulse" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black text-white uppercase tracking-widest block italic">Licencia Web</span>
+                <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">Activa y Sincronizada</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end text-right">
+              <span className="text-[10px] font-black text-[#4be277] uppercase tracking-widest">Activa</span>
+              <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
+            </div>
           </div>
-          <div className="flex flex-col items-start">
-            <span className="text-[10px] font-black uppercase text-white">Acceso Staff</span>
-            <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">Administración</span>
+          <div className="bg-white/[0.03] rounded-2xl p-4 flex items-center justify-between border border-[#4be277]/20 backdrop-blur-md shadow-[0_0_15px_rgba(75,226,119,0.05)]">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-[#4be277]/20 flex items-center justify-center">
+                <div className="w-3 h-3 bg-[#4be277] rounded-full animate-pulse" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black text-white uppercase tracking-widest block italic">Licencia APP (PWA)</span>
+                <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">Activa y Sincronizada</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end text-right">
+              <span className="text-[10px] font-black text-[#4be277] uppercase tracking-widest">Activa</span>
+              <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
+            </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-[#bccbb9]/20 ml-auto" />
-        </motion.button>
-      </motion.div>
+        </motion.div>
+      )}
 
       {/* 2. SECCIÓN LOGO CENTRAL */}
       <motion.div 
@@ -134,6 +176,87 @@ export default function HomeView() {
               <ChevronRight className="w-5 h-5 text-[#bccbb9]/20 ml-auto" />
             </motion.button>
           </>
+        ) : isAdmin ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full flex flex-col gap-3"
+          >
+            {/* TURNO EN JUEGO */}
+            <div className="bg-[#4be277]/10 border border-[#4be277]/30 rounded-2xl p-4 flex items-center justify-between shadow-[0_0_15px_rgba(75,226,119,0.1)]">
+              <div className="flex items-center gap-3">
+                <PlayCircle className="w-8 h-8 text-[#4be277] animate-pulse" />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-white uppercase tracking-widest italic">Jugando Ahora</span>
+                  <span className="text-[12px] font-bold text-[#4be277] uppercase tracking-tighter">La Escaloneta FC</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-black text-[#bccbb9] uppercase tracking-widest block">Termina en</span>
+                <span className="text-[14px] font-black text-white">15:00</span>
+              </div>
+            </div>
+
+            {/* CAJA Y MANTENIMIENTO */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="glass-panel p-4 rounded-2xl border border-[#FF9100]/20 bg-white/[0.02] flex flex-col justify-center items-center text-center">
+                <DollarSign className="w-6 h-6 text-[#FF9100] mb-1" />
+                <span className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">Caja del Día</span>
+                <span className="text-[16px] font-black text-white tracking-tighter mt-1">$45.000</span>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  const newVal = !maintenanceMode;
+                  setMaintenanceMode(newVal);
+                  localStorage.setItem('ramito_maintenance', String(newVal));
+                  if (showToast) showToast(newVal ? 'Modo Mantenimiento Activado' : 'Modo Mantenimiento Desactivado', newVal ? 'error' : 'success');
+                }}
+                className={`p-4 rounded-2xl border flex flex-col justify-center items-center text-center transition-all ${
+                  maintenanceMode ? 'bg-red-500/20 border-red-500/40 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'bg-white/[0.02] border-white/10 glass-panel'
+                }`}
+              >
+                <Power className={`w-6 h-6 mb-1 ${maintenanceMode ? 'text-red-500 animate-pulse' : 'text-[#bccbb9]/60'}`} />
+                <span className={`text-[8px] font-bold uppercase tracking-widest ${maintenanceMode ? 'text-red-500' : 'text-[#bccbb9]/60'}`}>Cierre Emergencia</span>
+                <span className={`text-[10px] font-black tracking-tighter mt-1 ${maintenanceMode ? 'text-red-500' : 'text-white'}`}>
+                  {maintenanceMode ? 'ACTIVADO' : 'NORMAL'}
+                </span>
+              </button>
+            </div>
+
+            <div className="glass-panel p-5 rounded-3xl border border-white/10 text-center space-y-4 relative overflow-hidden bg-white/[0.02] backdrop-blur-xl">
+              <div className="flex items-center justify-between mb-4 border-b border-white/5 pb-3">
+                <h3 className="text-xs font-black text-white uppercase italic tracking-widest flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-[#FF9100]" /> Reservas de Hoy
+                </h3>
+                <span className="text-[8px] font-black bg-[#FF9100]/20 text-[#FF9100] px-2 py-1 rounded-md border border-[#FF9100]/30">3 PENDIENTES</span>
+              </div>
+              
+              <div className="space-y-2 text-left">
+                <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5 group hover:border-[#4be277]/30 transition-colors">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-white flex items-center gap-1"><Clock className="w-3 h-3 text-[#bccbb9]" /> 18:00 - 19:00</span>
+                    <span className="text-[8px] text-[#bccbb9]/60 uppercase font-bold mt-1">Los Pibes FC • Pagado</span>
+                  </div>
+                  <span className="w-2 h-2 rounded-full bg-[#4be277] shadow-[0_0_8px_rgba(75,226,119,0.6)] animate-pulse"></span>
+                </div>
+                <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl border border-white/5 group hover:border-yellow-500/30 transition-colors">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-white flex items-center gap-1"><Clock className="w-3 h-3 text-[#bccbb9]" /> 19:00 - 20:00</span>
+                    <span className="text-[8px] text-[#bccbb9]/60 uppercase font-bold mt-1">Real Bañil • Seña 50%</span>
+                  </div>
+                  <span className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]"></span>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => navigate('/booking')} 
+                className="w-full h-12 mt-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center gap-2 text-white font-black uppercase tracking-[0.2em] italic text-[9px] hover:bg-white/10 transition-all"
+              >
+                Gestionar Calendario <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
         ) : (
           <motion.button
             whileTap={{ scale: 0.98 }}
@@ -188,7 +311,7 @@ export default function HomeView() {
       </AnimatePresence>
 
       {/* WHATSAPP FLOAT */}
-      {isLogged && adminPhone && (
+      {isLogged && !(localStorage.getItem('ramito_user_role')?.includes('admin')) && adminPhone && (
         <motion.a href={`https://wa.me/${adminPhone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" initial={{ scale: 0 }} animate={{ scale: 1 }} className="fixed bottom-24 right-6 w-16 h-16 bg-[#25D366] rounded-full flex items-center justify-center shadow-lg z-50 border-4 border-[#121414]"><MessageCircle className="w-8 h-8 text-white" /></motion.a>
       )}
     </main>

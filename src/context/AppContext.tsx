@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { COURTS } from '../data';
 
 interface AppContextType {
   isComplexOpen: boolean;
@@ -13,6 +14,10 @@ interface AppContextType {
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   allBookings: any[];
   setAllBookings: React.Dispatch<React.SetStateAction<any[]>>;
+  courts: any[];
+  setCourts: React.Dispatch<React.SetStateAction<any[]>>;
+  schedule: { weekday: { open: string; close: string }, weekend: { open: string; close: string } };
+  setSchedule: React.Dispatch<React.SetStateAction<any>>;
   appLicenseActive: boolean;
   setAppLicenseActive: (active: boolean) => void;
   webLicenseActive: boolean;
@@ -57,6 +62,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       { id: '1', date: 'Viernes 15 Mayo', time: '19:00', field: 'Cancha 1', status: 'pending_approval', amount: '$45.00', user: 'Agus Castro' },
       { id: '2', date: 'Sábado 16 Mayo', time: '21:00', field: 'Cancha 2', status: 'upcoming', amount: '$30.00', user: 'Juan Perez' }
     ];
+  });
+
+  const [courts, setCourts] = useState<any[]>(() => {
+    const saved = localStorage.getItem('ramito_courts');
+    return saved ? JSON.parse(saved) : COURTS;
+  });
+
+  const [schedule, setSchedule] = useState(() => {
+    const saved = localStorage.getItem('ramito_schedule');
+    return saved ? JSON.parse(saved) : { weekday: { open: '18:00', close: '23:00' }, weekend: { open: '15:00', close: '23:00' } };
   });
 
   const [appLicenseActive, setAppLicenseActive] = useState(() => {
@@ -162,6 +177,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('ramito_marquee_text', marqueeText);
   }, [marqueeText]);
 
+  useEffect(() => {
+    localStorage.setItem('ramito_courts', JSON.stringify(courts));
+  }, [courts]);
+
+  useEffect(() => {
+    localStorage.setItem('ramito_schedule', JSON.stringify(schedule));
+  }, [schedule]);
+
   const saveSettings = async (newSettings: Partial<any>) => {
     try {
       const { supabase } = await import('../lib/supabase');
@@ -180,6 +203,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (newSettings.app_license_active !== undefined) setAppLicenseActive(newSettings.app_license_active);
       if (newSettings.web_license_active !== undefined) setWebLicenseActive(newSettings.web_license_active);
       if (newSettings.marquee_text !== undefined) setMarqueeText(newSettings.marquee_text);
+      if (newSettings.schedule !== undefined) setSchedule(newSettings.schedule);
+      if (newSettings.courts !== undefined) setCourts(newSettings.courts);
       
       showToast('Configuración Guardada', 'success');
     } catch (err) {
@@ -205,6 +230,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setNotifications,
       allBookings,
       setAllBookings,
+      courts,
+      setCourts,
+      schedule,
+      setSchedule,
       appLicenseActive,
       setAppLicenseActive,
       webLicenseActive,

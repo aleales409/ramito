@@ -1,20 +1,25 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, Star, Filter, Lock } from 'lucide-react';
-import { COURTS, SLOTS } from '../data';
+import { Trophy, Star, Filter, Lock, Edit2, ShieldAlert, X } from 'lucide-react';
+import { SLOTS } from '../data';
 import { useApp } from '../context/AppContext';
 
 export default function BookingView() {
   const navigate = useNavigate();
-  const { showToast, allBookings } = useApp();
+  const { showToast, allBookings, setAllBookings, courts, setCourts } = useApp();
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(24);
+  
+  // States for Admin actions
+  const [confirmingSlotId, setConfirmingSlotId] = useState<string | null>(null);
+  const [editingCourt, setEditingCourt] = useState<any>(null);
+  const [showCourtConfirm, setShowCourtConfirm] = useState(false);
 
   const role = localStorage.getItem('ramito_user_role');
   const isAdmin = role === 'admin_elite' || role === 'admin_vip';
 
-  const selectedCourt = COURTS.find(c => c.id === selectedCourtId);
+  const selectedCourt = courts.find((c: any) => c.id === selectedCourtId);
 
   const days = [
     { name: 'Lun', num: 24 },
@@ -27,7 +32,7 @@ export default function BookingView() {
   ];
 
   return (
-    <main className="pt-16 pb-24 px-5 max-w-2xl mx-auto">
+    <main className="pt-16 pb-24 px-5 w-full overflow-x-hidden">
       {/* Headline Section */}
       <div className="mb-8">
         <h2 className="font-display text-4xl font-black text-white mb-1 uppercase italic tracking-tighter">Reservar</h2>
@@ -73,7 +78,7 @@ export default function BookingView() {
       <section className="mb-10">
         <label className="text-[10px] font-bold text-[#FF9100] uppercase tracking-[0.2em] mb-4 block ml-2">1. Selecciona tu Cancha</label>
         <div className="grid grid-cols-1 gap-4">
-          {COURTS.map((court) => (
+          {courts.map((court: any) => (
             <motion.div
               key={court.id}
               onClick={() => setSelectedCourtId(court.id)}
@@ -87,13 +92,23 @@ export default function BookingView() {
                 <div className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 border border-white/10">
                   <img src={court.imageUrl} alt={court.name} className="w-full h-full object-cover" />
                 </div>
-                <div className="flex flex-col justify-center">
-                  <h4 className="font-display text-xl font-black text-white uppercase italic tracking-tight">{court.name}</h4>
+                <div className="flex flex-col justify-center min-w-0 flex-1 pr-6">
+                  <div className="flex items-start justify-between">
+                    <h4 className="font-display text-lg font-black text-white uppercase italic tracking-tight line-clamp-2 leading-tight">{court.name}</h4>
+                    {isAdmin && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setEditingCourt(court); }}
+                        className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-[#FF9100] hover:text-black transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5 mt-1">
                     <Star className="w-3.5 h-3.5 text-[#FF9100] fill-[#FF9100]" />
                     <span className="text-xs font-black text-white">{court.rating}</span>
                   </div>
-                  <p className="text-[9px] font-bold text-[#bccbb9] uppercase tracking-widest mt-2 bg-white/5 px-2 py-1 rounded-lg w-fit">
+                  <p className="text-[9px] font-bold text-[#bccbb9] uppercase tracking-widest mt-2 bg-white/5 px-2 py-1 rounded-lg w-fit truncate max-w-full">
                     {court.features.slice(0, 2).join(' • ')}
                   </p>
                 </div>
@@ -103,7 +118,7 @@ export default function BookingView() {
                     animate={{ scale: 1 }}
                     className="absolute top-6 right-6"
                   >
-                    <div className="w-10 h-10 bg-[#FF9100] rounded-full flex items-center justify-center shadow-lg">
+                    <div className="w-10 h-10 bg-[#FF9100] rounded-full flex items-center justify-center shadow-lg pointer-events-none">
                       <Trophy className="w-5 h-5 text-[#121414]" />
                     </div>
                   </motion.div>
@@ -147,9 +162,9 @@ export default function BookingView() {
           {/* 3. Slot Selection */}
           <section className="pb-10">
             <div className="flex justify-between items-end mb-4 px-2">
-              <div className="flex flex-col">
+              <div className="flex flex-col min-w-0 flex-1">
                 <label className="text-[10px] font-bold text-[#FF9100] uppercase tracking-[0.2em]">3. Horarios Disponibles</label>
-                <h3 className="font-display text-base font-black text-white uppercase italic mt-1 tracking-tight">Turnos para {selectedCourt?.name}</h3>
+                <h3 className="font-display text-base font-black text-white uppercase italic mt-1 tracking-tight line-clamp-1">Turnos para {selectedCourt?.name}</h3>
               </div>
               <span className="text-[#FF9100] text-[10px] font-black cursor-pointer hover:underline uppercase tracking-widest">Ver todos</span>
             </div>
@@ -188,6 +203,27 @@ export default function BookingView() {
                           return;
                         }
 
+                        if (isAdmin) {
+                          if (confirmingSlotId === slot.id) {
+                            const newBooking = {
+                              id: Math.random().toString(36).substr(2, 9),
+                              date: `Mayo ${selectedDate}`,
+                              time: slot.time,
+                              field: selectedCourt?.name,
+                              status: 'upcoming',
+                              amount: `S/ ${slot.price}`,
+                              user: 'Administrador'
+                            };
+                            setAllBookings(prev => [...prev, newBooking]);
+                            showToast('¡Turno bloqueado exitosamente!', 'success');
+                            setConfirmingSlotId(null);
+                          } else {
+                            setConfirmingSlotId(slot.id);
+                            setTimeout(() => setConfirmingSlotId(null), 3000);
+                          }
+                          return;
+                        }
+
                         const isLogged = !!localStorage.getItem('ramito_user_name');
                         if (isLogged) {
                           navigate('/confirmation', { state: { court: selectedCourt, time: slot.time, date: `Mayo ${selectedDate}` } });
@@ -198,10 +234,12 @@ export default function BookingView() {
                       className={`w-full py-4 rounded-2xl text-[10px] font-black transition-all active:scale-95 uppercase tracking-widest ${
                         status === 'booked'
                           ? 'bg-white/5 text-[#bccbb9]/40 border border-white/5'
-                          : 'bg-[#FF9100] text-[#121414] shadow-lg shadow-[#FF9100]/20'
+                          : confirmingSlotId === slot.id 
+                            ? 'bg-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]'
+                            : 'bg-[#FF9100] text-[#121414] shadow-lg shadow-[#FF9100]/20'
                       }`}
                     >
-                      {status === 'booked' ? (isAdmin ? 'Ver Detalle' : 'Ocupado') : 'Reservar'}
+                      {status === 'booked' ? (isAdmin ? 'Ver Detalle' : 'Ocupado') : (confirmingSlotId === slot.id ? '¿Seguro? Toca' : 'Reservar')}
                     </button>
                   </motion.div>
                 );
@@ -226,15 +264,96 @@ export default function BookingView() {
 
       {/* Floating Filter FAB - Only if court selected */}
       {selectedCourtId && (
-        <motion.button
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          whileTap={{ scale: 0.9 }}
-          className="fixed bottom-24 right-5 w-16 h-16 bg-[#D32F2F] text-white rounded-full shadow-[0_10px_30px_rgba(211,47,47,0.4)] flex items-center justify-center z-40 active:scale-90 transition-transform"
-        >
-          <Filter className="w-6 h-6" />
-        </motion.button>
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-md z-40 pointer-events-none">
+          <motion.button
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            whileTap={{ scale: 0.9 }}
+            className="absolute right-5 w-16 h-16 bg-[#D32F2F] text-white rounded-full shadow-[0_10px_30px_rgba(211,47,47,0.4)] flex items-center justify-center pointer-events-auto active:scale-90 transition-transform"
+          >
+            <Filter className="w-6 h-6" />
+          </motion.button>
+        </div>
       )}
+
+      {/* Editing Court Modal */}
+      <AnimatePresence>
+        {editingCourt && !showCourtConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="w-full max-w-sm glass-panel rounded-[2rem] p-6 border border-white/10 space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-black text-white italic uppercase tracking-tighter">Editar Cancha</h3>
+                <button onClick={() => setEditingCourt(null)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center"><X className="w-4 h-4 text-white" /></button>
+              </div>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-[#bccbb9] uppercase tracking-widest">Nombre de la Cancha</label>
+                  <input type="text" value={editingCourt.name} onChange={(e) => setEditingCourt({ ...editingCourt, name: e.target.value })} className="w-full h-14 bg-black/40 border border-white/10 rounded-2xl px-4 text-white font-black" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-[#bccbb9] uppercase tracking-widest">Tipo de Terreno</label>
+                  <select 
+                    value={editingCourt.features[0]} 
+                    onChange={(e) => {
+                      const newFeatures = [...editingCourt.features];
+                      newFeatures[0] = e.target.value;
+                      setEditingCourt({ ...editingCourt, features: newFeatures });
+                    }} 
+                    className="w-full h-14 bg-black/40 border border-white/10 rounded-2xl px-4 text-white font-black outline-none"
+                  >
+                    <option value="Césped Sintético Pro">Césped Sintético Pro</option>
+                    <option value="Tierra / Cemento">Tierra / Cemento</option>
+                    <option value="Parquet">Parquet</option>
+                  </select>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowCourtConfirm(true)}
+                className="w-full h-14 bg-[#FF9100] text-black font-black rounded-2xl uppercase tracking-widest text-[11px]"
+              >
+                Guardar Cambios
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Double Confirmation Modal */}
+        {showCourtConfirm && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="w-full max-w-sm bg-gradient-to-b from-[#D32F2F]/20 to-[#121414] rounded-[2rem] p-6 border border-red-500/30 text-center space-y-6">
+              <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto border border-red-500/30">
+                <ShieldAlert className="w-10 h-10 text-red-500" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">¿Confirmar Acción?</h3>
+                <p className="text-[10px] font-bold text-[#bccbb9] uppercase tracking-[0.2em] leading-relaxed">
+                  Estás a punto de modificar la información pública de esta cancha. Todos los usuarios verán los nuevos datos.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowCourtConfirm(false)}
+                  className="flex-1 h-14 rounded-2xl bg-white/5 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => {
+                    const newCourts = courts.map(c => c.id === editingCourt.id ? editingCourt : c);
+                    setCourts(newCourts);
+                    setShowCourtConfirm(false);
+                    setEditingCourt(null);
+                    showToast('Cancha actualizada correctamente', 'success');
+                  }}
+                  className="flex-1 h-14 rounded-2xl bg-red-500 text-white font-black uppercase text-[10px] tracking-widest shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+                >
+                  Sí, Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

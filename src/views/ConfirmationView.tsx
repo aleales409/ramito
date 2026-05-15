@@ -202,7 +202,7 @@ export default function ConfirmationView() {
       <div className="h-10"></div>
 
       {/* Sticky Action Bar */}
-      <div className="fixed bottom-20 left-0 w-full p-4 bg-[#121414]/80 backdrop-blur-2xl border-t border-white/10 z-[40]">
+      <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-md p-4 bg-[#121414]/80 backdrop-blur-2xl border-t border-white/10 z-[40]">
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={handleConfirm}

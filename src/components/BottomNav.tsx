@@ -10,8 +10,8 @@ export default function BottomNav() {
   
   const navItems = [
     { icon: Home, label: 'Inicio', path: '/' },
-    { icon: LayoutGrid, label: 'Canchas', path: '/booking' },
-    { icon: CalendarCheck, label: 'Reservas', path: '/my-bookings' },
+    { icon: LayoutGrid, label: isAdmin ? 'Reservar' : 'Canchas', path: '/booking' },
+    { icon: CalendarCheck, label: isAdmin ? 'Gestión' : 'Reservas', path: '/my-bookings' },
     { icon: isAdmin ? Settings : User, label: isAdmin ? 'Config' : 'Perfil', path: '/profile' },
   ];
 

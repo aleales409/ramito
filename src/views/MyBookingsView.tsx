@@ -28,7 +28,7 @@ import NotificationBell from '../components/NotificationBell';
 
 export default function MyBookingsView() {
   const navigate = useNavigate();
-  const { allBookings, setAllBookings, setNotifications } = useApp();
+  const { allBookings, setAllBookings, setNotifications, showToast } = useApp();
   
   const role = localStorage.getItem('ramito_user_role');
   const userName = localStorage.getItem('ramito_user_name');
@@ -293,20 +293,42 @@ export default function MyBookingsView() {
                         <CheckCircle2 className="w-5 h-5" />
                         Validar Pago
                       </button>
-                      <button className="w-14 h-14 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center hover:bg-red-500 hover:text-[#121414] transition-all active:scale-95">
+                      <button 
+                        onClick={() => {
+                          setAllBookings((prev: any) => prev.map((b: any) => 
+                            b.id === booking.id ? { ...b, status: 'pending_payment', receiptUrl: null } : b
+                          ));
+                          showToast('Pago rechazado. El usuario deberá subirlo nuevamente.', 'error');
+                        }}
+                        className="w-14 h-14 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center hover:bg-red-500 hover:text-[#121414] transition-all active:scale-95"
+                      >
                         <XCircle className="w-6 h-6" />
                       </button>
                     </div>
                   )}
 
                   {!isAdmin && (booking.status === 'upcoming' || booking.status === 'pending_approval') && (
-                    <button className="flex-1 h-14 bg-white/5 border border-white/10 text-white rounded-2xl flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest italic hover:bg-white/10 transition-all">
+                    <button 
+                      onClick={() => {
+                        const shareText = `¡Tengo una reserva en Ramito Fut Show!\nCancha: ${booking.field}\nFecha: ${booking.date}\nHora: ${booking.time}\n¡Te espero!`;
+                        if (navigator.share) {
+                          navigator.share({ title: 'Reserva Ramito Fut Show', text: shareText }).catch(console.error);
+                        } else {
+                          navigator.clipboard.writeText(shareText);
+                          alert('Invitación copiada al portapapeles');
+                        }
+                      }}
+                      className="flex-1 h-14 bg-white/5 border border-white/10 text-white rounded-2xl flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest italic hover:bg-white/10 transition-all"
+                    >
                       <Share2 className="w-4 h-4" />
                       Invitar Amigos
                     </button>
                   )}
 
-                  <button className="px-6 h-14 bg-white/[0.03] border border-white/5 rounded-2xl flex items-center justify-center text-[#bccbb9] font-black text-[9px] uppercase tracking-widest italic hover:bg-white/10 transition-all">
+                  <button 
+                    onClick={() => showToast('Funcionalidad de detalles en desarrollo', 'success')}
+                    className="px-6 h-14 bg-white/[0.03] border border-white/5 rounded-2xl flex items-center justify-center text-[#bccbb9] font-black text-[9px] uppercase tracking-widest italic hover:bg-white/10 transition-all"
+                  >
                     Ver Más
                   </button>
                 </div>
@@ -355,7 +377,16 @@ export default function MyBookingsView() {
                 Aprobar
               </button>
               <button 
-                onClick={() => setViewingReceipt(null)}
+                onClick={() => {
+                  const bId = bookings.find((b: any) => b.receiptUrl === viewingReceipt)?.id;
+                  if (bId) {
+                    setAllBookings((prev: any) => prev.map((b: any) => 
+                      b.id === bId ? { ...b, status: 'pending_payment', receiptUrl: null } : b
+                    ));
+                    showToast('Pago rechazado. El usuario deberá subirlo nuevamente.', 'error');
+                  }
+                  setViewingReceipt(null);
+                }}
                 className="h-14 bg-red-500/10 border border-red-500/20 text-red-500 rounded-2xl flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest italic"
               >
                 <XCircle className="w-4 h-4" />

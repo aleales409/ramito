@@ -99,7 +99,8 @@ function AppContent() {
   const role = localStorage.getItem('ramito_user_role');
   const isAdmin = role === 'admin_vip' || role === 'admin_elite';
 
-  const shouldShowLock = isSystemBlocked && !(isAdmin && location.pathname === '/profile');
+  const maintenanceMode = localStorage.getItem('ramito_maintenance') === 'true';
+  const shouldShowLock = (isSystemBlocked || maintenanceMode) && !(isAdmin && location.pathname === '/profile');
 
   return (
     <>
