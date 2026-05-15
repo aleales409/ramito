@@ -3,53 +3,103 @@ import { motion } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { User, Key, ShieldCheck, ArrowRight, UserPlus, LogIn } from 'lucide-react';
 
+import { supabase } from '../lib/supabase';
+import { useApp } from '../context/AppContext';
+
 export default function LoginView() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { showToast } = useApp();
   const mode = location.state?.mode || 'register';
   const isRegister = mode === 'register';
 
   const [name, setName] = useState('');
   const [pin, setPin] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name && pin) {
-      // Determine device type
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const deviceType = isMobile ? 'mobile' : 'desktop';
-      
-      // Get current sessions
-      const activeSessionsStr = localStorage.getItem('ramito_active_sessions');
-      const activeSessions: any[] = activeSessionsStr ? JSON.parse(activeSessionsStr) : [];
-      
-      const isAttemptingAdmin = name.toLowerCase().includes('admin') || pin === '123456' || pin === '654321';
-      const roleToAssign = pin === '123456' ? 'admin_elite' : (pin === '654321' ? 'admin_vip' : 'player');
+      try {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const deviceType = isMobile ? 'mobile' : 'desktop';
 
-      if (roleToAssign === 'player') {
-        const hasSession = activeSessions.some((s) => s.name === name);
-        if (hasSession) {
-          alert('Acceso Denegado: Ya tienes una sesión activa en otro dispositivo.');
-          return;
+        let profileId = '';
+        let roleToAssign = 'player';
+
+        if (isRegister) {
+          // Check if name already exists
+          const { data: existingUser } = await supabase.from('profiles').select('id').eq('name', name).maybeSingle();
+          if (existingUser) {
+            showToast('Acceso Denegado: Ya existe un jugador con este nombre.');
+            return;
+          }
+
+          roleToAssign = pin === '123456' ? 'admin_elite' : (pin === '654321' ? 'admin_vip' : 'player');
+
+          const { data: newUser, error: insertError } = await supabase.from('profiles')
+            .insert([{ name, pin, role: roleToAssign }])
+            .select()
+            .single();
+
+          if (insertError) {
+             console.error(insertError);
+             showToast('Error al crear perfil.');
+             return;
+          }
+          profileId = newUser.id;
+        } else {
+          // Login flow
+          const { data: user, error: userError } = await supabase.from('profiles').select('*').eq('name', name).maybeSingle();
+          if (!user || user.pin !== pin) {
+            showToast('Acceso Denegado: Nombre o PIN incorrectos.');
+            return;
+          }
+          profileId = user.id;
+          roleToAssign = user.role;
         }
-      } else {
-        // Admin restriction: 1 mobile, 1 desktop max for this name
-        const sameDeviceSession = activeSessions.find(s => s.name === name && s.deviceType === deviceType);
-        if (sameDeviceSession) {
-          alert(`Acceso Denegado: Ya hay un administrador activo en este tipo de dispositivo (${deviceType}).`);
-          return;
+
+        // Limit active sessions
+        if (roleToAssign === 'player') {
+          const { data: sessions } = await supabase.from('active_sessions').select('id').eq('profile_id', profileId);
+          if (sessions && sessions.length > 0) {
+            showToast('Acceso Denegado: Ya tienes una sesión activa en otro dispositivo.');
+            return;
+          }
+        } else {
+          const { data: sessions } = await supabase.from('active_sessions')
+            .select('id')
+            .eq('profile_id', profileId)
+            .eq('device_type', deviceType);
+          
+          if (sessions && sessions.length > 0) {
+            showToast(`Acceso Denegado: Ya tienes una sesión activa de administrador en un dispositivo tipo ${deviceType}.`);
+            return;
+          }
         }
+
+        // Create new session
+        const { data: newSession, error: sessionError } = await supabase.from('active_sessions')
+          .insert([{ profile_id: profileId, device_type: deviceType }])
+          .select()
+          .single();
+
+        if (sessionError) {
+           console.error(sessionError);
+           showToast('Error al crear sesión activa.');
+           return;
+        }
+
+        localStorage.setItem('ramito_current_session_id', newSession.id);
+        localStorage.setItem('ramito_user_id', profileId);
+        localStorage.setItem('ramito_user_name', name);
+        localStorage.setItem('ramito_user_pin', pin);
+        localStorage.setItem('ramito_user_role', roleToAssign);
+        navigate('/');
+
+      } catch (err) {
+        console.error(err);
+        showToast('Error de conexión con la base de datos.');
       }
-
-      // Add to sessions
-      const newSession = { name, role: roleToAssign, deviceType, id: Date.now() };
-      localStorage.setItem('ramito_active_sessions', JSON.stringify([...activeSessions, newSession]));
-      localStorage.setItem('ramito_current_session_id', newSession.id.toString());
-
-      localStorage.setItem('ramito_user_name', name);
-      localStorage.setItem('ramito_user_pin', pin);
-      localStorage.setItem('ramito_user_role', roleToAssign);
-      navigate('/');
     }
   };
 

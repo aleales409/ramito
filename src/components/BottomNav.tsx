@@ -16,7 +16,7 @@ export default function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 pb-safe px-3 bg-[#121414]/80 backdrop-blur-2xl border-t border-white/10 shadow-2xl rounded-t-xl">
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50 flex justify-around items-center h-20 pb-safe px-3 bg-[#121414]/80 backdrop-blur-2xl border-t border-white/10 border-x shadow-2xl rounded-t-xl">
       {navItems.map((item) => {
         const isActive = location.pathname === item.path;
         const Icon = item.icon;

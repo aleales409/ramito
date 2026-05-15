@@ -18,6 +18,9 @@ interface AppContextType {
   webLicenseActive: boolean;
   setWebLicenseActive: (active: boolean) => void;
   isSystemBlocked: boolean;
+  toast: { message: string; type: 'error' | 'success'; visible: boolean };
+  showToast: (message: string, type?: 'error' | 'success') => void;
+  hideToast: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -62,6 +65,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const saved = localStorage.getItem('ramito_web_license');
     return saved !== null ? saved === 'true' : true;
   });
+
+  const [toast, setToast] = useState<{ message: string; type: 'error' | 'success'; visible: boolean }>({
+    message: '',
+    type: 'success',
+    visible: false
+  });
+
+  const showToast = (message: string, type: 'error' | 'success' = 'error') => {
+    setToast({ message, type, visible: true });
+  };
+
+  const hideToast = () => {
+    setToast(prev => ({ ...prev, visible: false }));
+  };
+
+  // Fetch settings from Supabase on mount
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const { supabase } = await import('../lib/supabase');
+        const { data, error } = await supabase.from('system_settings').select('*').eq('id', 1).single();
+        if (data && !error) {
+          setIsComplexOpen(data.is_complex_open);
+          setAppLicenseActive(data.app_license_active);
+          setWebLicenseActive(data.web_license_active);
+          setAdminPhone(data.admin_phone || '+51 987 654 321');
+        }
+      } catch (err) {
+        console.error('Error loading settings', err);
+      }
+    }
+    loadSettings();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('ramito_complex_open', isComplexOpen.toString());
@@ -115,7 +151,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAppLicenseActive,
       webLicenseActive,
       setWebLicenseActive,
-      isSystemBlocked
+      isSystemBlocked,
+      toast,
+      showToast,
+      hideToast
     }}>
       {children}
     </AppContext.Provider>

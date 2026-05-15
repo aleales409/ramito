@@ -28,6 +28,7 @@ import {
 import { UserRole } from '../types';
 import { useApp } from '../context/AppContext';
 import NotificationBell from '../components/NotificationBell';
+import { supabase } from '../lib/supabase';
 
 export default function ProfileView() {
   const navigate = useNavigate();
@@ -114,19 +115,24 @@ export default function ProfileView() {
   const isVIP = userRole === 'admin_vip';
   const isElite = userRole === 'admin_elite';
 
-  const handlePhoneSave = () => {
+  const handlePhoneSave = async () => {
     setAdminPhone(tempPhone);
+    await supabase.from('system_settings').update({ admin_phone: tempPhone }).eq('id', 1);
     setIsEditingPhone(false);
   };
 
-  const handleKeySave = () => {
+  const handleKeySave = async () => {
     if (userRole === 'admin_elite') setEliteKey(tempKey);
     else if (userRole === 'admin_vip') setVipKey(tempKey);
     else localStorage.setItem('ramito_user_pin', tempKey);
+    
+    const userId = localStorage.getItem('ramito_user_id');
+    if (userId) await supabase.from('profiles').update({ pin: tempKey }).eq('id', userId);
+    
     setIsEditingKey(false);
   };
 
-  const handlePatternNode = (node: number) => {
+  const handlePatternNode = async (node: number) => {
     if (newPattern.includes(node)) return;
     const p = [...newPattern, node];
     setNewPattern(p);
@@ -135,6 +141,10 @@ export default function ProfileView() {
       if (userRole === 'admin_elite') setEliteKey(patternStr);
       else if (userRole === 'admin_vip') setVipKey(patternStr);
       else localStorage.setItem('ramito_user_pin', patternStr);
+      
+      const userId = localStorage.getItem('ramito_user_id');
+      if (userId) await supabase.from('profiles').update({ pin: patternStr }).eq('id', userId);
+
       setTimeout(() => {
         setIsDrawingPattern(false);
         setNewPattern([]);
@@ -367,7 +377,11 @@ export default function ProfileView() {
 
                 {isVIP ? (
                   <button 
-                    onClick={() => setAppLicenseActive(!appLicenseActive)}
+                    onClick={async () => {
+                      const newVal = !appLicenseActive;
+                      setAppLicenseActive(newVal);
+                      await supabase.from('system_settings').update({ app_license_active: newVal }).eq('id', 1);
+                    }}
                     className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
                       appLicenseActive 
                         ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
@@ -401,7 +415,11 @@ export default function ProfileView() {
 
                 {isVIP ? (
                   <button 
-                    onClick={() => setWebLicenseActive(!webLicenseActive)}
+                    onClick={async () => {
+                      const newVal = !webLicenseActive;
+                      setWebLicenseActive(newVal);
+                      await supabase.from('system_settings').update({ web_license_active: newVal }).eq('id', 1);
+                    }}
                     className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
                       webLicenseActive 
                         ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
@@ -437,7 +455,11 @@ export default function ProfileView() {
 
                 {isVIP ? (
                   <button 
-                    onClick={() => setIsComplexOpen(!isComplexOpen)}
+                    onClick={async () => {
+                      const newVal = !isComplexOpen;
+                      setIsComplexOpen(newVal);
+                      await supabase.from('system_settings').update({ is_complex_open: newVal }).eq('id', 1);
+                    }}
                     className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
                       isComplexOpen 
                         ? 'bg-red-500/10 text-red-500 border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]' 
@@ -532,19 +554,15 @@ export default function ProfileView() {
 
         {/* Logout */}
         <button 
-          onClick={() => {
+          onClick={async () => {
              const sessionId = localStorage.getItem('ramito_current_session_id');
              if (sessionId) {
-               const sessionsStr = localStorage.getItem('ramito_active_sessions');
-               if (sessionsStr) {
-                 const sessions = JSON.parse(sessionsStr);
-                 const updatedSessions = sessions.filter((s: any) => s.id.toString() !== sessionId);
-                 localStorage.setItem('ramito_active_sessions', JSON.stringify(updatedSessions));
-               }
+               await supabase.from('active_sessions').delete().eq('id', sessionId);
              }
              localStorage.removeItem('ramito_user_role');
              localStorage.removeItem('ramito_user_name');
              localStorage.removeItem('ramito_user_pin');
+             localStorage.removeItem('ramito_user_id');
              localStorage.removeItem('ramito_current_session_id');
              window.location.href = '/';
           }}

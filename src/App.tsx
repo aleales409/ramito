@@ -91,6 +91,8 @@ function LockScreen() {
   );
 }
 
+import Toast from './components/Toast';
+
 function AppContent() {
   const { isSystemBlocked } = useApp();
   const location = useLocation();
@@ -101,12 +103,13 @@ function AppContent() {
 
   return (
     <>
+      <Toast />
       <AnimatePresence>
         {shouldShowLock && <LockScreen />}
       </AnimatePresence>
       
       {!shouldShowLock && (
-        <div className="flex flex-col min-h-screen">
+        <div className="flex flex-col min-h-[100dvh] w-full max-w-md mx-auto relative bg-[#121414] shadow-2xl shadow-black/50 overflow-x-hidden border-x border-white/5">
           <TopAppBar />
           
           <Routes>
@@ -128,10 +131,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AppProvider>
+    <div className="min-h-screen bg-black flex justify-center w-full">
+      <AppProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </AppProvider>
+    </div>
   );
 }
