@@ -25,7 +25,7 @@ function LockScreen() {
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 z-[9999] bg-[#000] flex flex-col items-center justify-center p-8 overflow-hidden text-center"
+      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-2xl flex flex-col items-center justify-center p-8 overflow-hidden text-center"
     >
       <div className="absolute inset-0 opacity-10 pointer-events-none">
         <div className="grid grid-cols-10 gap-2 p-4 text-[8px] font-mono text-[#4be277] select-none break-all">
@@ -109,7 +109,11 @@ function AppContent() {
       </AnimatePresence>
       
       {!shouldShowLock && (
-        <div className="flex flex-col min-h-[100dvh] w-full max-w-md mx-auto relative bg-[#121414] shadow-2xl shadow-black/50 overflow-x-hidden border-x border-white/5">
+        <div className="flex flex-col min-h-[100dvh] w-full max-w-md mx-auto relative main-bg-container shadow-2xl shadow-black/50 overflow-x-hidden border-x border-white/5">
+          <div className="premium-overlay" />
+          <div className="pitch-pattern" />
+          
+          <div className="relative z-10 flex flex-col flex-grow">
           <TopAppBar />
           
           <Routes>
@@ -123,6 +127,7 @@ function AppContent() {
           </Routes>
           
           <BottomNav />
+          </div>
         </div>
       )}
     </>

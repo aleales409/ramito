@@ -17,10 +17,13 @@ interface AppContextType {
   setAppLicenseActive: (active: boolean) => void;
   webLicenseActive: boolean;
   setWebLicenseActive: (active: boolean) => void;
+  marqueeText: string;
+  setMarqueeText: (text: string) => void;
   isSystemBlocked: boolean;
   toast: { message: string; type: 'error' | 'success'; visible: boolean };
   showToast: (message: string, type?: 'error' | 'success') => void;
   hideToast: () => void;
+  saveSettings: (newSettings: Partial<any>) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -66,6 +69,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return saved !== null ? saved === 'true' : true;
   });
 
+  const [marqueeText, setMarqueeText] = useState(() => {
+    return localStorage.getItem('ramito_marquee_text') || 'COMPLEJO RAMITO FUT SHOW • EL MEJOR NIVEL • RESERVAS ABIERTAS • VEN A JUGAR';
+  });
+
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success'; visible: boolean }>({
     message: '',
     type: 'success',
@@ -80,23 +87,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setToast(prev => ({ ...prev, visible: false }));
   };
 
-  // Fetch settings from Supabase on mount
+  // Fetch settings and bookings from Supabase on mount
   useEffect(() => {
-    async function loadSettings() {
+    async function loadData() {
       try {
         const { supabase } = await import('../lib/supabase');
-        const { data, error } = await supabase.from('system_settings').select('*').eq('id', 1).single();
-        if (data && !error) {
-          setIsComplexOpen(data.is_complex_open);
-          setAppLicenseActive(data.app_license_active);
-          setWebLicenseActive(data.web_license_active);
-          setAdminPhone(data.admin_phone || '+51 987 654 321');
+        
+        // Load System Settings
+        const { data: settings, error: settingsError } = await supabase
+          .from('system_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+          
+        if (settings && !settingsError) {
+          setIsComplexOpen(settings.is_complex_open);
+          setAppLicenseActive(settings.app_license_active);
+          setWebLicenseActive(settings.web_license_active);
+          setAdminPhone(settings.admin_phone || '+51 987 654 321');
+          setMarqueeText(settings.marquee_text || 'COMPLEJO RAMITO FUT SHOW • EL MEJOR NIVEL • RESERVAS ABIERTAS • VEN A JUGAR');
+          if (settings.elite_key) setEliteKey(settings.elite_key);
+          if (settings.vip_key) setVipKey(settings.vip_key);
+        }
+
+        // Load Bookings
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (bookings && !bookingsError) {
+          setAllBookings(bookings);
         }
       } catch (err) {
-        console.error('Error loading settings', err);
+        console.error('Error loading data from Supabase', err);
       }
     }
-    loadSettings();
+    loadData();
   }, []);
 
   useEffect(() => {
@@ -131,7 +158,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('ramito_all_bookings', JSON.stringify(allBookings));
   }, [allBookings]);
 
+  useEffect(() => {
+    localStorage.setItem('ramito_marquee_text', marqueeText);
+  }, [marqueeText]);
+
+  const saveSettings = async (newSettings: Partial<any>) => {
+    try {
+      const { supabase } = await import('../lib/supabase');
+      const { error } = await supabase
+        .from('system_settings')
+        .update(newSettings)
+        .eq('id', 1);
+        
+      if (error) throw error;
+      
+      // Update local state
+      if (newSettings.is_complex_open !== undefined) setIsComplexOpen(newSettings.is_complex_open);
+      if (newSettings.admin_phone !== undefined) setAdminPhone(newSettings.admin_phone);
+      if (newSettings.elite_key !== undefined) setEliteKey(newSettings.elite_key);
+      if (newSettings.vip_key !== undefined) setVipKey(newSettings.vip_key);
+      if (newSettings.app_license_active !== undefined) setAppLicenseActive(newSettings.app_license_active);
+      if (newSettings.web_license_active !== undefined) setWebLicenseActive(newSettings.web_license_active);
+      if (newSettings.marquee_text !== undefined) setMarqueeText(newSettings.marquee_text);
+      
+      showToast('Configuración Guardada', 'success');
+    } catch (err) {
+      console.error('Error saving settings', err);
+      showToast('Error al guardar en la nube');
+    }
+  };
+
   const isSystemBlocked = !appLicenseActive || !webLicenseActive;
+
 
   return (
     <AppContext.Provider value={{ 
@@ -151,10 +209,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAppLicenseActive,
       webLicenseActive,
       setWebLicenseActive,
+      marqueeText,
+      setMarqueeText,
       isSystemBlocked,
       toast,
       showToast,
-      hideToast
+      hideToast,
+      saveSettings
     }}>
       {children}
     </AppContext.Provider>

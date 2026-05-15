@@ -1,70 +1,104 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Trophy, 
-  ShieldCheck, 
-  Settings, 
-  LogOut, 
-  ChevronRight, 
-  Zap, 
-  Target, 
-  Users, 
-  Key, 
-  AlertCircle, 
-  Phone, 
-  Lock, 
-  Edit3, 
-  ChevronDown, 
-  User, 
-  MousePointer2,
-  FileSearch,
-  CheckCircle2,
-  Clock,
-  DollarSign,
-  Bell,
-  ArrowRight
+  User, ShieldCheck, Key, Settings, CreditCard, History, 
+  ChevronRight, LogOut, Phone, MessageCircle, AlertTriangle, 
+  CheckCircle2, Save, ExternalLink, ArrowRight, Lock
 } from 'lucide-react';
-import { UserRole } from '../types';
 import { useApp } from '../context/AppContext';
-import NotificationBell from '../components/NotificationBell';
 import { supabase } from '../lib/supabase';
 
 export default function ProfileView() {
   const navigate = useNavigate();
-  const { 
-    isComplexOpen, 
-    setIsComplexOpen, 
-    adminPhone, 
-    setAdminPhone, 
-    eliteKey, 
-    setEliteKey, 
-    vipKey, 
-    setVipKey,
-    appLicenseActive,
-    setAppLicenseActive,
-    webLicenseActive,
-    setWebLicenseActive
-  } = useApp();
+  const { showToast, eliteKey, vipKey, saveSettings, adminPhone } = useApp();
   
-  const userName = localStorage.getItem('ramito_user_name');
-  const role = (localStorage.getItem('ramito_user_role') as UserRole) || 'player';
+  const [activeTab, setActiveTab] = useState<'perfil' | 'seguridad' | 'soporte'>('perfil');
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!userName && role === 'player') {
+  // States for Security tab
+  const [newEliteKey, setNewEliteKey] = useState(eliteKey);
+  const [newVipKey, setNewVipKey] = useState(vipKey);
+  const [newAdminPhone, setNewAdminPhone] = useState(adminPhone);
+  const [newPersonalKey, setNewPersonalKey] = useState('');
+
+  const userId = localStorage.getItem('ramito_user_id');
+  const userRole = localStorage.getItem('ramito_user_role');
+
+  useEffect(() => {
+    if (userId) {
+      fetchUserData();
+    }
+  }, [userId]);
+
+  const fetchUserData = async () => {
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (error) throw error;
+      setUserData(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate('/');
+    showToast('Sesión cerrada correctamente');
+  };
+
+  const handleSaveKeys = async () => {
+    try {
+      await saveSettings({
+        elite_key: newEliteKey,
+        vip_key: newVipKey,
+        admin_phone: newAdminPhone
+      });
+      showToast('¡CONFIGURACIÓN ACTUALIZADA!', 'success');
+    } catch (err) {
+      showToast('Error al guardar cambios');
+    }
+  };
+
+  const handleUpdatePersonalKey = async () => {
+    if (!newPersonalKey || newPersonalKey.length < 4) {
+      showToast('La llave debe tener al menos 4 caracteres');
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ password: newPersonalKey })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      showToast('¡TU LLAVE HA SIDO ACTUALIZADA!', 'success');
+      setNewPersonalKey('');
+    } catch (err) {
+      showToast('Error al actualizar tu llave');
+    }
+  };
+
+  // 1. PANTALLA DE BLOQUEO SI NO ESTÁ LOGUEADO
+  if (!userId) {
     return (
-      <main className="pt-40 pb-32 px-10 max-w-md mx-auto flex flex-col items-center text-center space-y-8">
-        <div className="w-24 h-24 bg-[#1a1c1c] rounded-[2rem] flex items-center justify-center border border-white/10 shadow-2xl relative">
+      <main className="pt-24 pb-32 px-10 max-w-md mx-auto flex flex-col items-center text-center space-y-8">
+        <div className="w-24 h-24 glass-panel rounded-[2rem] flex items-center justify-center relative">
           <User className="w-10 h-10 text-[#bccbb9]/20" />
-          <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-red-500 rounded-2xl flex items-center justify-center border-4 border-[#121414]">
-            <Lock className="w-4 h-4 text-white" />
+          <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[#4be277] rounded-2xl flex items-center justify-center border-4 border-[#121414]">
+            <Lock className="w-4 h-4 text-[#121414]" />
           </div>
         </div>
         
         <div className="space-y-3">
-          <h2 className="font-display text-4xl font-black text-white uppercase italic tracking-tighter">Zona Restringida</h2>
+          <h2 className="font-display text-4xl font-black text-white uppercase italic tracking-tighter">Mi Perfil</h2>
           <p className="text-[#bccbb9] text-[10px] font-bold uppercase tracking-[0.2em] leading-relaxed">
-            Inicia sesión o regístrate para gestionar tu perfil, <br />
-            ver tus estadísticas y ganar trofeos.
+            Inicia sesión para gestionar tus datos, <br />
+            cambiar tu llave personal y acceder <br />
+            a la configuración de administrador.
           </p>
         </div>
 
@@ -78,505 +112,180 @@ export default function ProfileView() {
         </motion.button>
         
         <p className="text-[8px] font-black text-[#bccbb9]/30 uppercase tracking-[0.4em] italic pt-12">
-          Ramito Fut Show • v1.0.7
+          Seguridad Ramito Fut Show • v1.0.7
         </p>
       </main>
     );
   }
 
-  const [userRole, setUserRole] = useState<UserRole>(role);
-  
-  const [isEditingPhone, setIsEditingPhone] = useState(false);
-  const [tempPhone, setTempPhone] = useState(adminPhone);
+  if (loading) return null;
 
-  const [isEditingKey, setIsEditingKey] = useState(false);
-  const [tempKey, setTempKey] = useState('');
-
-  const [showProfileSettings, setShowProfileSettings] = useState(false);
-  const [isDrawingPattern, setIsDrawingPattern] = useState(false);
-  const [newPattern, setNewPattern] = useState<number[]>([]);
-
-  const name = userRole === 'admin_elite' ? 'Elite' : userRole === 'admin_vip' ? 'VIP' : localStorage.getItem('ramito_user_name') || 'Ramito Player';
-  const playerPin = localStorage.getItem('ramito_user_pin') || '1234';
-  
-  const isAdmin = userRole === 'admin_elite' || userRole === 'admin_vip';
-  const currentKey = isAdmin 
-    ? (userRole === 'admin_elite' ? eliteKey : vipKey) 
-    : playerPin;
-
-  const toggleRole = () => {
-    const roles: UserRole[] = ['player', 'admin_elite', 'admin_vip'];
-    const currentIndex = roles.indexOf(userRole);
-    const nextRole = roles[(currentIndex + 1) % roles.length];
-    setUserRole(nextRole);
-    localStorage.setItem('ramito_user_role', nextRole);
-  };
-
-  const isVIP = userRole === 'admin_vip';
-  const isElite = userRole === 'admin_elite';
-
-  const handlePhoneSave = async () => {
-    setAdminPhone(tempPhone);
-    await supabase.from('system_settings').update({ admin_phone: tempPhone }).eq('id', 1);
-    setIsEditingPhone(false);
-  };
-
-  const handleKeySave = async () => {
-    if (userRole === 'admin_elite') setEliteKey(tempKey);
-    else if (userRole === 'admin_vip') setVipKey(tempKey);
-    else localStorage.setItem('ramito_user_pin', tempKey);
-    
-    const userId = localStorage.getItem('ramito_user_id');
-    if (userId) await supabase.from('profiles').update({ pin: tempKey }).eq('id', userId);
-    
-    setIsEditingKey(false);
-  };
-
-  const handlePatternNode = async (node: number) => {
-    if (newPattern.includes(node)) return;
-    const p = [...newPattern, node];
-    setNewPattern(p);
-    if (p.length >= 6) {
-      const patternStr = p.join('');
-      if (userRole === 'admin_elite') setEliteKey(patternStr);
-      else if (userRole === 'admin_vip') setVipKey(patternStr);
-      else localStorage.setItem('ramito_user_pin', patternStr);
-      
-      const userId = localStorage.getItem('ramito_user_id');
-      if (userId) await supabase.from('profiles').update({ pin: patternStr }).eq('id', userId);
-
-      setTimeout(() => {
-        setIsDrawingPattern(false);
-        setNewPattern([]);
-      }, 800);
-    }
-  };
-
-  const payments = [
-    { id: 1, user: 'Agus Castro', amount: '$45.00', status: 'Pagado', date: 'Hoy, 18:30', field: 'Cancha 1' },
-    { id: 2, user: 'Juan Perez', amount: '$30.00', status: 'Pagado', date: 'Ayer, 20:00', field: 'Cancha 2' },
-    { id: 3, user: 'Maria G.', amount: '$45.00', status: 'Pendiente', date: 'Ayer, 21:00', field: 'Cancha 1' },
-  ];
 
   return (
-    <main className="pt-32 pb-32 px-5 max-w-2xl mx-auto space-y-10">
-      {/* Header with Notification Bell */}
-      <div className="flex justify-between items-start mb-6 w-full">
-         <div className="flex-1 opacity-0">spacer</div> {/* Spacer to center avatar better or just keep space */}
-         <div className="flex-1"></div>
-         <NotificationBell />
-      </div>
-
-      {/* Restructured Header */}
-      <div className="flex flex-col items-center space-y-6">
-        <div className="flex flex-col items-center text-center space-y-4">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="relative cursor-pointer"
-            onClick={toggleRole}
-          >
-            <div className={`w-32 h-32 rounded-[2.5rem] p-[2px] shadow-[0_0_40px_rgba(255,145,0,0.1)] transition-all ${
-              isVIP ? 'bg-gradient-to-br from-[#FF9100] via-[#4be277] to-[#D32F2F]' : isElite ? 'bg-blue-500/50' : 'bg-white/10'
-            }`}>
-              <div className="w-full h-full rounded-[2.45rem] bg-[#121414] overflow-hidden">
-                <img 
-                  src={isVIP || isElite 
-                    ? "https://images.unsplash.com/photo-1519085185750-74071727339a?auto=format&fit=crop&q=80&w=300&h=300"
-                    : "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=300&h=300"
-                  } 
-                  alt="Avatar"
-                  className={`w-full h-full object-cover ${isVIP || isElite ? 'grayscale-0' : 'grayscale'}`}
-                />
+    <main className="pt-16 pb-32 px-5 max-w-lg mx-auto min-h-screen">
+      {/* HEADER PERFIL */}
+      <div className="relative mb-10">
+        <div className="flex items-center gap-6">
+          <div className="relative">
+            <div className="w-24 h-24 rounded-[2.5rem] bg-gradient-to-br from-[#4be277] to-[#121414] p-1 shadow-2xl shadow-[#4be277]/20">
+              <div className="w-full h-full rounded-[2.2rem] bg-[#121414] flex items-center justify-center overflow-hidden">
+                <User className="w-12 h-12 text-[#4be277]" />
               </div>
             </div>
-          </motion.div>
-
-          <div className="space-y-1">
-            <h2 className="font-display text-3xl font-black text-white uppercase italic tracking-tighter">
-              {name}
-            </h2>
-            <div className="flex flex-col items-center gap-2">
-              <div className="px-2 py-0.5 bg-white/5 rounded-full border border-white/10">
-                <span className="text-[#bccbb9] text-[8px] font-black uppercase tracking-[0.2em]">
-                  {isVIP ? 'ADMINISTRADOR VIP' : isElite ? 'ADMINISTRADOR ELITE' : 'JUGADOR'}
-                </span>
-              </div>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-[#4be277] flex items-center justify-center border-4 border-[#121414]">
+              <ShieldCheck className="w-4 h-4 text-[#121414]" />
+            </div>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">{userData?.name || 'Cargando...'}</h2>
+            <div className="flex items-center gap-2 mt-2">
+              <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
+                userRole?.includes('admin') ? 'bg-[#4be277]/10 border-[#4be277]/30 text-[#4be277]' : 'bg-white/5 border-white/10 text-[#bccbb9]'
+              }`}>
+                {userRole === 'admin_elite' ? '👑 ELITE ADMIN' : (userRole === 'admin_vip' ? '💎 VIP ADMIN' : '⚽ JUGADOR')}
+              </span>
             </div>
           </div>
         </div>
-
-        {/* Mi Perfil Button (Toggles Settings) */}
-        <button 
-          onClick={() => setShowProfileSettings(!showProfileSettings)}
-          className={`w-full max-w-xs h-14 rounded-2xl flex items-center justify-between px-6 transition-all border ${
-            showProfileSettings 
-              ? 'bg-[#4be277]/10 border-[#4be277]/30 text-[#4be277]' 
-              : 'bg-white/5 border-white/10 text-white hover:bg-white/10'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <User className="w-4 h-4" />
-            <span className="text-[10px] font-black uppercase tracking-widest italic">Mi Perfil / Seguridad</span>
-          </div>
-          <motion.div
-            animate={{ rotate: showProfileSettings ? 180 : 0 }}
-          >
-            <ChevronDown className="w-4 h-4" />
-          </motion.div>
-        </button>
-
-        {/* Profile Settings (Key/Pattern) */}
-        <AnimatePresence>
-          {showProfileSettings && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="w-full space-y-4 overflow-hidden"
-            >
-              <div className="bg-[#1a1c1c] rounded-[2rem] border border-white/5 p-6 space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[9px] font-bold text-[#bccbb9] uppercase tracking-widest">Configuración de Acceso</span>
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => setIsDrawingPattern(false)}
-                        className={`text-[8px] font-black uppercase tracking-widest transition-all ${!isDrawingPattern ? 'text-[#4be277]' : 'text-white/20'}`}
-                      >
-                        Código
-                      </button>
-                      <button 
-                        onClick={() => setIsDrawingPattern(true)}
-                        className={`text-[8px] font-black uppercase tracking-widest transition-all ${isDrawingPattern ? 'text-[#4be277]' : 'text-white/20'}`}
-                      >
-                        Patrón
-                      </button>
-                    </div>
-                  </div>
-
-                  {!isDrawingPattern ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between bg-black/20 p-4 rounded-xl border border-white/5 group">
-                        <div className="flex items-center gap-3">
-                          <Lock className="w-4 h-4 text-blue-500" />
-                          <div>
-                            <span className="text-[8px] text-[#bccbb9] uppercase block tracking-widest">
-                              {isAdmin ? 'Clave Maestra' : 'Pin Personal'}
-                            </span>
-                            {isEditingKey ? (
-                              <input 
-                                type="text"
-                                value={tempKey}
-                                onChange={(e) => setTempKey(e.target.value)}
-                                className="bg-transparent border-b border-blue-500/50 text-white font-black text-sm outline-none w-24 tracking-[0.4em]"
-                                autoFocus
-                              />
-                            ) : (
-                              <span className="text-sm font-black text-white tracking-[0.4em]">{currentKey}</span>
-                            )}
-                          </div>
-                        </div>
-                        {isEditingKey ? (
-                          <button onClick={handleKeySave} className="text-[9px] font-black text-[#4be277] uppercase">Guardar</button>
-                        ) : (
-                          <button onClick={() => { setTempKey(currentKey); setIsEditingKey(true); }}>
-                            <Edit3 className="w-3 h-3 text-white/40" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center space-y-4 py-4">
-                      <div className="grid grid-cols-3 gap-4 p-4 bg-black/20 rounded-3xl border border-white/5">
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((node) => (
-                          <motion.button
-                            key={node}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handlePatternNode(node)}
-                            className={`w-10 h-10 rounded-full border-2 transition-all flex items-center justify-center ${
-                              newPattern.includes(node) 
-                                ? 'bg-blue-500 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)]' 
-                                : 'bg-white/5 border-white/10'
-                            }`}
-                          >
-                            <div className={`w-1.5 h-1.5 rounded-full ${newPattern.includes(node) ? 'bg-white' : 'bg-white/20'}`} />
-                          </motion.button>
-                        ))}
-                      </div>
-                      <p className="text-[8px] font-bold text-[#bccbb9] uppercase tracking-widest italic">
-                        {newPattern.length > 0 ? `Trazando: ${newPattern.length}/6 nodos` : 'Dibuja el nuevo patrón'}
-                      </p>
-                    </div>
-                  )}
-
-                  {isAdmin && (
-                    <div className="space-y-3 pt-2">
-                      <span className="text-[8px] font-bold text-[#bccbb9] uppercase tracking-widest block">Contacto de Administración</span>
-                      <div className="flex items-center justify-between group">
-                        <div className="flex items-center gap-3">
-                          <Phone className="w-4 h-4 text-[#FF9100]" />
-                          {isEditingPhone ? (
-                            <input 
-                              type="text"
-                              value={tempPhone}
-                              onChange={(e) => setTempPhone(e.target.value)}
-                              className="bg-transparent border-b border-[#FF9100]/50 text-white font-bold text-xs outline-none"
-                              autoFocus
-                            />
-                          ) : (
-                            <span className="text-xs font-bold text-white tracking-widest">{adminPhone}</span>
-                          )}
-                        </div>
-                        {isEditingPhone ? (
-                          <button onClick={handlePhoneSave} className="text-[9px] font-black text-[#4be277] uppercase">Listo</button>
-                        ) : (
-                          <button onClick={() => setIsEditingPhone(true)}>
-                            <Edit3 className="w-3 h-3 text-white/40" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
-      {/* Admin License Control */}
-      {(isVIP || isElite) && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-4"
-        >
-          <div className="flex justify-between items-end px-2">
-            <h3 className="text-[10px] font-black text-[#FF9100] uppercase tracking-[0.3em]">Gestión de Licencias</h3>
-            <span className="text-[9px] font-black text-[#bccbb9]/40 uppercase tracking-widest italic">Expira en 30 días</span>
-          </div>
+      {/* TABS NAVEGACIÓN */}
+      <div className="flex gap-2 p-1.5 glass-panel rounded-2xl border border-white/5 mb-8">
+        {(['perfil', 'seguridad', 'soporte'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+              activeTab === tab ? 'bg-white/10 text-white shadow-xl border border-white/10' : 'text-[#bccbb9]/40'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
 
-          <div className="grid grid-cols-1 gap-3">
-             {/* Licencia App */}
-            <div className="bg-[#1a1c1c] rounded-[2rem] border border-white/5 p-6">
+      <AnimatePresence mode="wait">
+        {/* VISTA PERFIL */}
+        {activeTab === 'perfil' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-4">
+            <div className="glass-panel rounded-3xl border border-white/5 p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
-                    appLicenseActive ? 'bg-[#4be277]/10 text-[#4be277]' : 'bg-red-500/10 text-red-500'
-                  }`}>
-                    <Zap className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="text-white text-sm font-black uppercase italic tracking-wider">Licencia App</h4>
-                    <p className="text-[10px] font-bold text-[#bccbb9] uppercase tracking-widest mt-0.5">
-                      {appLicenseActive ? 'ACTIVA' : 'EXPIRADA'}
-                    </p>
-                  </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-[#bccbb9]/40 uppercase tracking-widest">Correo Electrónico</p>
+                  <p className="text-sm font-black text-white uppercase italic">{userData?.email}</p>
                 </div>
-
-                {isVIP ? (
-                  <button 
-                    onClick={async () => {
-                      const newVal = !appLicenseActive;
-                      setAppLicenseActive(newVal);
-                      await supabase.from('system_settings').update({ app_license_active: newVal }).eq('id', 1);
-                    }}
-                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
-                      appLicenseActive 
-                        ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
-                        : 'bg-[#4be277] text-[#121414]'
-                    }`}
-                  >
-                    {appLicenseActive ? 'Desactivar' : 'Activar'}
-                  </button>
-                ) : (
-                  <div className={`w-3 h-3 rounded-full animate-pulse ${appLicenseActive ? 'bg-[#4be277]' : 'bg-red-500'}`} />
-                )}
+                <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+                  <User className="w-5 h-5 text-[#bccbb9]" />
+                </div>
               </div>
             </div>
 
-            {/* Licencia Dominio Web */}
-            <div className="bg-[#1a1c1c] rounded-[2rem] border border-white/5 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
-                    webLicenseActive ? 'bg-blue-500/10 text-blue-500' : 'bg-red-500/10 text-red-500'
-                  }`}>
-                    <Settings className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="text-white text-sm font-black uppercase italic tracking-wider">Web Domain</h4>
-                    <p className="text-[10px] font-bold text-[#bccbb9] uppercase tracking-widest mt-0.5">
-                      {webLicenseActive ? 'DOMINIO ACTIVO' : 'ERROR DNS'}
-                    </p>
-                  </div>
-                </div>
-
-                {isVIP ? (
-                  <button 
-                    onClick={async () => {
-                      const newVal = !webLicenseActive;
-                      setWebLicenseActive(newVal);
-                      await supabase.from('system_settings').update({ web_license_active: newVal }).eq('id', 1);
-                    }}
-                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
-                      webLicenseActive 
-                        ? 'bg-red-500/10 text-red-500 border border-red-500/20' 
-                        : 'bg-blue-500 text-white'
-                    }`}
-                  >
-                    {webLicenseActive ? 'Desactivar' : 'Activar'}
-                  </button>
-                ) : (
-                  <div className={`w-3 h-3 rounded-full animate-pulse ${webLicenseActive ? 'bg-blue-500' : 'bg-red-500'}`} />
-                )}
+            <div className="glass-panel rounded-3xl border border-white/5 p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <Key className="w-5 h-5 text-[#FF9100]" />
+                <h3 className="text-xs font-black text-white uppercase italic">Cambiar Mi Llave Personal</h3>
+              </div>
+              <div className="space-y-4">
+                <input 
+                  type="password" 
+                  value={newPersonalKey}
+                  onChange={(e) => setNewPersonalKey(e.target.value)}
+                  placeholder="NUEVA LLAVE" 
+                  className="w-full h-14 bg-black/40 border border-white/10 rounded-2xl px-6 text-white font-black tracking-[0.3em] outline-none focus:border-[#FF9100]/50 transition-all"
+                />
+                <button 
+                  onClick={handleUpdatePersonalKey}
+                  className="w-full h-14 bg-[#FF9100] text-black font-black rounded-2xl uppercase text-[10px] tracking-widest italic shadow-lg shadow-[#FF9100]/20"
+                >
+                  Actualizar Mi Llave
+                </button>
               </div>
             </div>
-          </div>
 
-          <div className="space-y-4 pt-4">
-            <h3 className="text-[10px] font-black text-[#4be277] uppercase tracking-[0.3em] ml-2">Control Operativo</h3>
-            <div className="bg-[#1a1c1c] rounded-[2.5rem] border border-white/5 p-8 space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${
-                    isComplexOpen ? 'bg-[#4be277]/10 text-[#4be277]' : 'bg-red-500/10 text-red-500'
-                  }`}>
-                    <Target className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="text-white text-sm font-black uppercase italic tracking-wider">Estado Complejo</h4>
-                    <p className="text-[10px] font-bold text-[#bccbb9] uppercase tracking-widest mt-0.5">
-                      {isComplexOpen ? 'ABIERTO' : 'CERRADO'}
-                    </p>
-                  </div>
-                </div>
-
-                {isVIP ? (
-                  <button 
-                    onClick={async () => {
-                      const newVal = !isComplexOpen;
-                      setIsComplexOpen(newVal);
-                      await supabase.from('system_settings').update({ is_complex_open: newVal }).eq('id', 1);
-                    }}
-                    className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
-                      isComplexOpen 
-                        ? 'bg-red-500/10 text-red-500 border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]' 
-                        : 'bg-[#4be277] text-[#121414] shadow-[0_0_15px_rgba(75,226,119,0.2)]'
-                    }`}
-                  >
-                    {isComplexOpen ? 'Cerrar' : 'Abrir'}
-                  </button>
-                ) : (
-                  <div className="flex flex-col items-end">
-                    <div className={`w-3 h-3 rounded-full mb-1 animate-pulse ${isComplexOpen ? 'bg-[#4be277]' : 'bg-red-500'}`} />
-                    <span className="text-[8px] font-bold text-[#bccbb9] uppercase tracking-widest">Lectura</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Auditoría Section */}
-      {(isVIP || isElite) && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-4"
-        >
-          <div className="flex justify-between items-end px-2">
-            <h3 className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em]">Auditoría de Pagos</h3>
-            <div className="flex items-center gap-1 text-[9px] font-black text-[#4be277] uppercase tracking-widest italic">
-              <DollarSign className="w-3 h-3" />
-              Total: $120.00
-            </div>
-          </div>
-
-          <div className="bg-[#1a1c1c] rounded-[2.5rem] border border-white/5 p-4 space-y-2">
-            {payments.map((p) => (
-              <div key={p.id} className="flex items-center justify-between p-4 bg-white/[0.02] rounded-2xl border border-white/5 hover:bg-white/[0.04] transition-colors group">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-                    <Users className="w-5 h-5 text-[#bccbb9]" />
-                  </div>
-                  <div>
-                    <h5 className="text-white text-[11px] font-black uppercase italic">{p.user}</h5>
-                    <p className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest">{p.field} • {p.date}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="block text-white text-xs font-black tracking-widest">{p.amount}</span>
-                  <div className="flex items-center gap-1 justify-end mt-0.5">
-                    {p.status === 'Pagado' ? (
-                      <CheckCircle2 className="w-3 h-3 text-[#4be277]" />
-                    ) : (
-                      <Clock className="w-3 h-3 text-[#FF9100]" />
-                    )}
-                    <span className={`text-[8px] font-black uppercase tracking-widest ${p.status === 'Pagado' ? 'text-[#4be277]' : 'text-[#FF9100]'}`}>
-                      {p.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button className="w-full py-4 text-[9px] font-black text-[#bccbb9]/40 uppercase tracking-widest flex items-center justify-center gap-2 hover:text-[#bccbb9] transition-colors">
-              <FileSearch className="w-4 h-4" />
-              Ver Reporte Completo
+            <button onClick={handleLogout} className="w-full h-16 rounded-2xl border border-red-500/20 bg-red-500/5 flex items-center justify-center gap-3 text-red-500 font-black uppercase text-[10px] tracking-[0.2em] hover:bg-red-500/10 transition-all italic">
+              Cerrar Sesión <LogOut className="w-4 h-4" />
             </button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Info List */}
-      <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="space-y-4 pt-10"
-      >
-        {!isVIP && !isElite && (
-          <div className="bg-[#1a1c1c] rounded-[2.5rem] border border-white/5 p-8 flex flex-col items-center gap-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-[#FF9100]/10 flex items-center justify-center">
-              <Trophy className="w-6 h-6 text-[#FF9100]" />
-            </div>
-            <div className="space-y-1">
-              <h4 className="text-white text-sm font-black uppercase italic tracking-widest">Estado de Cuenta</h4>
-              <p className="text-[#bccbb9] text-[10px] font-bold uppercase tracking-widest leading-loose">
-                Miembro Élite • Jugador Destacado<br />
-                <span className="text-[#4be277]">Al día con las reservas</span>
-              </p>
-            </div>
-          </div>
+          </motion.div>
         )}
 
-        {/* Logout */}
-        <button 
-          onClick={async () => {
-             const sessionId = localStorage.getItem('ramito_current_session_id');
-             if (sessionId) {
-               await supabase.from('active_sessions').delete().eq('id', sessionId);
-             }
-             localStorage.removeItem('ramito_user_role');
-             localStorage.removeItem('ramito_user_name');
-             localStorage.removeItem('ramito_user_pin');
-             localStorage.removeItem('ramito_user_id');
-             localStorage.removeItem('ramito_current_session_id');
-             window.location.href = '/';
-          }}
-          className="w-full flex items-center justify-center gap-4 p-6 rounded-[2rem] bg-[#1a1c1c]/40 border border-white/5 text-[#D32F2F] hover:bg-[#D32F2F]/10 transition-all active:scale-[0.98] group"
-        >
-          <LogOut className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span className="text-[11px] font-black uppercase tracking-[0.3em] italic">Cerrar Sesión</span>
-        </button>
-      </motion.div>
+        {/* VISTA SEGURIDAD (SOLO ADMINS) */}
+        {activeTab === 'seguridad' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+            {!userRole?.includes('admin') ? (
+              <div className="glass-panel p-10 rounded-3xl border border-white/5 text-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto border border-yellow-500/20">
+                  <AlertTriangle className="w-8 h-8 text-yellow-500" />
+                </div>
+                <p className="text-[10px] font-black text-[#bccbb9] uppercase tracking-widest italic">Acceso restringido a administradores</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="glass-panel rounded-[2.5rem] border border-white/5 p-8 space-y-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20">
+                      <ShieldCheck className="w-6 h-6 text-[#4be277]" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-black text-white uppercase italic tracking-widest">Gestión de Llaves Maestras</h3>
+                      <p className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest">Configura el acceso administrativo</p>
+                    </div>
+                  </div>
 
-      {/* Footer Hint */}
-      <p className="text-center text-[8px] font-black text-[#bccbb9]/20 uppercase tracking-[0.4em] italic pt-8">
-        El Show debe continuar • v1.0.7
-      </p>
+                  <div className="space-y-6">
+                    {userRole === 'admin_elite' && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-[#4be277] uppercase tracking-widest ml-1 italic">👑 Llave Elite Admin</label>
+                        <input type="text" value={newEliteKey} onChange={(e) => setNewEliteKey(e.target.value)} className="w-full h-16 bg-black/40 border border-[#4be277]/30 rounded-2xl px-6 text-white font-black tracking-[0.3em] outline-none shadow-[0_0_20px_rgba(75,226,119,0.1)] focus:border-[#4be277]" />
+                      </div>
+                    )}
+
+                    {(userRole === 'admin_vip' || userRole === 'admin_elite') && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-[#FFD600] uppercase tracking-widest ml-1 italic">💎 Llave VIP Admin</label>
+                        <input type="text" value={newVipKey} onChange={(e) => setNewVipKey(e.target.value)} className="w-full h-16 bg-black/40 border border-[#FFD600]/30 rounded-2xl px-6 text-white font-black tracking-[0.3em] outline-none shadow-[0_0_20px_rgba(255,214,0,0.1)] focus:border-[#FFD600]" />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-[#bccbb9] uppercase tracking-widest ml-1 italic">📱 WhatsApp de Soporte</label>
+                      <input type="text" value={newAdminPhone} onChange={(e) => setNewAdminPhone(e.target.value)} className="w-full h-16 bg-white/[0.02] border border-white/10 rounded-2xl px-6 text-white font-black outline-none focus:border-white/30" />
+                    </div>
+                  </div>
+
+                  <button onClick={handleSaveKeys} className="w-full h-16 bg-[#4be277] text-[#121414] rounded-2xl font-black uppercase text-[11px] tracking-[0.2em] shadow-xl shadow-[#4be277]/20 flex items-center justify-center gap-3 italic transition-transform active:scale-95">
+                    Guardar Configuración <Save className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="bg-red-500/5 border border-red-500/10 p-5 rounded-2xl flex gap-4">
+                  <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0" />
+                  <p className="text-[9px] font-bold text-red-500/60 uppercase tracking-widest leading-relaxed italic">
+                    Cualquier cambio en las llaves maestras afectará el acceso de todo el personal. Úsalas con extrema precaución.
+                  </p>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* VISTA SOPORTE */}
+        {activeTab === 'soporte' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+            <div className="glass-panel rounded-[2.5rem] border border-white/5 p-8 text-center space-y-6">
+              <div className="w-20 h-20 rounded-[2rem] bg-[#25D366]/10 flex items-center justify-center mx-auto border border-[#25D366]/20">
+                <MessageCircle className="w-10 h-10 text-[#25D366] animate-pulse" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Asistencia Directa</h3>
+                <p className="text-[10px] font-bold text-[#bccbb9]/40 uppercase tracking-widest max-w-[200px] mx-auto">¿Tienes problemas con tu llave o reserva? Háblanos por WhatsApp.</p>
+              </div>
+              <a href={`https://wa.me/${adminPhone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 w-full h-16 bg-[#25D366] text-white rounded-2xl font-black uppercase text-[11px] tracking-widest shadow-xl shadow-[#25D366]/20 hover:scale-[1.02] transition-all">
+                Abrir Chat de Soporte <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

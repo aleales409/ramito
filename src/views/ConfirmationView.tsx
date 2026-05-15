@@ -1,35 +1,57 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2, Calendar, Clock, Trophy, Wallet, Receipt, Copy, Info } from 'lucide-react';
 
 export default function ConfirmationView() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'cash'>('transfer');
+
+  // Read data passed from BookingView
+  const { court, time, date } = (location.state || {}) as { court?: any; time?: string; date?: string };
+  const courtName = court?.name || 'Cancha Ramito Fut Show';
+  const courtImage = court?.imageUrl || 'https://lh3.googleusercontent.com/aida-public/AB6AXuDI2rR_zidKFtJFxsXgf-iBEkAl2R-EfWM9xwF87LMnUecRPj-EU8uVrmO5z29sIThB3bNFTDI-aoGQDn_93BuqWLdS-srGtl1K1actD1HXlEMP1Nw6SPpHHFgqu2NHg_32Ko675tdbIxjyUU8a-aB0jpjGbFu1Dwj6su5LFlHhxj73Yr-qS3Wf8fvBBdB9RVAi870qod4DA7yyVuVB-f9XPA7cNpK54mQfrUMcZyUIP58WddmJCOdL0q-qlbIediyoUbNPc2dAyQId';
+  const slotTime = time || '19:00';
+  const slotDate = date || 'Lunes 24 Mayo';
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const status = paymentMethod === 'transfer' ? 'pending_payment' : 'upcoming';
-    localStorage.setItem('last_booking_status', status);
-    localStorage.setItem('last_payment_method', paymentMethod);
+    const userName = localStorage.getItem('ramito_user_name') || 'Anónimo';
     
-    // Pass real data
-    navigate('/success', { 
-      state: { 
-        bookingData: {
-          date: 'Lunes 24 Octubre',
-          time: '19:00',
-          field: 'Sede Norte'
-        }
-      }
-    });
+    const bookingData = {
+      date: slotDate,
+      time: slotTime,
+      field: courtName,
+      amount: 'S/ 125.00',
+      user: userName,
+      status: status,
+      payment_method: paymentMethod,
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      const { supabase } = await import('../lib/supabase');
+      const { error } = await supabase.from('bookings').insert([bookingData]);
+      if (error) throw error;
+
+      localStorage.setItem('last_booking_status', status);
+      localStorage.setItem('last_payment_method', paymentMethod);
+      
+      navigate('/success', { state: { bookingData } });
+    } catch (err) {
+      console.error('Error saving booking:', err);
+      // Fallback for demo
+      navigate('/success', { state: { bookingData } });
+    }
   };
 
   return (
-    <main className="px-5 space-y-6 mt-24 mb-32 max-w-md mx-auto">
+    <main className="px-5 space-y-6 mt-12 mb-32 max-w-md mx-auto">
       {/* Resumen de la Reserva */}
       <section className="space-y-4">
         <h2 className="font-display text-xl font-bold flex items-center gap-2 uppercase italic text-white">
@@ -40,9 +62,9 @@ export default function ConfirmationView() {
         <div className="bg-[#1a1c1c]/60 backdrop-blur-xl rounded-3xl overflow-hidden shadow-2xl border border-white/10">
           <div className="relative h-48">
             <img
-              alt="Estadio El Campín"
+              alt={courtName}
               className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDI2rR_zidKFtJFxsXgf-iBEkAl2R-EfWM9xwF87LMnUecRPj-EU8uVrmO5z29sIThB3bNFTDI-aoGQDn_93BuqWLdS-srGtl1K1actD1HXlEMP1Nw6SPpHHFgqu2NHg_32Ko675tdbIxjyUU8a-aB0jpjGbFu1Dwj6su5LFlHhxj73Yr-qS3Wf8fvBBdB9RVAi870qod4DA7yyVuVB-f9XPA7cNpK54mQfrUMcZyUIP58WddmJCOdL0q-qlbIediyoUbNPc2dAyQId"
+              src={courtImage}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#121414] to-transparent"></div>
             <div className="absolute bottom-4 left-4">
@@ -52,15 +74,15 @@ export default function ConfirmationView() {
             </div>
           </div>
           <div className="p-5 space-y-4">
-            <h3 className="font-display text-lg font-bold text-white uppercase italic">Estadio El Campín - Sede Norte</h3>
+            <h3 className="font-display text-lg font-bold text-white uppercase italic">{courtName}</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3 text-[#bccbb9]">
                 <Calendar className="w-5 h-5 text-[#4ae176]" />
-                <span className="text-xs font-semibold uppercase">Lunes 24 de Octubre, 2026</span>
+                <span className="text-xs font-semibold uppercase">{slotDate}</span>
               </div>
               <div className="flex items-center gap-3 text-[#bccbb9]">
                 <Clock className="w-5 h-5 text-[#4ae176]" />
-                <span className="text-xs font-semibold uppercase">19:00 - 20:00 (1 Hora)</span>
+                <span className="text-xs font-semibold uppercase">{slotTime} (1 Hora)</span>
               </div>
               <div className="flex items-center gap-3 text-[#bccbb9]">
                 <Trophy className="w-5 h-5 text-[#4ae176]" />
@@ -70,6 +92,7 @@ export default function ConfirmationView() {
           </div>
         </div>
       </section>
+
 
       {/* Detalles de Pago */}
       <section className="bg-[#1a1c1c]/60 backdrop-blur-xl rounded-3xl p-5 space-y-4 border border-white/10">

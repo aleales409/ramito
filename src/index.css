@@ -5,13 +5,16 @@
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Montserrat", sans-serif;
 
-  --color-background-base: #121414;
-  --color-surface-base: #1e2020;
+  --color-background-base: #060807;
+  --color-surface-base: #121414;
   --color-primary-base: #4be277;
   --color-secondary-base: #b3d17a;
   --color-brand-orange: #FF9100;
   --color-brand-red: #D32F2F;
   --color-brand-yellow: #FFD600;
+  
+  /* Gradientes Premium - Más vibrantes para que se noten */
+  --bg-gradient-premium: radial-gradient(circle at 50% -10%, #1d4d2e 0%, #060807 80%);
   
   /* Custom transitions */
   --animate-marquee: marquee 20s linear infinite;
@@ -24,17 +27,50 @@
 
 @layer components {
   .glass-panel {
-    background: rgba(18, 20, 20, 0.6);
+    background: rgba(255, 255, 255, 0.03);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  }
+
+  .main-bg-container {
+    position: relative;
+    background: var(--bg-gradient-premium);
+    overflow: hidden;
+  }
+  
+  /* Capa de textura y profundidad */
+  .premium-overlay {
+    position: absolute;
+    inset: 0;
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(75, 226, 119, 0.05) 0%, transparent 50%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3%3Ffilter id='noiseFilter'%3E%3FfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    opacity: 0.15;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Patrón de red sutil - Aumentada visibilidad */
+  .pitch-pattern {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 50px 50px;
+    mask-image: radial-gradient(circle at 50% 0%, black, transparent 90%);
+    z-index: 2;
+    pointer-events: none;
   }
   
   .pitch-gradient {
-    background: linear-gradient(180deg, rgba(18, 24, 24, 0) 0%, rgba(18, 20, 20, 1) 85%);
+    background: linear-gradient(180deg, rgba(6, 8, 7, 0) 0%, rgba(6, 8, 7, 1) 90%);
   }
   
   .action-button-shadow {
-    box-shadow: 0 0 20px rgba(75, 226, 119, 0.3);
+    box-shadow: 0 0 30px rgba(75, 226, 119, 0.2);
   }
 
   .no-scrollbar::-webkit-scrollbar {

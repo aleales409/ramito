@@ -36,8 +36,8 @@ export default function MyBookingsView() {
 
   if (!userName && !isAdmin) {
     return (
-      <main className="pt-40 pb-32 px-10 max-w-md mx-auto flex flex-col items-center text-center space-y-8">
-        <div className="w-24 h-24 bg-[#1a1c1c] rounded-[2rem] flex items-center justify-center border border-white/10 shadow-2xl relative">
+      <main className="pt-20 pb-32 px-10 max-w-md mx-auto flex flex-col items-center text-center space-y-8">
+        <div className="w-24 h-24 glass-panel rounded-[2rem] flex items-center justify-center relative">
           <CalendarDays className="w-10 h-10 text-[#bccbb9]/20" />
           <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-[#FF9100] rounded-2xl flex items-center justify-center border-4 border-[#121414]">
             <Lock className="w-4 h-4 text-[#121414]" />
@@ -112,30 +112,43 @@ export default function MyBookingsView() {
     }
   };
 
-  const approvePayment = (id: string) => {
+  const approvePayment = async (id: string) => {
     const booking = bookings.find((b: any) => b.id === id);
-    setAllBookings((prev: any) => prev.map((b: any) => 
-      b.id === id ? { ...b, status: 'upcoming' } : b
-    ));
+    
+    try {
+      const { supabase } = await import('../lib/supabase');
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'upcoming' })
+        .eq('id', id);
 
-    // Notify Player
-    setNotifications((prev: any) => [...prev, {
-      title: 'Pago Validado',
-      body: `Tu reserva para el ${booking?.date} ha sido confirmada por el administrador.`,
-      time: 'Ahora',
-      read: false
-    }]);
+      if (error) throw error;
+
+      setAllBookings((prev: any) => prev.map((b: any) => 
+        b.id === id ? { ...b, status: 'upcoming' } : b
+      ));
+
+      // Notify Player
+      setNotifications((prev: any) => [...prev, {
+        title: 'Pago Validado',
+        body: `Tu reserva para el ${booking?.date} ha sido confirmada por el administrador.`,
+        time: 'Ahora',
+        read: false
+      }]);
+    } catch (err) {
+      console.error('Error approving payment:', err);
+    }
   };
 
   return (
-    <main className="pt-32 pb-32 px-5 max-w-2xl mx-auto space-y-6">
+    <main className="pt-16 pb-32 px-5 max-w-2xl mx-auto space-y-6">
       <AnimatePresence>
         {showSuccessToast && (
           <motion.div
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 20, opacity: 1 }}
             exit={{ y: -100, opacity: 0 }}
-            className="fixed top-24 left-5 right-5 z-[100] bg-[#4be277] text-[#121414] p-4 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-white/20"
+            className="fixed top-12 left-5 right-5 z-[100] bg-[#4be277] text-[#121414] p-4 rounded-2xl shadow-2xl flex items-center gap-3 border-2 border-white/20"
           >
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
               <Check className="w-6 h-6" strokeWidth={3} />
@@ -170,7 +183,7 @@ export default function MyBookingsView() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 p-1.5 bg-[#1a1c1c] rounded-2xl border border-white/5">
+      <div className="flex gap-2 p-1.5 glass-panel rounded-2xl">
         <button 
           onClick={() => setActiveTab('active')}
           className={`flex-grow py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.15em] italic transition-all ${
@@ -192,7 +205,7 @@ export default function MyBookingsView() {
       {/* Bookings List */}
       <div className="space-y-4">
         {displayBookings.length === 0 ? (
-          <div className="bg-[#1a1c1c] rounded-[2.5rem] border border-white/5 p-16 flex flex-col items-center justify-center text-center space-y-4 opacity-40">
+          <div className="glass-panel rounded-[2.5rem] p-16 flex flex-col items-center justify-center text-center space-y-4 opacity-40">
             <Calendar className="w-10 h-10 text-[#bccbb9]/20" />
             <p className="text-[10px] font-black text-[#bccbb9] uppercase tracking-widest italic">Sin registros en esta vista</p>
           </div>
@@ -202,7 +215,7 @@ export default function MyBookingsView() {
               key={booking.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`relative bg-[#1a1c1c] rounded-[2.5rem] overflow-hidden border transition-all ${
+              className={`relative glass-panel rounded-[2.5rem] overflow-hidden transition-all ${
                 booking.status === 'pending_approval' ? 'border-[#FF9100]/30 shadow-[0_0_30px_rgba(255,145,0,0.1)]' : 
                 booking.status === 'pending_payment' ? 'border-red-500/20' : 'border-white/5'
               }`}
@@ -321,7 +334,7 @@ export default function MyBookingsView() {
               </button>
             </div>
             
-            <div className="w-full max-w-sm aspect-[3/4] bg-[#1a1c1c] rounded-[3rem] overflow-hidden border-4 border-white/10 shadow-2xl relative">
+            <div className="w-full max-w-sm aspect-[3/4] glass-panel rounded-[3rem] overflow-hidden shadow-2xl relative">
               <img src={viewingReceipt} alt="Comprobante" className="w-full h-full object-contain" />
               <div className="absolute top-0 left-0 w-full p-6 bg-gradient-to-b from-[#121414] to-transparent">
                 <span className="text-[10px] font-black text-[#FF9100] uppercase tracking-widest italic">Comprobante de Pago</span>

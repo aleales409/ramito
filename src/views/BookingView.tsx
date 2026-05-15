@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, Star, Filter } from 'lucide-react';
+import { Trophy, Star, Filter, Lock } from 'lucide-react';
 import { COURTS, SLOTS } from '../data';
+import { useApp } from '../context/AppContext';
 
 export default function BookingView() {
   const navigate = useNavigate();
+  const { showToast, allBookings } = useApp();
   const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(24);
+
+  const role = localStorage.getItem('ramito_user_role');
+  const isAdmin = role === 'admin_elite' || role === 'admin_vip';
 
   const selectedCourt = COURTS.find(c => c.id === selectedCourtId);
 
@@ -22,7 +27,7 @@ export default function BookingView() {
   ];
 
   return (
-    <main className="pt-32 pb-24 px-5 max-w-2xl mx-auto">
+    <main className="pt-16 pb-24 px-5 max-w-2xl mx-auto">
       {/* Headline Section */}
       <div className="mb-8">
         <h2 className="font-display text-4xl font-black text-white mb-1 uppercase italic tracking-tighter">Reservar</h2>
@@ -54,7 +59,7 @@ export default function BookingView() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="w-full h-48 rounded-[2.5rem] bg-[#1a1c1c] border-2 border-dashed border-white/5 mb-10 flex flex-col items-center justify-center space-y-3"
+            className="w-full h-48 rounded-[2.5rem] glass-panel border-2 border-dashed border-white/5 mb-10 flex flex-col items-center justify-center space-y-3"
           >
             <div className="p-4 bg-white/5 rounded-full">
               <Star className="w-8 h-8 text-[#bccbb9]/10" />
@@ -75,7 +80,7 @@ export default function BookingView() {
               className={`relative overflow-hidden rounded-[2rem] border-2 transition-all cursor-pointer ${
                 selectedCourtId === court.id 
                   ? 'border-[#FF9100] bg-[#FF9100]/5 shadow-[0_0_30px_rgba(255,145,0,0.2)]' 
-                  : 'border-white/5 bg-[#1a1c1c] grayscale-[0.5] opacity-60'
+                  : 'border-white/5 glass-panel grayscale-[0.5] opacity-60'
               }`}
             >
               <div className="flex gap-5 p-5">
@@ -119,7 +124,7 @@ export default function BookingView() {
           {/* 2. Date Selection */}
           <section>
             <label className="text-[10px] font-bold text-[#FF9100] uppercase tracking-[0.2em] mb-4 block ml-2">2. Selecciona Fecha</label>
-            <div className="bg-[#1a1c1c] border border-white/5 rounded-[2rem] p-5 flex flex-col gap-2">
+            <div className="glass-panel rounded-[2rem] p-5 flex flex-col gap-2">
               <div className="flex gap-3 overflow-x-auto no-scrollbar py-1 snap-x">
                 {days.map((day) => (
                   <button
@@ -150,40 +155,57 @@ export default function BookingView() {
             </div>
             
             <div className="flex gap-4 overflow-x-auto pb-6 snap-x no-scrollbar">
-              {SLOTS.map((slot) => (
-                <motion.div
-                  key={slot.id}
-                  whileHover={{ y: -5 }}
-                  className={`snap-start min-w-[150px] bg-gradient-to-br from-[#1a1c1c] to-[#121414] p-6 rounded-[2rem] border border-white/10 flex flex-col items-center gap-1 shadow-xl ${
-                    slot.status === 'booked' ? 'opacity-40 grayscale pointer-events-none' : 'hover:border-[#FF9100]/30'
-                  }`}
-                >
-                  <span className="text-[#bccbb9] text-[10px] font-black uppercase tracking-[0.2em]">MAY 18</span>
-                  <span className={`font-display text-2xl font-black italic tracking-tighter my-2 ${slot.status === 'booked' ? 'text-[#bccbb9]' : 'text-[#FF9100]'}`}>
-                    {slot.time}
-                  </span>
-                  <div className="w-full h-[1px] bg-white/5 my-2" />
-                  <span className="text-[#bccbb9] text-[11px] font-black tracking-widest mb-3">S/ {slot.price}</span>
-                  <button 
-                    disabled={slot.status === 'booked'}
-                    onClick={() => {
-                      const isLogged = !!localStorage.getItem('ramito_user_name');
-                      if (isLogged) {
-                        navigate('/confirmation');
-                      } else {
-                        navigate('/login');
-                      }
-                    }}
-                    className={`w-full py-3 rounded-xl text-[10px] font-black transition-all active:scale-95 uppercase tracking-widest ${
-                      slot.status === 'booked'
-                        ? 'bg-[#1a1c1c] text-[#bccbb9]'
-                        : 'bg-[#FF9100] text-[#121414] shadow-lg shadow-[#FF9100]/20'
+              {SLOTS.map((slot) => {
+                const isBookedLocally = allBookings?.some(b => b.time === slot.time && b.date.includes(selectedDate.toString()) && b.field === selectedCourt?.name);
+                const status = isBookedLocally ? 'booked' : slot.status;
+                
+                return (
+                  <motion.div
+                    key={slot.id}
+                    whileHover={{ y: -5 }}
+                    className={`snap-start min-w-[160px] glass-panel p-6 rounded-[2.5rem] flex flex-col items-center gap-1 shadow-xl border ${
+                      status === 'booked' ? 'border-red-500/20 bg-red-500/5' : 'border-white/5 hover:border-[#FF9100]/30'
                     }`}
                   >
-                    {slot.status === 'available' ? 'Reservar' : 'Ocupado'}
-                  </button>
-                </motion.div>
-              ))}
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[#bccbb9] text-[9px] font-black uppercase tracking-[0.2em]">MAYO {selectedDate}</span>
+                      {status === 'booked' && <Lock className="w-3 h-3 text-red-500/50" />}
+                    </div>
+                    <span className={`font-display text-3xl font-black italic tracking-tighter my-1 ${status === 'booked' ? 'text-red-500/40' : 'text-[#FF9100]'}`}>
+                      {slot.time}
+                    </span>
+                    <div className="w-full h-[1px] bg-white/5 my-2" />
+                    <span className={`text-[11px] font-black tracking-widest mb-4 ${status === 'booked' ? 'text-[#bccbb9]/20' : 'text-[#bccbb9]'}`}>S/ {slot.price}</span>
+                    
+                    <button 
+                      onClick={() => {
+                        if (status === 'booked') {
+                          if (isAdmin) {
+                            navigate('/my-bookings'); // Admins can go see the detail
+                          } else {
+                            showToast('Este turno ya está reservado');
+                          }
+                          return;
+                        }
+
+                        const isLogged = !!localStorage.getItem('ramito_user_name');
+                        if (isLogged) {
+                          navigate('/confirmation', { state: { court: selectedCourt, time: slot.time, date: `Mayo ${selectedDate}` } });
+                        } else {
+                          navigate('/login');
+                        }
+                      }}
+                      className={`w-full py-4 rounded-2xl text-[10px] font-black transition-all active:scale-95 uppercase tracking-widest ${
+                        status === 'booked'
+                          ? 'bg-white/5 text-[#bccbb9]/40 border border-white/5'
+                          : 'bg-[#FF9100] text-[#121414] shadow-lg shadow-[#FF9100]/20'
+                      }`}
+                    >
+                      {status === 'booked' ? (isAdmin ? 'Ver Detalle' : 'Ocupado') : 'Reservar'}
+                    </button>
+                  </motion.div>
+                );
+              })}
             </div>
           </section>
         </motion.div>
