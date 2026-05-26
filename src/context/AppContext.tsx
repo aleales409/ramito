@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { generarMarquee } from '../lib/scheduleUtils';
+import { updateVercelLicense } from '../lib/vercelSync';
 import { COURTS } from '../data';
 
 interface AppContextType {
@@ -72,6 +74,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [schedule, setSchedule] = useState(() => {
     const saved = localStorage.getItem('ramito_schedule');
     return saved ? JSON.parse(saved) : { weekday: { open: '18:00', close: '23:00' }, weekend: { open: '15:00', close: '23:00' } };
+  });
+
+  const [scheduleDays, setScheduleDays] = useState<Record<string, { morning: string; afternoon: string; night: string }>>(() => {
+    const saved = localStorage.getItem('ramito_schedule_days');
+    return saved ? JSON.parse(saved) : {};
   });
 
   const [appLicenseActive, setAppLicenseActive] = useState(() => {
@@ -185,6 +192,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('ramito_schedule', JSON.stringify(schedule));
   }, [schedule]);
 
+  // Persistir scheduleDays (horarios completos) en localStorage
+  useEffect(() => {
+    localStorage.setItem('ramito_schedule_days', JSON.stringify(scheduleDays));
+  }, [scheduleDays]);
+
   const saveSettings = async (newSettings: Partial<any>) => {
     try {
       const { supabase } = await import('../lib/supabase');
@@ -192,20 +204,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .from('system_settings')
         .update(newSettings)
         .eq('id', 1);
-        
+
       if (error) throw error;
-      
+
       // Update local state
       if (newSettings.is_complex_open !== undefined) setIsComplexOpen(newSettings.is_complex_open);
       if (newSettings.admin_phone !== undefined) setAdminPhone(newSettings.admin_phone);
       if (newSettings.elite_key !== undefined) setEliteKey(newSettings.elite_key);
       if (newSettings.vip_key !== undefined) setVipKey(newSettings.vip_key);
       if (newSettings.app_license_active !== undefined) setAppLicenseActive(newSettings.app_license_active);
-      if (newSettings.web_license_active !== undefined) setWebLicenseActive(newSettings.web_license_active);
+      if (newSettings.web_license_active !== undefined) {
+        try {
+          await updateVercelLicense(newSettings.web_license_active);
+        } catch (vercelErr) {
+          console.error('Error sync Vercel', vercelErr);
+          showToast('Error al sincronizar con Vercel', 'error');
+        }
+        setWebLicenseActive(newSettings.web_license_active);
+      }
       if (newSettings.marquee_text !== undefined) setMarqueeText(newSettings.marquee_text);
       if (newSettings.schedule !== undefined) setSchedule(newSettings.schedule);
       if (newSettings.courts !== undefined) setCourts(newSettings.courts);
-      
+      if (newSettings.schedule_days !== undefined) {
+        setScheduleDays(newSettings.schedule_days);
+        const generated = generarMarquee(newSettings.schedule_days);
+        setMarqueeText(generated);
+        await supabase.from('system_settings').update({ marquee_text: generated }).eq('id', 1);
+      }
+
       showToast('Configuración Guardada', 'success');
     } catch (err) {
       console.error('Error saving settings', err);

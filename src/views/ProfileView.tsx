@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   User, ShieldCheck, Key, Settings, CreditCard, History, 
   ChevronRight, LogOut, Phone, MessageCircle, AlertTriangle, 
-  CheckCircle2, Save, ExternalLink, ArrowRight, Lock, Clock
+  CheckCircle2, Save, ExternalLink, ArrowRight, Lock, Clock, Newspaper
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
@@ -221,7 +221,7 @@ export default function ProfileView() {
         {/* VISTA PERFIL */}
         {activeTab === 'perfil' && !showAdvancedConfig && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
-            <div className="glass-panel rounded-3xl border border-white/5 p-6 space-y-4 text-center">
+            <div className="w-full glass-panel rounded-3xl border border-white/5 p-6 space-y-4 text-center">
               <div className="w-16 h-16 rounded-2xl bg-[#FF9100]/10 flex items-center justify-center mx-auto border border-[#FF9100]/20">
                 <ShieldCheck className="w-8 h-8 text-[#FF9100]" />
               </div>
@@ -239,7 +239,7 @@ export default function ProfileView() {
                     <div>
                       <span className="text-[10px] font-black text-white uppercase tracking-widest block italic">Licencia Web</span>
                       <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">
-                        {webLicenseActive ? 'Activa y Sincronizada' : 'DESACTIVADA POR ELITE'}
+                        {webLicenseActive ? 'Activa • Auto-Sync Vercel (Mensual)' : 'DESACTIVADA POR ELITE'}
                       </span>
                     </div>
                   </div>
@@ -257,7 +257,7 @@ export default function ProfileView() {
                       <span className={`text-[10px] font-black ${webLicenseActive ? 'text-[#4be277]' : 'text-red-500'} uppercase tracking-widest`}>
                         {webLicenseActive ? 'Activa' : 'Expirada'}
                       </span>
-                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
+                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">Mensual</span>
                     </div>
                   )}
                 </div>
@@ -271,7 +271,7 @@ export default function ProfileView() {
                     <div>
                       <span className="text-[10px] font-black text-white uppercase tracking-widest block italic">Licencia APP (PWA)</span>
                       <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">
-                        {appLicenseActive ? 'Activa y Sincronizada' : 'DESACTIVADA POR ELITE'}
+                        {appLicenseActive ? 'Activa • Control Manual (Mensual)' : 'DESACTIVADA POR ELITE'}
                       </span>
                     </div>
                   </div>
@@ -289,7 +289,7 @@ export default function ProfileView() {
                       <span className={`text-[10px] font-black ${appLicenseActive ? 'text-[#4be277]' : 'text-red-500'} uppercase tracking-widest`}>
                         {appLicenseActive ? 'Activa' : 'Expirada'}
                       </span>
-                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
+                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">Mensual</span>
                     </div>
                   )}
                 </div>
@@ -302,6 +302,12 @@ export default function ProfileView() {
             >
               <Settings className="w-5 h-5" /> Configuración de Cuenta
             </button>
+            <motion.button 
+              onClick={() => navigate('/news-config')}
+              className="w-full h-16 bg-white/5 text-white font-black rounded-2xl border border-white/10 flex items-center justify-center gap-3 uppercase text-[10px] tracking-widest italic hover:bg-white/10 transition-all"
+            >
+              <Newspaper className="w-5 h-5" /> Noticias App
+            </motion.button>
           </motion.div>
         )}
 
@@ -315,7 +321,7 @@ export default function ProfileView() {
                Volver a Licencias
             </button>
 
-            <div className="glass-panel rounded-3xl border border-white/5 p-6 space-y-6">
+            <div className="w-full glass-panel rounded-3xl border border-white/5 p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <p className="text-[10px] font-black text-[#bccbb9]/40 uppercase tracking-widest">Correo Electrónico</p>
@@ -327,7 +333,7 @@ export default function ProfileView() {
               </div>
             </div>
 
-            <div className="glass-panel rounded-3xl border border-white/5 p-6 space-y-4">
+            <div className="w-full glass-panel rounded-3xl border border-white/5 p-6 space-y-4">
               <div className="flex items-center gap-3">
                 <Key className="w-5 h-5 text-[#FF9100]" />
                 <h3 className="text-xs font-black text-white uppercase italic">Cambiar Mi Llave Personal</h3>
@@ -350,7 +356,7 @@ export default function ProfileView() {
             </div>
 
             {userRole?.includes('admin') && (
-              <div className="glass-panel rounded-3xl border border-white/5 p-6 space-y-4">
+              <div className="w-full glass-panel rounded-3xl border border-white/5 p-6 space-y-4">
                 <div className="flex items-center gap-3 mb-2">
                   <Clock className="w-5 h-5 text-[#FF9100]" />
                   <h3 className="text-xs font-black text-white uppercase italic">Horarios del Complejo</h3>

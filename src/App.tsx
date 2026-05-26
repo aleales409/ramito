@@ -4,13 +4,14 @@ import { AppProvider } from './context/AppContext';
 import TopAppBar from './components/TopAppBar';
 import BottomNav from './components/BottomNav';
 import HomeView from './views/HomeView';
+
 import BookingView from './views/BookingView';
 import ConfirmationView from './views/ConfirmationView';
 import SuccessView from './views/SuccessView';
 import MyBookingsView from './views/MyBookingsView';
 import ProfileView from './views/ProfileView';
 import LoginView from './views/LoginView';
-
+import NewsConfigView from './views/NewsConfigView';
 import { useApp } from './context/AppContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -125,7 +126,8 @@ function AppContent() {
             <Route path="/success" element={<SuccessView />} />
             <Route path="/my-bookings" element={<MyBookingsView />} />
             <Route path="/profile" element={<ProfileView />} />
-          </Routes>
+          <Route path="/news-config" element={<NewsConfigView />} />
+            </Routes>
           
           <BottomNav />
           </div>

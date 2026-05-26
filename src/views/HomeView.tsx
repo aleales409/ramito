@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn, Calendar, Clock, PlayCircle, DollarSign, Power } from 'lucide-react';
+import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn, Calendar, Clock, PlayCircle, DollarSign, Power, Globe, Smartphone, Newspaper } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+
 
 export default function HomeView() {
   const navigate = useNavigate();
-  const { eliteKey, vipKey, adminPhone, showToast } = useApp();
+  const { eliteKey, vipKey, adminPhone, showToast, webLicenseActive, appLicenseActive, saveSettings } = useApp();
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(() => localStorage.getItem('ramito_maintenance') === 'true');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminKey, setAdminKey] = useState('');
   const [error, setError] = useState(false);
+
+
+  const [selectedLicense, setSelectedLicense] = useState<'web' | 'app' | null>(null);
+  const [renewalKey, setRenewalKey] = useState('');
+  const [isRenewing, setIsRenewing] = useState(false);
 
   const isLogged = !!localStorage.getItem('ramito_user_name');
   const role = localStorage.getItem('ramito_user_role');
@@ -67,7 +73,7 @@ export default function HomeView() {
   // ──────────────────────────────────────────────
   if (isAdmin) {
     return (
-      <main className="relative flex-grow flex flex-col items-center min-h-[100dvh] pt-6 pb-28 px-6 overflow-hidden">
+      <main className="relative flex-grow flex flex-col items-center min-h-[100dvh] pt-16 pb-28 px-6 overflow-hidden">
         {/* Fondo oscuro */}
         <div className="absolute inset-0 bg-pitch opacity-20 pointer-events-none" />
 
@@ -80,43 +86,53 @@ export default function HomeView() {
           />
         </div>
 
-        {/* 1. LICENCIAS — estilo Caja del Día */}
+        {/* 1. LICENCIAS — estilo Caja del Día y side-by-side */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm mb-4 z-10 space-y-3"
+          className="w-full max-w-sm mb-4 z-10 grid grid-cols-2 gap-3"
         >
           {/* Licencia Web */}
-          <div className="glass-panel p-4 rounded-2xl border border-[#FF9100]/20 bg-white/[0.02] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#FF9100]/20 flex items-center justify-center">
-                <div className="w-3 h-3 bg-[#FF9100] rounded-full animate-pulse" />
-              </div>
-              <div>
-                <span className="text-[10px] font-black text-white uppercase tracking-widest block italic">Licencia Web</span>
-                <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">Activa y Sincronizada</span>
-              </div>
+          <div 
+            onClick={() => setSelectedLicense('web')}
+            className="glass-panel p-4 rounded-2xl border border-[#FF9100]/20 bg-white/[0.02] flex flex-col justify-center items-center text-center cursor-pointer active:scale-95 transition-all hover:bg-white/[0.04]"
+          >
+            <div className="w-8 h-8 rounded-full bg-[#FF9100]/10 flex items-center justify-center mb-2 border border-[#FF9100]/30 relative">
+              <Globe className={`w-4 h-4 ${webLicenseActive ? 'text-[#FF9100]' : 'text-red-500'}`} />
+              <span className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-black ${webLicenseActive ? 'bg-[#4be277] animate-pulse' : 'bg-red-500'}`} />
             </div>
-            <div className="flex flex-col items-end text-right">
-              <span className="text-[10px] font-black text-[#FF9100] uppercase tracking-widest">Activa</span>
-              <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
+            <span className="text-[10px] font-black text-white uppercase tracking-widest block italic leading-tight">Licencia Web</span>
+            <span className="text-[8px] font-bold text-[#bccbb9]/50 uppercase tracking-widest mt-1 min-h-[20px] leading-tight">
+              {webLicenseActive ? 'Activa • Auto-Sync Vercel' : 'DESACTIVADA POR ELITE'}
+            </span>
+            <div className="mt-3 flex items-center gap-1.5">
+              <span className={`text-[10px] font-black uppercase tracking-widest ${webLicenseActive ? 'text-[#FF9100]' : 'text-red-500'}`}>
+                {webLicenseActive ? 'Activa' : 'Expirada'}
+              </span>
+              <span className="text-white/20">•</span>
+              <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">Mensual</span>
             </div>
           </div>
 
           {/* Licencia APP (PWA) */}
-          <div className="glass-panel p-4 rounded-2xl border border-[#FF9100]/20 bg-white/[0.02] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#FF9100]/20 flex items-center justify-center">
-                <div className="w-3 h-3 bg-[#FF9100] rounded-full animate-pulse" />
-              </div>
-              <div>
-                <span className="text-[10px] font-black text-white uppercase tracking-widest block italic">Licencia APP (PWA)</span>
-                <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">Activa y Sincronizada</span>
-              </div>
+          <div 
+            onClick={() => setSelectedLicense('app')}
+            className="glass-panel p-4 rounded-2xl border border-[#FF9100]/20 bg-white/[0.02] flex flex-col justify-center items-center text-center cursor-pointer active:scale-95 transition-all hover:bg-white/[0.04]"
+          >
+            <div className="w-8 h-8 rounded-full bg-[#FF9100]/10 flex items-center justify-center mb-2 border border-[#FF9100]/30 relative">
+              <Smartphone className={`w-4 h-4 ${appLicenseActive ? 'text-[#FF9100]' : 'text-red-500'}`} />
+              <span className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-black ${appLicenseActive ? 'bg-[#4be277] animate-pulse' : 'bg-red-500'}`} />
             </div>
-            <div className="flex flex-col items-end text-right">
-              <span className="text-[10px] font-black text-[#FF9100] uppercase tracking-widest">Activa</span>
-              <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
+            <span className="text-[10px] font-black text-white uppercase tracking-widest block italic leading-tight">Licencia APP (PWA)</span>
+            <span className="text-[8px] font-bold text-[#bccbb9]/50 uppercase tracking-widest mt-1 min-h-[20px] leading-tight">
+              {appLicenseActive ? 'Activa • Control Manual' : 'DESACTIVADA POR ELITE'}
+            </span>
+            <div className="mt-3 flex items-center gap-1.5">
+              <span className={`text-[10px] font-black uppercase tracking-widest ${appLicenseActive ? 'text-[#FF9100]' : 'text-red-500'}`}>
+                {appLicenseActive ? 'Activa' : 'Expirada'}
+              </span>
+              <span className="text-white/20">•</span>
+              <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">Mensual</span>
             </div>
           </div>
         </motion.div>
@@ -216,6 +232,171 @@ export default function HomeView() {
             </button>
           </div>
         </motion.div>
+
+        {/* Modal Detalle de Licencia */}
+        <AnimatePresence>
+          {selectedLicense && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center px-5">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => {
+                  setSelectedLicense(null);
+                  setRenewalKey('');
+                  setIsRenewing(false);
+                }}
+                className="absolute inset-0 bg-black/90 backdrop-blur-xl"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="relative w-full max-w-sm glass-panel rounded-[3rem] p-8 animate-glow"
+                style={{
+                  border: '1px solid rgba(255, 145, 0, 0.25)',
+                  boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 40px rgba(255, 145, 0, 0.05)'
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button 
+                  onClick={() => {
+                    setSelectedLicense(null);
+                    setRenewalKey('');
+                    setIsRenewing(false);
+                  }} 
+                  className="absolute top-6 right-6 text-[#bccbb9] hover:text-white"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+
+                <div className="flex flex-col items-center space-y-6">
+                  <div className="w-16 h-16 rounded-[1.25rem] bg-[#FF9100]/10 flex items-center justify-center border border-[#FF9100]/30 relative shadow-[0_0_20px_rgba(255,145,0,0.1)]">
+                    {selectedLicense === 'web' ? (
+                      <Globe className="w-8 h-8 text-[#FF9100]" />
+                    ) : (
+                      <Smartphone className="w-8 h-8 text-[#FF9100]" />
+                    )}
+                    <span className={`absolute -top-1 -right-1 w-4.5 h-4.5 rounded-full border-2 border-[#121414] flex items-center justify-center ${
+                      (selectedLicense === 'web' ? webLicenseActive : appLicenseActive) ? 'bg-[#4be277]' : 'bg-red-500'
+                    }`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                    </span>
+                  </div>
+
+                  <div className="text-center">
+                    <h3 className="font-display text-2xl font-black text-white uppercase italic tracking-tighter">
+                      {selectedLicense === 'web' ? 'Licencia Web' : 'Licencia APP (PWA)'}
+                    </h3>
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-3.5 py-1 rounded-full border inline-block mt-2 ${
+                      (selectedLicense === 'web' ? webLicenseActive : appLicenseActive)
+                        ? 'bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277]'
+                        : 'bg-red-500/10 border-red-500/20 text-red-500'
+                    }`}>
+                      {(selectedLicense === 'web' ? webLicenseActive : appLicenseActive) ? 'ACTIVA Y SINCRONIZADA' : 'DESACTIVADA POR SEGURIDAD'}
+                    </span>
+                  </div>
+
+                  {/* Detalles de la licencia */}
+                  <div className="w-full space-y-3 bg-white/[0.02] border border-white/5 p-4 rounded-2xl text-[10px]">
+                    <div className="flex justify-between">
+                      <span className="font-bold text-[#bccbb9]/40 uppercase tracking-wider">Tipo:</span>
+                      <span className="font-black text-white uppercase">{selectedLicense === 'web' ? 'Dominio & Server' : 'Mobile PWA'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold text-[#bccbb9]/40 uppercase tracking-wider">Sincronización:</span>
+                      <span className="font-black text-[#4be277] uppercase flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-[#4be277] rounded-full animate-pulse" />
+                        {selectedLicense === 'web' ? 'Auto-Sync (Vercel)' : 'Manual (Élite Switch)'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold text-[#bccbb9]/40 uppercase tracking-wider">Validez:</span>
+                      <span className="font-black text-[#FF9100] uppercase">Suscripción Mensual</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="font-bold text-[#bccbb9]/40 uppercase tracking-wider">Clave ID:</span>
+                      <span className="font-mono font-black text-white/50">{selectedLicense === 'web' ? 'LIC-WEB-2026-FUT' : 'LIC-PWA-2026-FUT'}</span>
+                    </div>
+                  </div>
+
+                  {/* Formulario de renovación */}
+                  {!isRenewing ? (
+                    <div className="w-full space-y-2.5">
+                      <button
+                        onClick={() => setIsRenewing(true)}
+                        className="w-full bg-[#FF9100] text-[#121414] font-black h-14 rounded-2xl uppercase text-[10px] tracking-widest shadow-lg shadow-[#FF9100]/20 flex items-center justify-center gap-2 italic hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >
+                        🔄 RENOVAR O ACTUALIZAR LICENCIA
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedLicense(null);
+                          navigate('/profile');
+                        }}
+                        className="w-full bg-white/5 border border-white/10 text-white font-black h-12 rounded-2xl uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 italic hover:bg-white/10 transition-all"
+                      >
+                        ⚙️ IR A CONFIGURACIÓN COMPLETA
+                      </button>
+                    </div>
+                  ) : (
+                    <form 
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        if (!renewalKey) return;
+                        // Validar con la llave Elite Admin o un código de renovación
+                        if (renewalKey === eliteKey || renewalKey === 'RAMITO365') {
+                          const targetField = selectedLicense === 'web' ? 'web_license_active' : 'app_license_active';
+                          try {
+                            await saveSettings({ [targetField]: true });
+                            showToast('¡Licencia Actualizada con Éxito!', 'success');
+                            setSelectedLicense(null);
+                            setRenewalKey('');
+                            setIsRenewing(false);
+                          } catch (err) {
+                            showToast('Error al actualizar la licencia');
+                          }
+                        } else {
+                          showToast('Llave de renovación incorrecta');
+                        }
+                      }} 
+                      className="w-full space-y-4"
+                    >
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Llave Élite o Código Renovar</label>
+                        <input
+                          type="password"
+                          value={renewalKey}
+                          onChange={(e) => setRenewalKey(e.target.value)}
+                          placeholder="INGRESE SU LLAVE"
+                          className="w-full h-14 bg-white/[0.03] border border-white/10 rounded-2xl px-4 text-center text-white font-black tracking-[0.3em] focus:border-[#FF9100]/50 outline-none"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsRenewing(false);
+                            setRenewalKey('');
+                          }}
+                          className="flex-1 bg-white/5 border border-white/10 text-[#bccbb9] font-black h-12 rounded-2xl uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 italic hover:bg-white/10 transition-all"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="flex-1 bg-[#4be277] text-black font-black h-12 rounded-2xl uppercase text-[9px] tracking-widest shadow-lg shadow-[#4be277]/20 flex items-center justify-center gap-2 italic hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        >
+                          Confirmar
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </main>
     );
   }
