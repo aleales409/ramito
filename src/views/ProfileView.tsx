@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase';
 
 export default function ProfileView() {
   const navigate = useNavigate();
-  const { showToast, eliteKey, vipKey, saveSettings, adminPhone, schedule } = useApp();
+  const { showToast, eliteKey, vipKey, saveSettings, adminPhone, schedule, appLicenseActive, webLicenseActive } = useApp();
   
   const [activeTab, setActiveTab] = useState<'perfil' | 'seguridad' | 'soporte'>('perfil');
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
@@ -230,35 +230,68 @@ export default function ProfileView() {
                 <p className="text-[10px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-1">Estado del sistema en tiempo real</p>
               </div>
               <div className="space-y-3 mt-4 text-left">
+                {/* Licencia Web */}
                 <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between border border-white/10">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-[#4be277]/20 flex items-center justify-center">
-                      <div className="w-3 h-3 bg-[#4be277] rounded-full animate-pulse" />
+                      <div className={`w-3 h-3 ${webLicenseActive ? 'bg-[#4be277]' : 'bg-red-500'} rounded-full animate-pulse`} />
                     </div>
                     <div>
                       <span className="text-[10px] font-black text-white uppercase tracking-widest block italic">Licencia Web</span>
-                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">Activa y Sincronizada</span>
+                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">
+                        {webLicenseActive ? 'Activa y Sincronizada' : 'DESACTIVADA POR ELITE'}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end text-right">
-                    <span className="text-[10px] font-black text-[#4be277] uppercase tracking-widest">Activa</span>
-                    <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
-                  </div>
+                  {userRole === 'admin_elite' ? (
+                    <button 
+                      onClick={() => {
+                        saveSettings({ web_license_active: !webLicenseActive });
+                      }}
+                      className={`w-12 h-6 rounded-full flex items-center px-1 transition-colors ${webLicenseActive ? 'bg-[#4be277]' : 'bg-white/10 border border-white/20'}`}
+                    >
+                      <motion.div animate={{ x: webLicenseActive ? 24 : 0 }} className={`w-4 h-4 rounded-full ${webLicenseActive ? 'bg-black' : 'bg-[#bccbb9]'}`} />
+                    </button>
+                  ) : (
+                    <div className="flex flex-col items-end text-right">
+                      <span className={`text-[10px] font-black ${webLicenseActive ? 'text-[#4be277]' : 'text-red-500'} uppercase tracking-widest`}>
+                        {webLicenseActive ? 'Activa' : 'Expirada'}
+                      </span>
+                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Licencia APP (PWA) */}
                 <div className="bg-white/5 rounded-2xl p-4 flex items-center justify-between border border-white/10">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-[#4be277]/20 flex items-center justify-center">
-                      <div className="w-3 h-3 bg-[#4be277] rounded-full animate-pulse" />
+                      <div className={`w-3 h-3 ${appLicenseActive ? 'bg-[#4be277]' : 'bg-red-500'} rounded-full animate-pulse`} />
                     </div>
                     <div>
                       <span className="text-[10px] font-black text-white uppercase tracking-widest block italic">Licencia APP (PWA)</span>
-                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">Activa y Sincronizada</span>
+                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">
+                        {appLicenseActive ? 'Activa y Sincronizada' : 'DESACTIVADA POR ELITE'}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end text-right">
-                    <span className="text-[10px] font-black text-[#4be277] uppercase tracking-widest">Activa</span>
-                    <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
-                  </div>
+                  {userRole === 'admin_elite' ? (
+                    <button 
+                      onClick={() => {
+                        saveSettings({ app_license_active: !appLicenseActive });
+                      }}
+                      className={`w-12 h-6 rounded-full flex items-center px-1 transition-colors ${appLicenseActive ? 'bg-[#4be277]' : 'bg-white/10 border border-white/20'}`}
+                    >
+                      <motion.div animate={{ x: appLicenseActive ? 24 : 0 }} className={`w-4 h-4 rounded-full ${appLicenseActive ? 'bg-black' : 'bg-[#bccbb9]'}`} />
+                    </button>
+                  ) : (
+                    <div className="flex flex-col items-end text-right">
+                      <span className={`text-[10px] font-black ${appLicenseActive ? 'text-[#4be277]' : 'text-red-500'} uppercase tracking-widest`}>
+                        {appLicenseActive ? 'Activa' : 'Expirada'}
+                      </span>
+                      <span className="text-[8px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5">365 Días</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -384,12 +417,12 @@ export default function ProfileView() {
                   <div className="space-y-6">
                     {userRole === 'admin_elite' && (
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-[#4be277] uppercase tracking-widest ml-1 italic">👑 Llave Elite Admin</label>
+                        <label className="text-[10px] font-black text-[#4be277] uppercase tracking-widest ml-1 italic">👑 Llave Elite Admin (Máster)</label>
                         <input type="text" value={newEliteKey} onChange={(e) => setNewEliteKey(e.target.value)} className="w-full h-16 bg-black/40 border border-[#4be277]/30 rounded-2xl px-6 text-white font-black tracking-[0.3em] outline-none shadow-[0_0_20px_rgba(75,226,119,0.1)] focus:border-[#4be277]" />
                       </div>
                     )}
 
-                    {userRole === 'admin_vip' && (
+                    {(userRole === 'admin_elite' || userRole === 'admin_vip') && (
                       <div className="space-y-2">
                         <label className="text-[10px] font-black text-[#FFD600] uppercase tracking-widest ml-1 italic">💎 Llave VIP Admin</label>
                         <input type="text" value={newVipKey} onChange={(e) => setNewVipKey(e.target.value)} className="w-full h-16 bg-black/40 border border-[#FFD600]/30 rounded-2xl px-6 text-white font-black tracking-[0.3em] outline-none shadow-[0_0_20px_rgba(255,214,0,0.1)] focus:border-[#FFD600]" />
