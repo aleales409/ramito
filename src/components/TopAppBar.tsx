@@ -29,44 +29,70 @@ export default function TopAppBar() {
       const timeRange = isWeekend ? schedule.weekend : schedule.weekday;
       
       const currentHours = now.getHours();
+      const [openH, openM] = timeRange.open.split(':').map(Number);
+      const [closeH, closeM] = timeRange.close.split(':').map(Number);
+      
       const currentMinutes = now.getMinutes();
       const currentTime = currentHours + currentMinutes / 60;
-      
-      const [openH, openM] = timeRange.open.split(':').map(Number);
       const openTime = openH + openM / 60;
-      
-      const [closeH, closeM] = timeRange.close.split(':').map(Number);
       const closeTime = closeH + closeM / 60;
       
       let currentlyOpen = false;
       if (closeTime < openTime) {
-        // Crosses midnight
         if (currentTime >= openTime || currentTime <= closeTime) currentlyOpen = true;
       } else {
         if (currentTime >= openTime && currentTime <= closeTime) currentlyOpen = true;
       }
       
       setIsOpen(currentlyOpen);
-      
-      if (currentlyOpen) {
-        setAutoMarquee(`${marqueeText} • HOY ABIERTO DE ${timeRange.open} A ${timeRange.close}`);
-      } else {
-        setAutoMarquee(`COMPLEJO CERRADO • ABRIMOS A LAS ${timeRange.open} • ${marqueeText}`);
-      }
     };
 
     checkStatus();
     const interval = setInterval(checkStatus, 60000);
     return () => clearInterval(interval);
-  }, [schedule, marqueeText]);
+  }, [schedule]);
+
+  const now = new Date();
+  const day = now.getDay();
+  const isWeekend = day === 0 || day === 6;
+  const timeRange = isWeekend ? schedule.weekend : schedule.weekday;
 
   return (
     <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
       <div className="w-full bg-black/60 backdrop-blur-md flex items-center justify-between px-5 py-2 border-b border-white/5 overflow-hidden">
         <div className="flex-grow overflow-hidden relative">
-          <div className="whitespace-nowrap animate-marquee inline-block text-[10px] font-black tracking-[0.1em] text-[#FF9100] uppercase italic">
-            {autoMarquee} • &nbsp;&nbsp;&nbsp;&nbsp;
-            {autoMarquee} •
+          <div className="whitespace-nowrap animate-marquee inline-block text-[10px] font-black tracking-[0.1em] uppercase italic">
+            <span className="text-[#FF9100]">{marqueeText}</span>
+            {isOpen ? (
+              <span className="text-white">
+                {' • '}HOY <span className="text-[#4be277] font-black">ABIERTO</span> DE{' '}
+                <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.open}</span>
+                {' '}A{' '}
+                <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.close}</span>
+              </span>
+            ) : (
+              <span className="text-zinc-400">
+                {' • '}<span className="text-red-500 font-extrabold">COMPLEJO CERRADO</span> • ABRIMOS A LAS{' '}
+                <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.open}</span>
+              </span>
+            )}
+            <span className="text-zinc-500 mx-5">•</span>
+            {/* Duplicate for seamless infinite loop */}
+            <span className="text-[#FF9100]">{marqueeText}</span>
+            {isOpen ? (
+              <span className="text-white">
+                {' • '}HOY <span className="text-[#4be277] font-black">ABIERTO</span> DE{' '}
+                <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/30 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.open}</span>
+                {' '}A{' '}
+                <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/30 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.close}</span>
+              </span>
+            ) : (
+              <span className="text-zinc-400">
+                {' • '}<span className="text-red-500 font-extrabold">COMPLEJO CERRADO</span> • ABRIMOS A LAS{' '}
+                <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.open}</span>
+              </span>
+            )}
+            <span className="text-zinc-500 mx-5">•</span>
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0 ml-4">

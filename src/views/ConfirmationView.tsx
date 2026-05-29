@@ -2,11 +2,13 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2, Calendar, Clock, Trophy, Wallet, Receipt, Copy, Info } from 'lucide-react';
+import { getTransferAccounts } from '../lib/transferRotation';
 
 export default function ConfirmationView() {
   const navigate = useNavigate();
   const location = useLocation();
   const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'cash'>('transfer');
+  const { activeAccount } = getTransferAccounts();
 
   // Read data passed from BookingView
   const { court, time, date } = (location.state || {}) as { court?: any; time?: string; date?: string };
@@ -138,14 +140,18 @@ export default function ConfirmationView() {
             <motion.div 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="p-5 rounded-2xl border border-[#4be277]/20 bg-[#4be277]/5 space-y-4 overflow-hidden"
+              className="p-5 rounded-2xl border border-[#4be277]/20 bg-[#4be277]/5 space-y-4 overflow-hidden text-left"
             >
+              <div className="flex items-center gap-1.5 p-2 rounded-xl bg-[#4be277]/10 border border-[#4be277]/25 text-[8.5px] font-black text-[#4be277] uppercase tracking-wider font-sans">
+                <Info className="w-3.5 h-3.5 shrink-0 animate-pulse" />
+                <span>Cuenta de Producción • Rotación de Enlace Activa</span>
+              </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[9px] font-bold text-[#4be277]/70 uppercase tracking-[0.1em]">ALIAS</span>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-white">RAMITO.FUT.SHOW</span>
+                  <span className="text-xs font-black text-white">{activeAccount.alias}</span>
                   <Copy 
-                    onClick={() => copyToClipboard('RAMITO.FUT.SHOW')}
+                    onClick={() => copyToClipboard(activeAccount.alias)}
                     className="w-4 h-4 text-[#4be277] cursor-pointer hover:scale-110 transition-transform" 
                   />
                 </div>
@@ -153,16 +159,16 @@ export default function ConfirmationView() {
               <div className="flex flex-col gap-1">
                 <span className="text-[9px] font-bold text-[#4be277]/70 uppercase tracking-[0.1em]">CBU (22 DÍGITOS)</span>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-white">0000003100012345678901</span>
+                  <span className="text-xs font-black text-white">{activeAccount.cbu}</span>
                   <Copy 
-                    onClick={() => copyToClipboard('0000003100012345678901')}
+                    onClick={() => copyToClipboard(activeAccount.cbu)}
                     className="w-4 h-4 text-[#4be277] cursor-pointer hover:scale-110 transition-transform" 
                   />
                 </div>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[9px] font-bold text-[#4be277]/70 uppercase tracking-[0.1em]">TITULAR DE LA CUENTA</span>
-                <span className="text-xs font-black text-white">RAMITO FUT SHOW S.R.L.</span>
+                <span className="text-xs font-black text-white">{activeAccount.titular}</span>
               </div>
             </motion.div>
           )}

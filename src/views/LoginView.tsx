@@ -60,7 +60,11 @@ export default function LoginView() {
     localStorage.setItem('ramito_user_role', user.role);
     
     showToast(`¡Bienvenido, ${user.name}!`, 'success');
-    navigate('/profile');
+    if (user.role === 'admin_elite' || user.role === 'admin_vip') {
+      navigate('/profile?view=admin_selection');
+    } else {
+      navigate('/profile');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -78,7 +82,9 @@ export default function LoginView() {
           return;
         }
 
-        const roleToAssign = pin === '123456' ? 'admin_elite' : (pin === '654321' ? 'admin_vip' : 'player');
+        const currentEliteKey = localStorage.getItem('ramito_elite_key') || '123456';
+        const currentVipKey = localStorage.getItem('ramito_vip_key') || '654321';
+        const roleToAssign = pin === currentEliteKey ? 'admin_elite' : (pin === currentVipKey ? 'admin_vip' : 'player');
         const { data: newUser, error: insertError } = await supabase.from('profiles')
           .insert([{ email, password, name, pin, role: roleToAssign }])
           .select()

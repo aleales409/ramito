@@ -8,6 +8,8 @@ interface AppContextType {
   setIsComplexOpen: (isOpen: boolean) => void;
   adminPhone: string;
   setAdminPhone: (phone: string) => void;
+  stadiumName: string;
+  setStadiumName: (name: string) => void;
   eliteKey: string;
   setEliteKey: (key: string) => void;
   vipKey: string;
@@ -24,6 +26,8 @@ interface AppContextType {
   setAppLicenseActive: (active: boolean) => void;
   webLicenseActive: boolean;
   setWebLicenseActive: (active: boolean) => void;
+  maintenanceMode: boolean;
+  setMaintenanceMode: (active: boolean) => void;
   marqueeText: string;
   setMarqueeText: (text: string) => void;
   isSystemBlocked: boolean;
@@ -44,6 +48,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [adminPhone, setAdminPhone] = useState(() => {
     return localStorage.getItem('ramito_admin_phone') || '+51 987 654 321';
   });
+
+  const [stadiumName, setStadiumName] = useState(() => {
+    return localStorage.getItem('ramito_stadium_name') || 'Ramito Fut Show';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ramito_stadium_name', stadiumName);
+  }, [stadiumName]);
 
   const [eliteKey, setEliteKey] = useState(() => {
     return localStorage.getItem('ramito_elite_key') || '123456';
@@ -91,6 +103,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return saved !== null ? saved === 'true' : true;
   });
 
+  const [maintenanceMode, setMaintenanceMode] = useState(() => {
+    const saved = localStorage.getItem('ramito_maintenance');
+    return saved !== null ? saved === 'true' : false;
+  });
+
   const [marqueeText, setMarqueeText] = useState(() => {
     return localStorage.getItem('ramito_marquee_text') || 'COMPLEJO RAMITO FUT SHOW • EL MEJOR NIVEL • RESERVAS ABIERTAS • VEN A JUGAR';
   });
@@ -113,7 +130,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function loadData() {
       try {
-        const { supabase } = await import('../lib/supabase');
+        const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+        if (!isSupabaseConfigured) {
+          console.log('Skipping Supabase fetching because configuration is missing/invalid. Offline simulation mode is active.');
+          return;
+        }
         
         // Load System Settings
         const { data: settings, error: settingsError } = await supabase
@@ -173,6 +194,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [webLicenseActive]);
 
   useEffect(() => {
+    localStorage.setItem('ramito_maintenance', maintenanceMode.toString());
+  }, [maintenanceMode]);
+
+  useEffect(() => {
     localStorage.setItem('ramito_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
@@ -199,20 +224,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const saveSettings = async (newSettings: Partial<any>) => {
     try {
-      const { supabase } = await import('../lib/supabase');
-      const { error } = await supabase
-        .from('system_settings')
-        .update(newSettings)
-        .eq('id', 1);
+      const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+      if (isSupabaseConfigured) {
+        const { error } = await supabase
+          .from('system_settings')
+          .update(newSettings)
+          .eq('id', 1);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
 
       // Update local state
       if (newSettings.is_complex_open !== undefined) setIsComplexOpen(newSettings.is_complex_open);
       if (newSettings.admin_phone !== undefined) setAdminPhone(newSettings.admin_phone);
       if (newSettings.elite_key !== undefined) setEliteKey(newSettings.elite_key);
       if (newSettings.vip_key !== undefined) setVipKey(newSettings.vip_key);
-      if (newSettings.app_license_active !== undefined) setAppLicenseActive(newSettings.app_license_active);
+      if (newSettings.app_license_active !== undefined) {
+        setAppLicenseActive(newSettings.app_license_active);
+        if (!newSettings.app_license_active) {
+          setMaintenanceMode(true);
+        }
+      }
       if (newSettings.web_license_active !== undefined) {
         try {
           await updateVercelLicense(newSettings.web_license_active);
@@ -229,7 +261,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setScheduleDays(newSettings.schedule_days);
         const generated = generarMarquee(newSettings.schedule_days);
         setMarqueeText(generated);
-        await supabase.from('system_settings').update({ marquee_text: generated }).eq('id', 1);
+        if (isSupabaseConfigured) {
+          await supabase.from('system_settings').update({ marquee_text: generated }).eq('id', 1);
+        }
       }
 
       showToast('Configuración Guardada', 'success');
@@ -248,6 +282,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setIsComplexOpen, 
       adminPhone, 
       setAdminPhone,
+      stadiumName,
+      setStadiumName,
       eliteKey,
       setEliteKey,
       vipKey,
@@ -264,6 +300,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setAppLicenseActive,
       webLicenseActive,
       setWebLicenseActive,
+      maintenanceMode,
+      setMaintenanceMode,
       marqueeText,
       setMarqueeText,
       isSystemBlocked,

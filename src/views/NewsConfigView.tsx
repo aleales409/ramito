@@ -39,7 +39,7 @@ export default function NewsConfigView() {
   };
 
   return (
-    <main className="pt-16 pb-32 px-5 max-w-lg mx-auto min-h-screen">
+    <main className="pt-16 pb-32 px-4 xs:px-5 w-full max-w-md mx-auto min-h-screen overflow-x-hidden">
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
