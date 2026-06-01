@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { generarMarquee } from '../lib/scheduleUtils';
 import { updateVercelLicense } from '../lib/vercelSync';
 import { COURTS } from '../data';
+import { getCantinaItems, saveCantinaItems, CantinaItem } from '../lib/cantina';
 
 interface AppContextType {
   isComplexOpen: boolean;
@@ -28,18 +29,75 @@ interface AppContextType {
   setWebLicenseActive: (active: boolean) => void;
   maintenanceMode: boolean;
   setMaintenanceMode: (active: boolean) => void;
+  emergencyMode: boolean;
+  setEmergencyMode: (active: boolean) => void;
+  emergencyMessage: string;
+  setEmergencyMessage: (message: string) => void;
   marqueeText: string;
   setMarqueeText: (text: string) => void;
+  secondaryMarqueeText: string;
+  setSecondaryMarqueeText: (text: string) => void;
   isSystemBlocked: boolean;
   toast: { message: string; type: 'error' | 'success'; visible: boolean };
   showToast: (message: string, type?: 'error' | 'success') => void;
   hideToast: () => void;
   saveSettings: (newSettings: Partial<any>) => Promise<void>;
+  userAvatar: string | null;
+  setUserAvatar: (avatar: string | null) => void;
+  userName: string;
+  setUserName: (name: string) => void;
+  userRole: string | null;
+  setUserRole: (role: string | null) => void;
+  cashTotal: number;
+  setCashTotal: React.Dispatch<React.SetStateAction<number>>;
+  transferTotal: number;
+  setTransferTotal: React.Dispatch<React.SetStateAction<number>>;
+  mpTotal: number;
+  setMpTotal: React.Dispatch<React.SetStateAction<number>>;
+  ledgerTransactions: any[];
+  setLedgerTransactions: React.Dispatch<React.SetStateAction<any[]>>;
+  cantinaItems: CantinaItem[];
+  setCantinaItems: React.Dispatch<React.SetStateAction<CantinaItem[]>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [userAvatar, setUserAvatarState] = useState<string | null>(() => {
+    return localStorage.getItem('ramito_user_avatar');
+  });
+
+  const [userName, setUserNameState] = useState<string>(() => {
+    return localStorage.getItem('ramito_user_name') || '';
+  });
+
+  const [userRole, setUserRoleState] = useState<string | null>(() => {
+    return localStorage.getItem('ramito_user_role');
+  });
+
+  const setUserAvatar = (avatar: string | null) => {
+    setUserAvatarState(avatar);
+    if (avatar) {
+      localStorage.setItem('ramito_user_avatar', avatar);
+    } else {
+      localStorage.removeItem('ramito_user_avatar');
+    }
+  };
+
+  const setUserName = (name: string) => {
+    setUserNameState(name);
+    localStorage.setItem('ramito_user_name', name);
+  };
+
+  const setUserRole = (role: string | null) => {
+    setUserRoleState(role);
+    if (role) {
+      localStorage.setItem('ramito_user_role', role);
+    } else {
+      localStorage.removeItem('ramito_user_role');
+    }
+  };
+
   const [isComplexOpen, setIsComplexOpen] = useState(() => {
     const saved = localStorage.getItem('ramito_complex_open');
     return saved !== null ? saved === 'true' : true;
@@ -67,14 +125,72 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [notifications, setNotifications] = useState<any[]>(() => {
     const saved = localStorage.getItem('ramito_notifications');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved) : [
+      { id: 'n1', title: 'COMPROBANTE DISPONIBLE', body: 'Carlos Mendoza ha subido una captura de Yape por S/. 120.00 para la Cancha 1 (Césped).', time: 'Hace 5 min', read: false },
+      { id: 'n2', title: 'COMPROBANTE DISPONIBLE', body: 'Sofía Rodríguez ha cargado un comprobante de Plin por S/. 100.00 para la Cancha 2 (Sin Césped).', time: 'Hace 15 min', read: false },
+      { id: 'n3', title: 'TURNO VALIDADO', body: 'Se ha verificado con éxito el pago del turno de Mateo Silva para hoy a las 22:00 hs.', time: 'Hace 45 min', read: true }
+    ];
   });
 
   const [allBookings, setAllBookings] = useState<any[]>(() => {
     const saved = localStorage.getItem('ramito_all_bookings');
     return saved ? JSON.parse(saved) : [
-      { id: '1', date: 'Viernes 15 Mayo', time: '19:00', field: 'Cancha 1', status: 'pending_approval', amount: '$45.00', user: 'Agus Castro' },
-      { id: '2', date: 'Sábado 16 Mayo', time: '21:00', field: 'Cancha 2', status: 'upcoming', amount: '$30.00', user: 'Juan Perez' }
+      { 
+        id: 'b1', 
+        date: 'Hoy', 
+        time: '20:00', 
+        field: 'Cancha 1 • El Maracaná', 
+        status: 'pending_approval', 
+        amount: 'S/. 150.00', 
+        user: 'Carlos Mendoza',
+        receiptUrl: 'https://images.unsplash.com/photo-1554224155-1696413565d3?auto=format&fit=crop&q=80&w=600',
+        phone: '+51 912 345 678',
+        extras: ['Pack Hidratación (2 Gatorade + 2 Aguas)']
+      },
+      { 
+        id: 'b2', 
+        date: 'Hoy', 
+        time: '18:00', 
+        field: 'Cancha 2 • La Bombonera', 
+        status: 'pending_approval', 
+        amount: 'S/. 100.00', 
+        user: 'Sofía Rodríguez',
+        receiptUrl: 'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?auto=format&fit=crop&q=80&w=600',
+        phone: '+51 980 765 432'
+      },
+      { 
+        id: 'b3', 
+        date: 'Hoy', 
+        time: '22:00', 
+        field: 'Cancha 1 • El Maracaná', 
+        status: 'upcoming', 
+        amount: 'S/. 135.00', 
+        user: 'Mateo Silva',
+        receiptUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&q=80&w=600',
+        phone: '+51 955 443 322',
+        extras: ['Alquiler Pelota Profesional FIFA']
+      },
+      { 
+        id: 'b4', 
+        date: 'Mañana', 
+        time: '18:00', 
+        field: 'Cancha 1 • El Maracaná', 
+        status: 'pending_payment', 
+        amount: 'S/. 120.00', 
+        user: 'Camila Espinoza',
+        phone: '+51 933 221 100'
+      },
+      { 
+        id: 'b5', 
+        date: 'Ayer', 
+        time: '21:00', 
+        field: 'Cancha 2 • La Bombonera', 
+        status: 'completed', 
+        amount: 'S/. 100.00', 
+        user: 'Javier Ortega',
+        receiptUrl: 'https://images.unsplash.com/photo-1563013544-824ae1d704d3?auto=format&fit=crop&q=80&w=600',
+        phone: '+51 966 887 799'
+      }
     ];
   });
 
@@ -108,8 +224,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return saved !== null ? saved === 'true' : false;
   });
 
+  const [emergencyMode, setEmergencyMode] = useState(() => {
+    const saved = localStorage.getItem('ramito_emergency_mode');
+    return saved !== null ? saved === 'true' : false;
+  });
+
+  const [emergencyMessage, setEmergencyMessage] = useState(() => {
+    return localStorage.getItem('ramito_emergency_message') || 'EL COMPLEJO PERMANECERÁ CERRADO TEMPORALMENTE DEBIDO A FUERZAS MAYOR, LES AGRADECEMOS SU COMPRENSIÓN.';
+  });
+
   const [marqueeText, setMarqueeText] = useState(() => {
     return localStorage.getItem('ramito_marquee_text') || 'COMPLEJO RAMITO FUT SHOW • EL MEJOR NIVEL • RESERVAS ABIERTAS • VEN A JUGAR';
+  });
+
+  const [secondaryMarqueeText, setSecondaryMarqueeText] = useState(() => {
+    return localStorage.getItem('ramito_secondary_marquee_text') || '';
+  });
+
+  const [cashTotal, setCashTotal] = useState<number>(() => {
+    return parseInt(localStorage.getItem('ramito_audit_cash') || '15000', 10);
+  });
+  const [transferTotal, setTransferTotal] = useState<number>(() => {
+    return parseInt(localStorage.getItem('ramito_audit_transfer') || '18000', 10);
+  });
+  const [mpTotal, setMpTotal] = useState<number>(() => {
+    return parseInt(localStorage.getItem('ramito_audit_mp') || '12000', 10);
+  });
+
+  const [ledgerTransactions, setLedgerTransactions] = useState<any[]>(() => {
+    const saved = localStorage.getItem('ramito_ledger_txs');
+    return saved ? JSON.parse(saved) : [
+      { id: 'tx1', time: '15:30', detail: 'Juan Pérez • Cancha Sintética (18:00)', method: 'Mercado Pago (Aprobado)', amount: 12000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' },
+      { id: 'tx2', time: '14:15', detail: 'María Gómez • Cancha de Tenis (19:00)', method: 'Efectivo en Puerta', amount: 8000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
+      { id: 'tx3', time: '12:00', detail: 'Carlos Soto • Cancha Sintética (15:00)', method: 'Transferencia Bancaria', amount: 12000, type: 'transfer', labelColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+      { id: 'tx4', time: '10:45', detail: 'Lucas Díaz • Cancha de Pádel (16:30)', method: 'Efectivo en Puerta', amount: 7000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
+      { id: 'tx5', time: '09:15', detail: 'Andrés Ruiz • Cancha de Pádel (17:30)', method: 'Mercado Pago (API Link)', amount: 6000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' }
+    ];
+  });
+
+  const [cantinaItems, setCantinaItems] = useState<CantinaItem[]>(() => {
+    return getCantinaItems();
   });
 
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success'; visible: boolean }>({
@@ -149,6 +303,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setWebLicenseActive(settings.web_license_active);
           setAdminPhone(settings.admin_phone || '+51 987 654 321');
           setMarqueeText(settings.marquee_text || 'COMPLEJO RAMITO FUT SHOW • EL MEJOR NIVEL • RESERVAS ABIERTAS • VEN A JUGAR');
+          if (settings.secondary_marquee_text !== undefined && settings.secondary_marquee_text !== null) {
+            setSecondaryMarqueeText(settings.secondary_marquee_text);
+          }
           if (settings.elite_key) setEliteKey(settings.elite_key);
           if (settings.vip_key) setVipKey(settings.vip_key);
         }
@@ -198,6 +355,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [maintenanceMode]);
 
   useEffect(() => {
+    localStorage.setItem('ramito_emergency_mode', emergencyMode.toString());
+  }, [emergencyMode]);
+
+  useEffect(() => {
+    localStorage.setItem('ramito_emergency_message', emergencyMessage);
+  }, [emergencyMessage]);
+
+  useEffect(() => {
     localStorage.setItem('ramito_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
@@ -208,6 +373,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem('ramito_marquee_text', marqueeText);
   }, [marqueeText]);
+
+  useEffect(() => {
+    localStorage.setItem('ramito_secondary_marquee_text', secondaryMarqueeText);
+  }, [secondaryMarqueeText]);
 
   useEffect(() => {
     localStorage.setItem('ramito_courts', JSON.stringify(courts));
@@ -221,6 +390,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem('ramito_schedule_days', JSON.stringify(scheduleDays));
   }, [scheduleDays]);
+
+  useEffect(() => {
+    localStorage.setItem('ramito_audit_cash', String(cashTotal));
+  }, [cashTotal]);
+
+  useEffect(() => {
+    localStorage.setItem('ramito_audit_transfer', String(transferTotal));
+  }, [transferTotal]);
+
+  useEffect(() => {
+    localStorage.setItem('ramito_audit_mp', String(mpTotal));
+  }, [mpTotal]);
+
+  useEffect(() => {
+    localStorage.setItem('ramito_ledger_txs', JSON.stringify(ledgerTransactions));
+  }, [ledgerTransactions]);
+
+  useEffect(() => {
+    saveCantinaItems(cantinaItems);
+  }, [cantinaItems]);
 
   const saveSettings = async (newSettings: Partial<any>) => {
     try {
@@ -255,6 +444,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setWebLicenseActive(newSettings.web_license_active);
       }
       if (newSettings.marquee_text !== undefined) setMarqueeText(newSettings.marquee_text);
+      if (newSettings.secondary_marquee_text !== undefined) setSecondaryMarqueeText(newSettings.secondary_marquee_text);
       if (newSettings.schedule !== undefined) setSchedule(newSettings.schedule);
       if (newSettings.courts !== undefined) setCourts(newSettings.courts);
       if (newSettings.schedule_days !== undefined) {
@@ -302,13 +492,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setWebLicenseActive,
       maintenanceMode,
       setMaintenanceMode,
+      emergencyMode,
+      setEmergencyMode,
+      emergencyMessage,
+      setEmergencyMessage,
       marqueeText,
       setMarqueeText,
+      secondaryMarqueeText,
+      setSecondaryMarqueeText,
       isSystemBlocked,
       toast,
       showToast,
       hideToast,
-      saveSettings
+      saveSettings,
+      userAvatar,
+      setUserAvatar,
+      userName,
+      setUserName,
+      userRole,
+      setUserRole,
+      cashTotal,
+      setCashTotal,
+      transferTotal,
+      setTransferTotal,
+      mpTotal,
+      setMpTotal,
+      ledgerTransactions,
+      setLedgerTransactions,
+      cantinaItems,
+      setCantinaItems
     }}>
       {children}
     </AppContext.Provider>

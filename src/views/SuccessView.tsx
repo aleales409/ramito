@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle2, Share2, CalendarDays, Clock } from 'lucide-react';
+import { Check, Share2, CalendarDays, Clock } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 export default function SuccessView() {
@@ -63,11 +63,15 @@ export default function SuccessView() {
         className="relative z-10 space-y-6"
       >
         <div className="flex justify-center">
-          <div className={`w-24 h-24 ${isPending ? 'bg-[#FF9100]' : 'bg-[#4be277]'} rounded-full flex items-center justify-center shadow-lg transition-colors`}>
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center border transition-all ${
+            isPending 
+              ? 'border-[#FF9100]/30 bg-[#FF9100]/10 text-[#FF9100] shadow-[0_0_20px_rgba(255,145,0,0.1)]' 
+              : 'border-[#4be277]/30 bg-[#4be277]/10 text-[#4be277] shadow-[0_0_20px_rgba(75,226,119,0.1)]'
+          }`}>
             {isPending ? (
-              <Clock className="w-12 h-12 text-[#121414]" strokeWidth={3} />
+              <Clock className="w-9 h-9" strokeWidth={2} />
             ) : (
-              <CheckCircle2 className="w-12 h-12 text-[#121414]" strokeWidth={3} />
+              <Check className="w-9 h-9" strokeWidth={2} />
             )}
           </div>
         </div>

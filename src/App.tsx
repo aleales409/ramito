@@ -19,7 +19,7 @@ import { ShieldAlert, Terminal, Lock, ShieldCheck } from 'lucide-react';
 
 function LockScreen() {
   const navigate = useNavigate();
-  const { isSystemBlocked, maintenanceMode } = useApp();
+  const { emergencyMode } = useApp();
   const role = localStorage.getItem('ramito_user_role');
   const isAdmin = role === 'admin_vip' || role === 'admin_elite';
 
@@ -27,98 +27,36 @@ function LockScreen() {
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="fixed inset-0 z-[9999] bg-zinc-950/98 backdrop-blur-3xl flex flex-col items-center justify-center p-8 overflow-hidden text-center"
+      className="fixed inset-0 z-[9999] bg-zinc-950 flex flex-col items-center justify-center overflow-hidden text-center select-none"
     >
-      <div className="absolute inset-0 opacity-10 pointer-events-none">
-        <div className="grid grid-cols-10 gap-2 p-4 text-[8px] font-mono text-[#4be277] select-none break-all">
-          {Array.from({ length: 100 }).map((_, i) => (
-            <div key={i} className="animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}>
-              101011001010101011
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* High-fidelity recreated maintenance or emergency image (unmovable) */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center select-none pointer-events-none" 
+        style={{ 
+          backgroundImage: `url(${emergencyMode ? '/emergencia.png' : '/mantenimiento.png'})`,
+          opacity: 1
+        }}
+      />
 
-      <div className="relative space-y-8 max-w-sm w-full">
-        {maintenanceMode ? (
-          /* Vista de Mantenimiento con logo grande de la aplicación */
-          <div className="space-y-6">
-            <motion.div 
-              animate={{ y: [0, -6, 0] }}
-              transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-              className="relative mx-auto w-48 h-48 flex items-center justify-center bg-white/[0.02] border border-white/5 rounded-[3rem] p-4 shadow-2xl"
-            >
-              <img 
-                src="/logo_ramito.png" 
-                alt="Ramito Fut Show Logo" 
-                className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(75,226,119,0.2)] animate-pulse"
-                referrerPolicy="no-referrer"
-              />
-            </motion.div>
-
-            <div className="space-y-3 px-2">
-              <h1 className="font-display text-3xl font-black text-white uppercase italic tracking-tighter leading-none">
-                En <span className="text-[#4be277]">Actualización</span>
-              </h1>
-              <p className="text-[10px] font-black text-[#4be277] uppercase tracking-[0.2em] bg-[#4be277]/10 py-1.5 px-3 rounded-full inline-block">
-                Volveremos Pronto
-              </p>
-              <p className="text-[10px] sm:text-[11px] font-black text-[#bccbb9]/70 uppercase tracking-[0.15em] leading-relaxed mt-2">
-                Estamos realizando mejoras en nuestra aplicación móvil para ofrecerles un servicio más rápido y seguro. Las funciones de reserva estarán disponibles nuevamente a la brevedad.
-              </p>
-            </div>
-          </div>
-        ) : (
-          /* Vista Bloqueo de Licencia original o por defecto */
-          <>
-            <div className="relative mx-auto w-32 h-32">
-              <motion.div 
-                animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-                transition={{ repeat: Infinity, duration: 4 }}
-                className="w-full h-full rounded-[2.5rem] bg-red-500/10 border-2 border-red-500/30 flex items-center justify-center"
-              >
-                <ShieldAlert className="w-16 h-16 text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)]" />
-              </motion.div>
-              <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-black rounded-2xl border-2 border-red-500/30 flex items-center justify-center">
-                <Lock className="w-6 h-6 text-red-500" />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h1 className="font-display text-4xl font-black text-white uppercase italic tracking-tighter leading-none">
-                Sistema <span className="text-red-500">Bloqueado</span>
-              </h1>
-              <p className="text-[11px] font-bold text-[#bccbb9] uppercase tracking-[0.25em] leading-relaxed">
-                La licencia de servicio ha expirado o ha sido desactivada por seguridad. 
-              </p>
-            </div>
-
-            <div className="bg-red-500/5 border border-red-500/20 rounded-3xl p-6 text-left space-y-4">
-              <div className="flex items-center gap-3">
-                <Terminal className="w-4 h-4 text-red-500" />
-                <span className="text-[9px] font-black text-red-500 uppercase tracking-widest leading-none">Log de Error: ERR_LIC_EXPIRED</span>
-              </div>
-              <p className="text-[10px] font-bold text-[#bccbb9]/60 uppercase tracking-widest leading-relaxed">
-                Contacte al equipo de soporte de Ramito Fut Show para renovar el dominio web o la clave de aplicación móvil.
-              </p>
-            </div>
-          </>
-        )}
-
+      {/* Button overlay with high accessibility so administrators can easily toggle back */}
+      <div className="absolute bottom-6 md:bottom-8 z-20 w-full max-w-xs px-4">
         {isAdmin ? (
           <button 
+            type="button"
             onClick={() => navigate('/profile')}
-            className="w-full h-16 bg-white text-[#121414] font-black rounded-2xl flex items-center justify-center gap-3 uppercase tracking-[0.2em] italic text-xs hover:bg-[#4be277] transition-all"
+            className="w-full h-14 bg-white text-[#121414] font-black rounded-2xl flex items-center justify-center gap-3 uppercase tracking-[0.2em] italic text-xs hover:bg-orange-500 hover:text-white transition-all shadow-lg active:scale-95"
           >
             <ShieldCheck className="w-5 h-5" />
             Entrar como Admin
           </button>
         ) : (
+          /* Invisible touch container for Admin access back in standard state */
           <button 
-            onClick={() => navigate('/')}
-            className="w-full h-16 bg-white/5 border border-white/10 text-white font-black rounded-2xl uppercase tracking-[0.2em] italic text-xs hover:bg-white/10 transition-all"
+            type="button"
+            onClick={() => navigate('/login')}
+            className="w-full h-14 bg-transparent border-0 opacity-0 cursor-default"
           >
-            Volver al Inicio
+            Administrar
           </button>
         )}
       </div>
@@ -129,12 +67,12 @@ function LockScreen() {
 import Toast from './components/Toast';
 
 function AppContent() {
-  const { isSystemBlocked, maintenanceMode } = useApp();
+  const { isSystemBlocked, maintenanceMode, emergencyMode } = useApp();
   const location = useLocation();
   const role = localStorage.getItem('ramito_user_role');
   const isAdmin = role === 'admin_vip' || role === 'admin_elite';
 
-  const shouldShowLock = (isSystemBlocked || maintenanceMode) && !(isAdmin && location.pathname === '/profile');
+  const shouldShowLock = (isSystemBlocked || maintenanceMode || emergencyMode) && !(isAdmin && location.pathname === '/profile');
 
   return (
     <>
@@ -144,7 +82,7 @@ function AppContent() {
       </AnimatePresence>
       
       {!shouldShowLock && (
-        <div className="flex flex-col min-h-[100dvh] w-full max-w-md mx-auto relative main-bg-container shadow-2xl shadow-black/50 overflow-x-hidden border-x border-white/5">
+        <div className="flex flex-col min-h-[100dvh] w-full max-w-5xl md:max-w-6xl mx-auto relative main-bg-container shadow-2xl shadow-black/50 overflow-x-hidden border-x border-white/5">
           <div className="premium-overlay" />
           <div className="pitch-pattern" />
           

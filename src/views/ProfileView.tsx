@@ -4,13 +4,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   User, ShieldCheck, Key, Settings, CreditCard, History, 
   ChevronRight, LogOut, Phone, MessageCircle, AlertTriangle, 
-  CheckCircle2, Save, ExternalLink, ArrowRight, Lock, Clock, Newspaper,
+  Save, ExternalLink, ArrowRight, Lock, Clock, Newspaper,
   Globe, Smartphone, X, Activity, CheckCircle, Wrench, Trash2, Plus, Copy, RefreshCw, Power, Check, FileText, Mail,
-  Database, HardDrive, Info
+  Database, HardDrive, Info, GlassWater, Trophy, Sparkles, Crown, Gem, Bell
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getRotationMetadata, getActiveAccountIndex } from '../lib/transferRotation';
+import { getCantinaItems, saveCantinaItems, CantinaItem } from '../lib/cantina';
 
 export default function ProfileView() {
   const navigate = useNavigate();
@@ -18,9 +19,17 @@ export default function ProfileView() {
   const searchParams = new URLSearchParams(location.search);
   const paramView = searchParams.get('view');
 
-  const { showToast, eliteKey, setEliteKey, vipKey, setVipKey, saveSettings, adminPhone, schedule, appLicenseActive, webLicenseActive, maintenanceMode, setMaintenanceMode, notifications, setNotifications, stadiumName, setStadiumName, marqueeText, setMarqueeText } = useApp();
+  const { 
+    showToast, eliteKey, setEliteKey, vipKey, setVipKey, saveSettings, adminPhone, schedule, 
+    appLicenseActive, webLicenseActive, maintenanceMode, setMaintenanceMode, emergencyMode, setEmergencyMode, 
+    emergencyMessage, setEmergencyMessage, notifications, setNotifications, stadiumName, setStadiumName, 
+    marqueeText, setMarqueeText, secondaryMarqueeText, setSecondaryMarqueeText, setUserAvatar, 
+    setUserName, setUserRole, allBookings, 
+    cashTotal, setCashTotal, transferTotal, setTransferTotal, mpTotal, setMpTotal, 
+    ledgerTransactions, setLedgerTransactions, cantinaItems, setCantinaItems 
+  } = useApp();
   
-  const [activeTab, setActiveTab] = useState<'licencias' | 'ajustes' | 'seguridad' | 'noticia'>(() => {
+  const [activeTab, setActiveTab] = useState<'licencias' | 'ajustes' | 'seguridad' | 'noticia' | 'analytics'>(() => {
     const userRole = localStorage.getItem('ramito_user_role');
     const searchParamsTemp = new URLSearchParams(window.location.search);
     const viewParam = searchParamsTemp.get('view');
@@ -54,6 +63,9 @@ export default function ProfileView() {
   const [showAppWindow, setShowAppWindow] = useState(false);
   const [showEmergencyWindow, setShowEmergencyWindow] = useState(false);
   const [showTransferWindow, setShowTransferWindow] = useState(false);
+  const [showCantinaWindow, setShowCantinaWindow] = useState(false);
+  const [showMaintenanceWindow, setShowMaintenanceWindow] = useState(false);
+
   const [showVercelMetricsWindow, setShowVercelMetricsWindow] = useState(() => {
     const searchParamsTemp = new URLSearchParams(window.location.search);
     return searchParamsTemp.get('tab') === 'ajustes' && searchParamsTemp.get('modal') === 'vercel';
@@ -75,7 +87,7 @@ export default function ProfileView() {
   const [transferCbu2, setTransferCbu2] = useState(() => localStorage.getItem('ramito_transfer_cbu_2') || '0000003100098765432109');
   const [transferTitular2, setTransferTitular2] = useState(() => localStorage.getItem('ramito_transfer_titular_2') || 'COMPLEJO RAMITO S.A.');
   const [showExportModal, setShowExportModal] = useState(false);
-  const [selectedExportRange, setSelectedExportRange] = useState<'semanal' | 'mensual'>('semanal');
+  const [selectedExportRange, setSelectedExportRange] = useState<'mensual' | 'trimestral'>('mensual');
   const [selectedAuditLog, setSelectedAuditLog] = useState<any>(null);
 
   // States for WEB License Options (Separated and Complete)
@@ -116,16 +128,35 @@ export default function ProfileView() {
   const [supportEmail, setSupportEmail] = useState(() => localStorage.getItem('ramito_support_email') || 'soporte@ramitofut.com');
   const [supportIg, setSupportIg] = useState(() => localStorage.getItem('ramito_support_ig') || '@ramitofut');
   const [activationCode, setActivationCode] = useState('');
+  const [maintenanceBg, setMaintenanceBg] = useState(() => localStorage.getItem('ramito_maintenance_bg') || '');
+  const [maintenanceCustomMsg, setMaintenanceCustomMsg] = useState(() => localStorage.getItem('ramito_maintenance_msg') || 'Estamos realizando mejoras en nuestra aplicación móvil para ofrecerles un servicio más rápido y seguro. Las funciones de reserva estarán disponibles nuevamente a la brevedad.');
+
+  const [court1Policy, setCourt1Policy] = useState(() => localStorage.getItem('ramito_court1_policy') || 'CANCELACIÓN GRATUITA HASTA 24 HORAS ANTES DEL INICIO. EL USO DE CHIMPUNES CON COCOS GRANDES ESTÁ PROHIBIDO POR CUIDADO DEL CÉSPED.');
+  const [showCourt1PolicyWindow, setShowCourt1PolicyWindow] = useState(false);
+
+  const [court2Policy, setCourt2Policy] = useState(() => localStorage.getItem('ramito_court2_policy') || 'EL USO DE CALZADO CON TAPONES O COCÓS (BOTINES) ESTÁ ABSOLUTAMENTE PROHIBIDO POR CUESTIONES DE SEGURIDAD Y CUIDADO DE LA LOSA. SE EXIGE EL USO EXCLUSIVO DE ZAPATILLAS DE SUELA LISA DE GOMA (SUELA FLAT/FUTSAL).');
+  const [showCourt2PolicyWindow, setShowCourt2PolicyWindow] = useState(false);
+
+  const [stockAlertThreshold, setStockAlertThreshold] = useState<number>(() => {
+    return parseInt(localStorage.getItem('ramito_stock_alert_threshold') || '5', 10);
+  });
 
   // States for news/marquee and profile configurations
 
   const [newMarqueeText, setNewMarqueeText] = useState(() => marqueeText || '');
+  const [newSecondaryMarqueeText, setNewSecondaryMarqueeText] = useState(() => secondaryMarqueeText || '');
   
   useEffect(() => {
     if (marqueeText) {
       setNewMarqueeText(marqueeText);
     }
   }, [marqueeText]);
+
+  useEffect(() => {
+    if (secondaryMarqueeText !== undefined) {
+      setNewSecondaryMarqueeText(secondaryMarqueeText);
+    }
+  }, [secondaryMarqueeText]);
 
   useEffect(() => {
     if (eliteKey) {
@@ -190,8 +221,6 @@ export default function ProfileView() {
   };
 
   // States for Emergency Tab (Cierre de Emergencia)
-  const [emergencyReason, setEmergencyReason] = useState(() => localStorage.getItem('ramito_emergency_reason') || 'Inclemencias Climáticas');
-  const [emergencyMessage, setEmergencyMessage] = useState(() => localStorage.getItem('ramito_emergency_message') || 'El complejo permanecerá cerrado temporalmente debido a tormentas eléctricas. Las reservas de hoy se reprogramarán libremente.');
   const [affectedCourts, setAffectedCourts] = useState(() => localStorage.getItem('ramito_emergency_courts') || 'Ambas');
 
   // Audit Logs State
@@ -224,16 +253,65 @@ export default function ProfileView() {
     });
   };
 
-  const generatePDFReport = (range: 'semanal' | 'mensual') => {
-    const daysFiltered = range === 'semanal' ? 7 : 30;
+  const exportToExcelReport = (range: 'mensual' | 'trimestral') => {
+    const totalCaja = cashTotal + transferTotal + mpTotal;
+    
+    let csvContent = "\uFEFF"; // Add UTF-8 BOM so Excel opens accented characters flawlessly
+    
+    csvContent += "=== REPORTE DE AUDITORÍA Y ARQUEO DE CAJA ===\n";
+    csvContent += `Complejo Lunático:;${stadiumName || 'Complejo Deportivo Ramito'}\n`;
+    csvContent += `Rango del Reporte:;${range.toUpperCase()}\n`;
+    csvContent += `Fecha de Carga/Consolidado:;${new Date().toLocaleString('es-AR')}\n\n`;
+
+    csvContent += "=== CONCILIACIÓN DE FONDOS ===\n";
+    csvContent += "Medio de Pago;Monto Registrado;Porcentaje\n";
+    csvContent += `Efectivo (Cash);$ ${cashTotal.toLocaleString('es-AR')};${((cashTotal / (totalCaja || 1)) * 100).toFixed(1)}%\n`;
+    csvContent += `Transferencias Bancarias;$ ${transferTotal.toLocaleString('es-AR')};${((transferTotal / (totalCaja || 1)) * 100).toFixed(1)}%\n`;
+    csvContent += `Mercado Pago;$ ${mpTotal.toLocaleString('es-AR')};${((mpTotal / (totalCaja || 1)) * 100).toFixed(1)}%\n`;
+    csvContent += `TOTAL CONSOLIDADO CAJA;$ ${totalCaja.toLocaleString('es-AR')};100%\n\n`;
+
+    csvContent += "=== HISTORIAL CRONOLÓGICO DE AUDITORÍA ===\n";
+    csvContent += "Fecha;Operador;Operación ID-Acción;Descripción;Resultado\n";
+    
+    const logsQty = range === 'mensual' ? Math.min(30, auditLogs.length) : auditLogs.length;
+    auditLogs.slice(0, logsQty).forEach((log: any) => {
+      const cleanDate = (log.timestamp || '').replace(/;/g, ',');
+      const cleanUser = (log.user || '').replace(/;/g, ',');
+      const cleanAction = (log.action || '').replace(/;/g, ',');
+      const cleanDesc = (log.details || '').replace(/;/g, ',');
+      const cleanStatus = (log.type || '').replace(/;/g, ',');
+      csvContent += `"${cleanDate}";"${cleanUser}";"${cleanAction}";"${cleanDesc}";"${cleanStatus}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `reporte_auditoria_${range}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`Reporte Excel/CSV exportado con éxito (${range})`, 'success');
+    addAuditLog('IMP. REPORTE EXCEL', `Se exportó el reporte estructurado en formato CSV/Excel con el consolidado en un solo click`, 'success');
+  };
+
+  const generatePDFReport = (range: 'mensual' | 'trimestral') => {
+    const daysFiltered = range === 'mensual' ? 30 : 90;
     
     // We filter logs that fit the selected timeframe or take a clean slice representation
-    const logsQty = range === 'semanal' ? Math.min(10, auditLogs.length) : auditLogs.length;
+    const logsQty = range === 'mensual' ? Math.min(25, auditLogs.length) : auditLogs.length;
     const reportedLogs = auditLogs.slice(0, logsQty);
+
+    // Dynamic totals
+    const totalCaja = cashTotal + transferTotal + mpTotal;
+    const cashPercentage = ((cashTotal / (totalCaja || 1)) * 100).toFixed(1);
+    const transferPercentage = ((transferTotal / (totalCaja || 1)) * 100).toFixed(1);
+    const mpPercentage = ((mpTotal / (totalCaja || 1)) * 100).toFixed(1);
 
     const reportWindow = window.open('', '_blank');
     if (!reportWindow) {
-      if (showToast) showToast('Habilite las ventanas emergentes para descargar el PDF', 'error');
+      if (showToast) showToast('Hablite las ventanas emergentes para descargar el PDF', 'error');
       return;
     }
 
@@ -247,9 +325,10 @@ export default function ProfileView() {
               color: #1a1a1a;
               padding: 40px;
               background-color: #ffffff;
+              line-height: 1.4;
             }
             .header-container {
-              border-bottom: 3px solid #ef4444;
+              border-bottom: 3px solid #009EE3;
               padding-bottom: 20px;
               margin-bottom: 30px;
               display: flex;
@@ -257,17 +336,17 @@ export default function ProfileView() {
               align-items: center;
             }
             .main-title {
-              font-size: 24px;
+              font-size: 26px;
               font-weight: 900;
               text-transform: uppercase;
               letter-spacing: -0.5px;
-              color: #000000;
+              color: #121414;
               margin: 0;
             }
             .main-subtitle {
-              font-size: 10px;
+              font-size: 11px;
               font-weight: bold;
-              color: #666666;
+              color: #009EE3;
               text-transform: uppercase;
               letter-spacing: 2px;
               margin-top: 4px;
@@ -279,17 +358,32 @@ export default function ProfileView() {
               text-transform: uppercase;
               letter-spacing: 0.5px;
             }
+            .section-title {
+              font-size: 12px;
+              font-weight: 800;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              color: #0f172a;
+              margin-top: 30px;
+              margin-bottom: 12px;
+              border-left: 4px solid #009EE3;
+              padding-left: 10px;
+            }
             .stats-grid {
               display: grid;
-              grid-template-columns: repeat(3, 1fr);
+              grid-template-columns: repeat(4, 1fr);
               gap: 15px;
-              margin-bottom: 35px;
+              margin-bottom: 25px;
             }
             .stat-box {
               border: 1px solid #e2e8f0;
               padding: 15px;
-              border-radius: 10px;
+              border-radius: 12px;
               background-color: #f8fafc;
+            }
+            .stat-box.highlight {
+              border: 1px solid #009EE3;
+              background-color: #f0f9ff;
             }
             .stat-label {
               font-size: 9px;
@@ -299,21 +393,24 @@ export default function ProfileView() {
               letter-spacing: 1px;
             }
             .stat-value {
-              font-size: 24px;
+              font-size: 20px;
               font-weight: 800;
               color: #0f172a;
               margin-top: 5px;
             }
+            .stat-value.highlight-text {
+              color: #009EE3;
+            }
             table {
               width: 100%;
               border-collapse: collapse;
-              margin-bottom: 30px;
+              margin-bottom: 25px;
             }
             th {
               background-color: #f1f5f9;
               text-align: left;
-              padding: 12px 14px;
-              font-size: 10px;
+              padding: 10px 12px;
+              font-size: 9.5px;
               font-weight: bold;
               color: #475569;
               text-transform: uppercase;
@@ -321,8 +418,8 @@ export default function ProfileView() {
               border-bottom: 2px solid #cbd5e1;
             }
             td {
-              padding: 12px 14px;
-              font-size: 11px;
+              padding: 10px 12px;
+              font-size: 10.5px;
               border-bottom: 1px solid #e2e8f0;
               color: #1e293b;
             }
@@ -330,7 +427,7 @@ export default function ProfileView() {
               font-size: 8px;
               font-weight: 800;
               text-transform: uppercase;
-              padding: 2.5px 6px;
+              padding: 2px 6px;
               border-radius: 4px;
               display: inline-block;
             }
@@ -338,6 +435,55 @@ export default function ProfileView() {
             .badge-success { background-color: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
             .badge-warning { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
             .badge-info { background-color: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+            .badge-mp { background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+            
+            .auditable-meta {
+              background-color: #fafafa;
+              border: 1px dashed #cbd5e1;
+              border-radius: 12px;
+              padding: 15px;
+              margin-bottom: 30px;
+              display: flex;
+              justify-content: space-between;
+              gap: 20px;
+            }
+            .meta-column {
+              flex: 1;
+              font-size: 10px;
+            }
+            .meta-column h5 {
+              margin: 0 0 6px 0;
+              color: #64748b;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              font-weight: bold;
+            }
+            .meta-column p {
+              margin: 0;
+              font-weight: bold;
+              color: #1e293b;
+            }
+
+            .sig-container {
+              margin-top: 50px;
+              display: flex;
+              justify-content: space-between;
+              gap: 50px;
+              page-break-inside: avoid;
+            }
+            .sig-box {
+              flex: 1;
+              text-align: center;
+              border-top: 1px solid #cbd5e1;
+              padding-top: 10px;
+              font-size: 10px;
+              font-weight: bold;
+              color: #64748b;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+              margin-top: 60px;
+            }
+
             .footer-container {
               border-top: 1px solid #e2e8f0;
               padding-top: 20px;
@@ -354,36 +500,87 @@ export default function ProfileView() {
           <div class="header-container">
             <div>
               <h1 class="main-title">RAMITO FUT SHOW</h1>
-              <div class="main-subtitle">CONSOLA ELITE • REGISTROS DE AUDITORÍA (${range.toUpperCase()})</div>
+              <div class="main-subtitle">CONSOLA ELITE • REPORTE DE AUDITORÍA DETALLADO (${range.toUpperCase()})</div>
             </div>
             <div class="meta-info">
               <div>Rango: Reporte Histórico de ${daysFiltered} Días</div>
               <div>Emisión: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
+              <div>ID Operación: MP-AUDIT-TX-${Date.now()}</div>
             </div>
           </div>
 
+          <div class="auditable-meta">
+            <div class="meta-column">
+              <h5>Licencias de Operación</h5>
+              <p>Web App: Activa (Vercel Secure Deploy)</p>
+              <p>Móvil PWA: ${appOfflineCache}</p>
+            </div>
+            <div class="meta-column">
+              <h5>Pasarela Homologada</h5>
+              <p>Servicio: Mercado Pago SDK v2 (Producción)</p>
+              <p>Gateway IPN Callback: HTTPS POST webhook_ok</p>
+            </div>
+            <div class="meta-column">
+              <h5>Estado de Caja</h5>
+              <p>Recaudación: Balance Cuadrado y Auditado</p>
+              <p>Moneda Oficial: Peso Argentino (ARS)</p>
+            </div>
+          </div>
+
+          <div class="section-title">Resumen de Caja Consolidado</div>
           <div class="stats-grid">
-            <div class="stat-box">
-              <div class="stat-label">Total Sucesos</div>
-              <div class="stat-value">${reportedLogs.length}</div>
+            <div class="stat-box highlight">
+              <div class="stat-label">Caja Total Hoy</div>
+              <div class="stat-value highlight-text">$${totalCaja.toLocaleString('es-AR')}</div>
             </div>
             <div class="stat-box">
-              <div class="stat-label">Acciones Críticas</div>
-              <div class="stat-value">${reportedLogs.filter(l => l.type === 'alert').length}</div>
+              <div class="stat-label">Recaudado Puerta</div>
+              <div class="stat-value">$${cashTotal.toLocaleString('es-AR')} (${cashPercentage}%)</div>
             </div>
             <div class="stat-box">
-              <div class="stat-label">Modificaciones Ok</div>
-              <div class="stat-value">${reportedLogs.filter(l => l.type === 'success').length}</div>
+              <div class="stat-label">Bancos Directo</div>
+              <div class="stat-value">$${transferTotal.toLocaleString('es-AR')} (${transferPercentage}%)</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-label">Cobros Mercado Pago</div>
+              <div class="stat-value">$${mpTotal.toLocaleString('es-AR')} (${mpPercentage}%)</div>
             </div>
           </div>
 
+          <div class="section-title">Ledger de Transacciones del Día (Caja Unificada)</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 12%">Hora</th>
+                <th style="width: 25%">Medio de Cobro</th>
+                <th style="width: 45%">Detalle de la Operación</th>
+                <th style="width: 18%">Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${ledgerTransactions.map(tx => `
+                <tr>
+                  <td style="font-family: monospace; font-weight: bold; color: #475569;">${tx.time}</td>
+                  <td>
+                    <span class="badge-style ${tx.type === 'mercadopago' ? 'badge-mp' : tx.type === 'transfer' ? 'badge-success' : 'badge-info'}">
+                      ${tx.method}
+                    </span>
+                  </td>
+                  <td style="font-weight: bold; color: #0f172a;">${tx.detail}</td>
+                  <td style="font-family: monospace; font-weight: 900; color: #1e293b;">$${(tx.amount || 0).toLocaleString('es-AR')} ARS</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="section-title">Log de Seguridad de la Consola (${reportedLogs.length} Sucesos Recientes)</div>
           <table>
             <thead>
               <tr>
                 <th style="width: 15%">timestamp</th>
-                <th style="width: 20%">acción realizada</th>
+                <th style="width: 25%">acción realizada</th>
                 <th style="width: 45%">detalles descriptivos del log</th>
-                <th style="width: 20%">usuario administrador</th>
+                <th style="width: 15%">autorizado por</th>
               </tr>
             </thead>
             <tbody>
@@ -395,15 +592,24 @@ export default function ProfileView() {
                       ${log.action}
                     </span>
                   </td>
-                  <td style="font-weight: bold; color: #0f172a;">${log.details}</td>
+                  <td style="font-weight: normal; color: #334155;">${log.details}</td>
                   <td style="color: #64748b; font-size: 10px; font-weight: bold; text-transform: uppercase;">${log.user}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
 
+          <div class="sig-container">
+            <div class="sig-box">
+              Firma Administrador Responsable
+            </div>
+            <div class="sig-box">
+              Firma Auditor de Calidad del Complejo
+            </div>
+          </div>
+
           <div class="footer-container">
-            SISTEMA LICENCIADO RAMITO FUT SHOW • REPORTE IMPRESO DE AUDITORÍA DE SEGURIDAD
+            SISTEMA LICENCIADO RAMITO FUT SHOW • ARCHIVO DE SEGURIDAD PROTEGIDO POR LICENCIA ELITE
           </div>
           
           <script>
@@ -417,7 +623,7 @@ export default function ProfileView() {
 
     reportWindow.document.write(htmlContent);
     reportWindow.document.close();
-    addAuditLog('IMP. REPORTE AUDITORÍA', `Se exportó el reporte ${range.toUpperCase()} estructurado para formato PDF e impresión de seguridad.`, 'success');
+    addAuditLog('IMP. REPORTE AUDITORÍA', `Se exportó el reporte dinámico ${range.toUpperCase()} (Caja total: $${totalCaja.toLocaleString('es-AR')}) estructurado para formato PDF e impresión de seguridad.`, 'success');
   };
 
   const filteredAuditLogs = selectedAuditFilter === 'todos' 
@@ -455,6 +661,21 @@ export default function ProfileView() {
     rand += '-';
     for (let i = 0; i < 4; i++) rand += numbers.charAt(Math.floor(Math.random() * numbers.length));
     setNewCodeName(`RAMITO-${rand}`);
+  };
+
+  const handleBgUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      showToast('Por favor, selecciona un archivo de imagen válido', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setMaintenanceBg(base64);
+      localStorage.setItem('ramito_maintenance_bg', base64);
+      showToast('Imagen de fondo de mantenimiento cargada con éxito', 'success');
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAddCustomCode = () => {
@@ -499,7 +720,7 @@ export default function ProfileView() {
     
     const newNotification = {
       id: 'renewal-req-' + Date.now(),
-      title: `🚨 Solicitud de Renovación (${licenseType.toUpperCase()})`,
+      title: `Solicitud de Renovación (${licenseType.toUpperCase()})`,
       message: `El ${userRoleStr} (${userNameStr}) solicita formalmente la renovación de la Licencia ${licenseType === 'web' ? 'Web de Producción' : 'Móvil de la APP'}.`,
       time: 'Justo ahora',
       read: false,
@@ -558,7 +779,7 @@ export default function ProfileView() {
 
         const newNotification = {
           id: 'renewal-success-' + Date.now(),
-          title: `🔑 Licencia Activada con Éxito (${licenseType.toUpperCase()})`,
+          title: `Licencia Activada con Éxito (${licenseType.toUpperCase()})`,
           message: `Se ha aplicado el código de cupón ${cleanedCode} para renovar la Licencia ${licenseType === 'web' ? 'Web' : 'App'} por ${daysToAdd} días. El sistema vuelve a estar operativo.`,
           time: 'Justo ahora',
           read: false,
@@ -576,22 +797,7 @@ export default function ProfileView() {
     }
   };
 
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [avatar, setAvatar] = useState(() => localStorage.getItem('ramito_user_avatar') || null);
-
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setAvatar(base64String);
-        localStorage.setItem('ramito_user_avatar', base64String);
-        showToast('Avatar de operador cargado', 'success');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+   const [avatar, setAvatar] = useState(() => localStorage.getItem('ramito_user_avatar') || null);
 
   const handleUpdateAvatarAndName = async () => {
     if (!newProfileName.trim()) {
@@ -623,6 +829,7 @@ export default function ProfileView() {
       
       localStorage.setItem('ramito_user_name', uppercaseName);
       localStorage.setItem('ramito_user_email', emailLower);
+      setUserName(uppercaseName);
 
       if (userId && userId !== 'master_access' && isSupabaseConfigured) {
         const { error } = await supabase
@@ -667,7 +874,8 @@ export default function ProfileView() {
   const userId = localStorage.getItem('ramito_user_id');
   const userRole = localStorage.getItem('ramito_user_role');
   const userName = userData?.name || localStorage.getItem('ramito_user_name') || 'Cargando...';
-  const isReadOnly = userRole !== 'admin_elite';
+  const isReadOnly = userRole !== 'admin_elite' && userRole !== 'admin_vip';
+  const isLicensingReadOnly = userRole !== 'admin_elite';
 
   const [newProfileName, setNewProfileName] = useState('');
   
@@ -749,9 +957,17 @@ export default function ProfileView() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem('ramito_current_session_id');
+    localStorage.removeItem('ramito_user_id');
+    localStorage.removeItem('ramito_user_name');
+    localStorage.removeItem('ramito_user_role');
+    localStorage.removeItem('ramito_user_email');
+    localStorage.removeItem('ramito_user_pw');
+    setUserName('');
+    setUserRole(null);
+    setUserAvatar(null);
     navigate('/');
-    showToast('Sesión cerrada correctamente');
+    showToast('Sesión cerrada correctamente', 'success');
   };
 
   const handleSaveKeys = async () => {
@@ -861,6 +1077,13 @@ export default function ProfileView() {
     }
   };
 
+  const handleSaveCantina = () => {
+    saveCantinaItems(cantinaItems);
+    addAuditLog('CONF. TIENDA / CANTINA', `Actualización de tarifas e inventarios de tienda/cantina. ${cantinaItems.length} productos configurados en catálogo en tiempo real.`, 'success');
+    showToast('¡Catálogo de Cantina e Extras actualizado con éxito!', 'success');
+    setShowCantinaWindow(false);
+  };
+
   const handleSaveAppConfig = async () => {
     localStorage.setItem('ramito_app_days_remaining', String(appDaysRemaining));
     localStorage.setItem('ramito_app_pwa_short_name', appPwaShortName);
@@ -928,9 +1151,11 @@ export default function ProfileView() {
           <div className="relative">
             <div 
               className="w-24 h-24 rounded-[2.5rem] bg-gradient-to-br from-[#4be277] to-[#121414] p-1 shadow-2xl shadow-[#4be277]/20 relative overflow-hidden group cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                setShowProfileModal(true);
+                setShowAdvancedConfig(true);
+              }}
             >
-              <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleAvatarChange} />
               <div className="w-full h-full rounded-[2.2rem] bg-[#121414] flex items-center justify-center overflow-hidden relative">
                 {avatar ? (
                   <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
@@ -938,7 +1163,7 @@ export default function ProfileView() {
                   <User className="w-12 h-12 text-[#4be277]" />
                 )}
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span className="text-[8px] font-black uppercase tracking-widest text-white">Cambiar</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-white">Editar</span>
                 </div>
               </div>
             </div>
@@ -949,10 +1174,25 @@ export default function ProfileView() {
           <div className="flex-1 text-left">
             <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter leading-none">{userName}</h2>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-2">
-              <span className={`self-start text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${
+              <span className={`self-start text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border flex items-center gap-1.5 italic ${
                 userRole?.includes('admin') ? 'bg-[#4be277]/10 border-[#4be277]/30 text-[#4be277]' : 'bg-white/5 border-white/10 text-[#bccbb9]'
               }`}>
-                {userRole === 'admin_elite' ? '👑 ELITE ADMIN' : (userRole === 'admin_vip' ? '💎 VIP ADMIN' : '⚽ JUGADOR')}
+                {userRole === 'admin_elite' ? (
+                  <>
+                    <Crown className="w-3 h-3 text-[#4be277]" strokeWidth={2.5} />
+                    ELITE ADMIN
+                  </>
+                ) : userRole === 'admin_vip' ? (
+                  <>
+                    <Gem className="w-3 h-3 text-[#4be277]" strokeWidth={2.5} />
+                    VIP ADMIN
+                  </>
+                ) : (
+                  <>
+                    <Activity className="w-3 h-3 text-[#bccbb9]" strokeWidth={2.5} />
+                    JUGADOR
+                  </>
+                )}
               </span>
               
               <button
@@ -974,14 +1214,18 @@ export default function ProfileView() {
        {/* TABS NAVEGACIÓN */}
       <div className="flex gap-1.5 p-1.5 glass-panel rounded-2xl border border-white/5 mb-8 overflow-x-auto scrollbar-none">
         {(userRole?.includes('admin')
-          ? ['licencias', 'ajustes', 'seguridad', 'noticia'] as const
+          ? ['licencias', 'ajustes', 'seguridad', 'noticia', 'analytics'] as const
           : ['seguridad', 'noticia'] as const
         ).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as any)}
             className={`flex-1 py-3 px-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0 ${
-              activeTab === tab ? 'bg-white/10 text-white shadow-xl border border-white/10' : 'text-[#bccbb9]/40'
+              activeTab === tab 
+                ? tab === 'analytics'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-white/10 text-white shadow-xl border border-white/10' 
+                : 'text-[#bccbb9]/40 hover:text-[#bccbb9]/60'
             }`}
           >
             {tab === 'seguridad' 
@@ -990,7 +1234,9 @@ export default function ProfileView() {
               ? 'LICENCIAS' 
               : tab === 'ajustes' 
               ? 'AJUSTES' 
-              : 'MARQUESINA'}
+              : tab === 'noticia'
+              ? 'MARQUESINA'
+              : '📊 ANALÍTICA'}
           </button>
         ))}
       </div>
@@ -1111,74 +1357,10 @@ export default function ProfileView() {
                   <Settings className="w-4 h-4 text-amber-500" /> Configurar Licencia App
                 </button>
               </div>
-
-              {/* Card Modo Mantenimiento */}
-              <div 
-                className="glass-panel rounded-3xl border p-5 space-y-4 bg-zinc-950/60 relative overflow-hidden"
-                style={{ borderColor: maintenanceMode ? 'rgba(239, 68, 68, 0.4)' : 'rgba(75, 226, 119, 0.2)' }}
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
-
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-                      <Wrench className="w-5 h-5 text-red-500" />
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-black text-white uppercase tracking-wider block italic">Mantenimiento del Sistema</span>
-                      <span className="text-[8px] font-mono text-[#bccbb9]/50 tracking-wider">ID: LIC-SYS-MANT-2026-FUT</span>
-                    </div>
-                  </div>
-                  <span className={`text-[8px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded border ${
-                    maintenanceMode ? 'bg-red-500/10 border-red-500/30 text-red-500 animate-pulse' : 'bg-[#4be277]/10 border-[#4be277]/30 text-[#4be277]'
-                  }`}>
-                    {maintenanceMode ? 'Activo (Bloqueado)' : 'Inactivo (Liberado)'}
-                  </span>
-                </div>
-
-                <div className="space-y-2 pt-1 border-t border-white/5">
-                  <div className="flex justify-between items-center text-[9px]">
-                    <span className="text-[#bccbb9]/40 uppercase font-black tracking-widest">Pantalla de Espera:</span>
-                    <span className="text-white font-black uppercase">Logo Grande + Mensaje</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[9px]">
-                    <span className="text-[#bccbb9]/40 uppercase font-black tracking-widest">Acceso del Personal:</span>
-                    <span className="text-[#4be277] font-black uppercase">Habilitado</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[9px]">
-                    <span className="text-[#bccbb9]/40 uppercase font-black tracking-widest">Configura:</span>
-                    <span className="text-[#4be277] font-black uppercase">Elite Admin</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-2xl">
-                  <div>
-                    <span className="text-[10px] font-black text-white uppercase tracking-wider block">Interruptor de Mantenimiento</span>
-                    <span className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block mt-0.5">Activar pantalla de Volveremos pronto</span>
-                  </div>
-                  {!isReadOnly ? (
-                    <button 
-                      onClick={() => {
-                        const newVal = !maintenanceMode;
-                        setMaintenanceMode(newVal);
-                        localStorage.setItem('ramito_maintenance', String(newVal));
-                        showToast(newVal ? 'Modo Mantenimiento Activado' : 'Modo Mantenimiento Desactivado', newVal ? 'error' : 'success');
-                      }}
-                      className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors ${maintenanceMode ? 'bg-red-500' : 'bg-white/10'}`}
-                    >
-                      <motion.div animate={{ x: maintenanceMode ? 24 : 0 }} className={`w-5 h-5 rounded-full ${maintenanceMode ? 'bg-white' : 'bg-zinc-400'}`} />
-                    </button>
-                  ) : (
-                    <div className="flex flex-col items-end">
-                      <span className="text-[8px] font-black text-[#FF9100] bg-[#FF9100]/10 border border-[#FF9100]/20 px-2 py-0.5 rounded">SÓLO LECTURA (VIP)</span>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* GESTOR DE CÓDIGOS DE ACTIVACIÓN (SOLO ELITE ADMIN) */}
-            {!isReadOnly && (
+            {!isLicensingReadOnly && (
               <div className="glass-panel rounded-3xl border border-white/5 p-5 space-y-4 bg-zinc-950/60 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
                 
@@ -1187,7 +1369,7 @@ export default function ProfileView() {
                     <Key className="w-5 h-5 text-purple-400" />
                   </div>
                   <div>
-                    <span className="text-[11px] font-black text-white uppercase tracking-wider block italic">🔑 Servidor de Códigos (App Móvil PWA)</span>
+                    <span className="text-[11px] font-black text-white uppercase tracking-wider block italic">Servidor de Códigos (App Móvil PWA)</span>
                     <span className="text-[8px] font-mono text-[#bccbb9]/50 tracking-wider">CREAR CUPONES DE RECARGA • EXCLUSIVO ELITE</span>
                   </div>
                 </div>
@@ -1236,7 +1418,7 @@ export default function ProfileView() {
                     <div>
                       <label className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block mb-1">Aplica Para</label>
                       <div className="flex items-center h-10 w-full rounded-xl border border-purple-500/15 bg-purple-500/5 px-3 text-[8.5px] font-bold uppercase tracking-wider text-purple-300">
-                        📱 Sólo APP Móvil PWA
+                        Sólo APP Móvil PWA
                       </div>
                     </div>
                   </div>
@@ -1244,7 +1426,7 @@ export default function ProfileView() {
                   <button
                     type="button"
                     onClick={handleAddCustomCode}
-                    className="w-full h-10 bg-purple-500 hover:bg-purple-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all outline-none"
+                    className="w-full h-10 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/50 text-purple-300 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all outline-none"
                   >
                     <Plus className="w-3.5 h-3.5" /> Registrar Cupón Activo
                   </button>
@@ -1278,7 +1460,7 @@ export default function ProfileView() {
                                   <div className="relative flex items-center justify-center">
                                     <span className="text-[9px]">{itemNumber}</span>
                                     <div className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-black w-3.5 h-3.5 rounded-full flex items-center justify-center border border-black shadow">
-                                      <CheckCircle2 className="w-2.5 h-2.5" strokeWidth={4} />
+                                      <Check className="w-2.5 h-2.5" strokeWidth={4} />
                                     </div>
                                   </div>
                                 ) : (
@@ -1364,11 +1546,51 @@ export default function ProfileView() {
               </p>
             </div>
 
+            {/* BOTÓN MANTENIMIENTO DEL SISTEMA (ABRE VENTANA FLOTANTE FULL-SCREEN) */}
+            <button
+              onClick={() => setShowMaintenanceWindow(true)}
+              className={`w-full text-left glass-panel rounded-3xl border p-5 relative overflow-hidden group hover:border-amber-500/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r ${
+                maintenanceMode
+                  ? 'from-amber-950/45 to-amber-900/10 border-amber-500/40 shadow-[0_10px_35px_rgba(245,158,11,0.15)]'
+                  : 'from-zinc-950/80 to-zinc-950/40 border-white/5 shadow-lg'
+              }`}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-all duration-500" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
+                    maintenanceMode
+                      ? 'bg-amber-500/20 border-amber-500/45 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-pulse'
+                      : 'bg-amber-500/10 border-amber-500/20 text-amber-500 group-hover:bg-amber-500/20 group-hover:border-amber-500/40'
+                  }`}>
+                    <Wrench className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-amber-400 transition-colors">
+                      Mantenimiento del Sistema
+                    </span>
+                    <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                      SOPORTE TÉCNICO • WALLPAPER DE ESPERA • MENSAJE PERSONALIZADO
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`w-2 h-2 rounded-full ${maintenanceMode ? 'bg-red-500 animate-ping' : 'bg-[#4be277]'}`} />
+                      <span className={`text-[8px] font-black uppercase tracking-wider font-mono ${maintenanceMode ? 'text-red-400 font-bold' : 'text-[#4be277]'}`}>
+                        {maintenanceMode ? 'BLOQUEO ACTIVO / APP EN MANTENIMIENTO' : 'PANTALLA DE ESPERA LIBERADA / OPERANDO'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                  <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </div>
+            </button>
+
             {/* CIERRE DE EMERGENCIA AUTOMÁTICO (BOTÓN PREFERENCIAL EN PANTALLA COMPLETA) */}
             <button
               onClick={() => setShowEmergencyWindow(true)}
               className={`w-full text-left glass-panel rounded-3xl border p-5 relative overflow-hidden group hover:border-red-500/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r ${
-                maintenanceMode
+                emergencyMode
                   ? 'from-red-950/45 to-red-900/10 border-red-500/40 shadow-[0_10px_35px_rgba(239,68,68,0.15)]'
                   : 'from-zinc-950/80 to-zinc-950/40 border-white/5 shadow-lg'
               }`}
@@ -1377,7 +1599,7 @@ export default function ProfileView() {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-start gap-3.5">
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
-                    maintenanceMode
+                    emergencyMode
                       ? 'bg-red-500/20 border-red-500/45 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.25)] animate-pulse'
                       : 'bg-red-500/10 border-red-500/20 text-red-500 group-hover:bg-red-500/20 group-hover:border-red-500/40'
                   }`}>
@@ -1391,9 +1613,9 @@ export default function ProfileView() {
                       SUSPENSIÓN EN TIEMPO REAL • BLOQUEO DE RESERVAS Y CANCHAS
                     </p>
                     <div className="flex items-center gap-2 mt-2">
-                      <span className={`w-2 h-2 rounded-full ${maintenanceMode ? 'bg-red-500 animate-ping' : 'bg-green-500'}`} />
-                      <span className={`text-[8px] font-black uppercase tracking-wider font-mono ${maintenanceMode ? 'text-red-400' : 'text-green-400'}`}>
-                        {maintenanceMode ? 'SISTEMA BAJO MANTENIMIENTO / CERRADO' : 'SISTEMA ONLINE / OPERATIVO CON NORMALIDAD'}
+                      <span className={`w-2 h-2 rounded-full ${emergencyMode ? 'bg-red-500 animate-ping' : 'bg-green-500'}`} />
+                      <span className={`text-[8px] font-black uppercase tracking-wider font-mono ${emergencyMode ? 'text-red-400' : 'text-green-400'}`}>
+                        {emergencyMode ? 'CIERRE POR FUERZA MAYOR ACTIVO (BLOQUEADO)' : 'SISTEMA ONLINE / OPERATIVO CON NORMALIDAD'}
                       </span>
                     </div>
                   </div>
@@ -1499,6 +1721,102 @@ export default function ProfileView() {
                 </div>
               </div>
             </button>
+
+            {/* BOTÓN RESTRICCIONES Y POLÍTICAS DE CANCHA 1 (CÉSPED) */}
+            <button
+              onClick={() => setShowCourt1PolicyWindow(true)}
+              className="w-full text-left glass-panel rounded-3xl border border-white/5 p-5 relative overflow-hidden group hover:border-[#4be277]/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-zinc-950/80 to-zinc-950/40 shadow-lg"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#4be277]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#4be277]/10 transition-all duration-500" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277] group-hover:bg-[#4be277]/20 group-hover:border-[#4be277]/40 transition-all duration-300">
+                    <Info className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-[#4be277] transition-colors">
+                      Políticas de Reglas - Cancha 1 (Césped)
+                    </span>
+                    <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                      RESTRICCIONES DE BOTINES • REGULATION WARNINGS • MENSAJE PERSISTIDO EN RESERVAS
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="w-2 h-2 rounded-full bg-[#4be277] animate-pulse" />
+                      <span className="text-[8px] font-black uppercase tracking-wider font-mono text-[#bccbb9]/70 truncate max-w-[200px] sm:max-w-md block select-none">
+                        {court1Policy}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                  <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </div>
+            </button>
+
+            {/* BOTÓN RESTRICCIONES Y POLÍTICAS DE CANCHA 2 (SIN CÉSPED) */}
+            <button
+              onClick={() => setShowCourt2PolicyWindow(true)}
+              className="w-full text-left glass-panel rounded-3xl border border-white/5 p-5 relative overflow-hidden group hover:border-amber-500/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-zinc-950/80 to-zinc-950/40 shadow-lg"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-all duration-500" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-amber-500/10 border-amber-500/20 text-amber-500 group-hover:bg-amber-500/20 group-hover:border-amber-500/40 transition-all duration-300">
+                    <Info className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-amber-500 transition-colors">
+                      Políticas de Reglas - Cancha 2 (Sin Césped)
+                    </span>
+                    <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                      CALZADO DE SUELA LISA • LOSA DEPORTIVA • RESTRICCIONES DE BOTINES CON COCÓS
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="text-[8px] font-black uppercase tracking-wider font-mono text-[#bccbb9]/70 truncate max-w-[200px] sm:max-w-md block select-none">
+                        {court2Policy}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                  <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </div>
+            </button>
+
+            {/* BOTÓN CONFIGURACIÓN DE CANTINA & MINI-SHOP */}
+            <button
+              onClick={() => setShowCantinaWindow(true)}
+              className="w-full text-left glass-panel rounded-3xl border border-white/5 p-5 relative overflow-hidden group hover:border-[#FF9100]/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-zinc-950/80 to-zinc-950/40 shadow-lg"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF9100]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#FF9100]/10 transition-all duration-500" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-[#FF9100]/10 border-[#FF9100]/20 text-[#FF9100] group-hover:bg-[#FF9100]/20 group-hover:border-[#FF9100]/40 transition-all duration-300">
+                    <GlassWater className="w-6 h-6 animate-bounce" />
+                  </div>
+                  <div>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-[#FF9100] transition-colors">
+                      Configuración de Cantina, Bebidas y Extras
+                    </span>
+                    <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                      AJUSTE DE TARIFAS • EDITADOR DE PRECIOS Y DESCRIPCIÓN DE CONSUMOS E INSUMOS EXTRAS
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="w-2 h-2 rounded-full bg-[#FF9100] animate-pulse" />
+                      <span className="text-[8px] font-black uppercase tracking-wider font-mono text-[#FF9100]">
+                        TIENDA ACTIVA • {cantinaItems.length} PRODUCTOS CONFIGURADOS EN CAJA
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                  <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </div>
+            </button>
           </motion.div>
         )}
 
@@ -1548,63 +1866,286 @@ export default function ProfileView() {
               </div>
             ) : (
               <div className="space-y-6 text-left font-sans">
-                {/* 1. SECCIÓN: CAJA DEL DÍA - REVOLUCIONARIA Y POLISHED */}
+                {/* 1. SECCIÓN: CAJA DEL DÍA - REVOLUCIONARIA, CON MERCADO PAGO INTEGRADO */}
                 <div className="glass-panel rounded-3xl border border-white/5 p-5 bg-zinc-950/60 relative overflow-hidden space-y-4">
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-[#4be277]/[0.02] rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute top-0 right-0 w-48 h-48 bg-[#009EE3]/[0.02] rounded-full blur-3xl pointer-events-none" />
                   
-                  <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-                    <div className="w-10 h-10 rounded-xl bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20 shrink-0">
-                      <CreditCard className="w-5 h-5 text-[#4be277]" />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#009EE3]/10 flex items-center justify-center border border-[#009EE3]/20 shrink-0">
+                        <CreditCard className="w-5 h-5 text-[#009EE3]" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black text-[#009EE3] uppercase tracking-wider block italic">Sistema de Caja Unificada</span>
+                        <h4 className="text-sm font-black text-white uppercase italic tracking-tighter">Auditoría Financiera Activa</h4>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-black text-[#4be277] uppercase tracking-wider block italic">Sistema de Caja del Día</span>
-                      <h4 className="text-sm font-black text-white uppercase italic tracking-tighter">Auditoría Financiera Activa</h4>
+                    <div className="flex items-center gap-2 bg-black/40 border border-white/5 px-2.5 py-1 rounded-xl shrink-0">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse border border-emerald-400/50" />
+                      <span className="text-[7.5px] font-black text-[#bccbb9]/60 tracking-wider uppercase font-mono">CONEXIÓN MP SECURE PRO: OK</span>
                     </div>
                   </div>
 
                   {/* Grande de Caja del Día */}
-                  <div className="text-center py-4 bg-black/40 border border-white/5 rounded-2xl relative overflow-hidden">
-                    <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#4be277]/40 to-transparent" />
-                    <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Monto Reconciliado Total de Hoy</span>
-                    <span className="font-mono text-3xl font-black text-white block tracking-tighter mt-1">$45.000<span className="text-xs font-bold text-[#4be277] ml-1 font-sans">ARS</span></span>
-                    <span className="text-[7.5px] font-mono text-[#4be277] uppercase tracking-widest mt-1.5 inline-flex items-center gap-1 bg-[#4be277]/10 px-2.5 py-0.5 rounded-full border border-[#4be277]/25">
-                      <Check className="w-2.5 h-2.5" /> Balance Cuadrado y Auditado
+                  <div className="text-center py-5 bg-black/50 border border-white/5 rounded-2xl relative overflow-hidden">
+                    <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#009EE3]/40 to-transparent" />
+                    <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Monto Reconciliado Total de Hoy (Semaforizado)</span>
+                    <span className="font-mono text-3xl font-black text-white block tracking-tighter mt-1">
+                      ${(cashTotal + transferTotal + mpTotal).toLocaleString('es-AR')}
+                      <span className="text-xs font-bold text-[#4be277] ml-1 font-sans">ARS</span>
                     </span>
+                    <div className="mt-2.5 flex flex-wrap justify-center gap-2">
+                      <span className="text-[7.5px] font-mono text-[#4be277] uppercase tracking-widest inline-flex items-center gap-1 bg-[#4be277]/10 px-2.5 py-0.5 rounded-full border border-[#4be277]/25">
+                        <Check className="w-2.5 h-2.5" /> Balance Cuadrado y Auditado
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCashTotal(15000);
+                          setTransferTotal(18000);
+                          setMpTotal(12000);
+                          setLedgerTransactions([
+                            { id: 'tx1', time: '15:30', detail: 'Juan Pérez • Cancha Sintética (18:00)', method: 'Mercado Pago (Aprobado)', amount: 12000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' },
+                            { id: 'tx2', time: '14:15', detail: 'María Gómez • Cancha de Tenis (19:00)', method: 'Efectivo en Puerta', amount: 8000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
+                            { id: 'tx3', time: '12:00', detail: 'Carlos Soto • Cancha Sintética (15:00)', method: 'Transferencia Bancaria', amount: 12000, type: 'transfer', labelColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+                            { id: 'tx4', time: '10:45', detail: 'Lucas Díaz • Cancha de Pádel (16:30)', method: 'Efectivo en Puerta', amount: 7000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
+                            { id: 'tx5', time: '09:15', detail: 'Andrés Ruiz • Cancha de Pádel (17:30)', method: 'Mercado Pago (API Link)', amount: 6000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' }
+                          ]);
+                          showToast('Valores de caja restablecidos a valores por defecto', 'success');
+                        }}
+                        className="text-[7px] text-zinc-400 hover:text-white uppercase tracking-widest font-bold bg-white/5 px-2 py-0.5 rounded border border-white/5 transition-all"
+                      >
+                        Restablecer Caja
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Columnas de Efectivo vs Transferencia */}
-                  <div className="grid grid-cols-2 gap-3">
+                  {/* Columnas de Efectivo, Transferencia y Mercado Pago */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* Efectivo */}
-                    <div className="p-4 bg-zinc-900/60 border border-white/5 rounded-2xl space-y-1">
+                    <div className="p-4 bg-zinc-900/60 border border-white/5 rounded-2xl space-y-2 relative group">
                       <div className="flex justify-between items-center">
-                        <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest font-bold">💸 Efectivo</span>
-                        <span className="text-[7.5px] font-mono text-zinc-400 bg-white/5 px-1.5 py-0.5 rounded">33.3%</span>
+                        <span className="text-[8.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest font-bold flex items-center gap-1">💸 Efectivo</span>
+                        <span className="text-[7.5px] font-mono text-zinc-400 bg-white/5 px-1.5 py-0.5 rounded">
+                          {((cashTotal / (cashTotal + transferTotal + mpTotal || 1)) * 100).toFixed(1)}%
+                        </span>
                       </div>
-                      <span className="font-mono text-lg font-black text-white block">$15.000</span>
-                      <span className="text-[7px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Recaudado en Puerta</span>
+                      <span className="font-mono text-lg font-black text-white block">${cashTotal.toLocaleString('es-AR')}</span>
+                      <div className="flex items-center justify-between gap-1 pt-1">
+                        <span className="text-[7px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Recaudado Puerta</span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCashTotal(prev => prev + 1000);
+                              showToast('+1.000 ARS Efectivo registrado', 'success');
+                            }}
+                            className="text-[7px] font-black text-white bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
+                          >
+                            +1k
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCashTotal(prev => Math.max(0, prev - 1000));
+                              showToast('-1.000 ARS Efectivo ajustado', 'success');
+                            }}
+                            className="text-[7px] font-black text-zinc-400 bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
+                          >
+                            -1k
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Transferencias */}
-                    <div className="p-4 bg-zinc-900/60 border border-white/5 rounded-2xl space-y-1">
+                    <div className="p-4 bg-zinc-900/60 border border-white/5 rounded-2xl space-y-2 relative group">
                       <div className="flex justify-between items-center">
-                        <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest font-bold">🏦 Transferencia</span>
-                        <span className="text-[7.5px] font-mono text-[#4be277] bg-[#4be277]/10 px-1.5 py-0.5 rounded border border-[#4be277]/10">66.7%</span>
+                        <span className="text-[8.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest font-bold flex items-center gap-1">🏦 Transferencia</span>
+                        <span className="text-[7.5px] font-mono text-[#4be277] bg-[#4be277]/10 px-1.5 py-0.5 rounded border border-[#4be277]/10">
+                          {((transferTotal / (cashTotal + transferTotal + mpTotal || 1)) * 100).toFixed(1)}%
+                        </span>
                       </div>
-                      <span className="font-mono text-lg font-black text-white block">$30.000</span>
-                      <span className="text-[7px] font-black text-[#4be277]/70 uppercase tracking-widest block">Bancos Verificados</span>
+                      <span className="font-mono text-lg font-black text-white block">${transferTotal.toLocaleString('es-AR')}</span>
+                      <div className="flex items-center justify-between gap-1 pt-1">
+                        <span className="text-[7px] font-black text-[#4be277]/75 uppercase tracking-widest block">Bancos CBU Coincide</span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTransferTotal(prev => prev + 2000);
+                              showToast('+2.000 ARS Transferencia cargada', 'success');
+                            }}
+                            className="text-[7px] font-black text-white bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
+                          >
+                            +2k
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTransferTotal(prev => Math.max(0, prev - 2000));
+                              showToast('-2.000 ARS Transferencia corregida', 'success');
+                            }}
+                            className="text-[7px] font-black text-zinc-400 bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
+                          >
+                            -2k
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mercado Pago */}
+                    <div className="p-4 bg-zinc-900/60 border border-[#009EE3]/15 rounded-2xl space-y-2 relative group">
+                      <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[#009EE3] animate-pulse" />
+                      <div className="flex justify-between items-center">
+                        <span className="text-[8.5px] font-black text-[#009EE3] uppercase tracking-widest font-bold flex items-center gap-1">💙 Mercado Pago</span>
+                        <span className="text-[7.5px] font-mono text-[#009EE3] bg-[#009EE3]/10 px-1.5 py-0.5 rounded border border-[#009EE3]/15">
+                          {((mpTotal / (cashTotal + transferTotal + mpTotal || 1)) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <span className="font-mono text-lg font-black text-[#009EE3] block">${mpTotal.toLocaleString('es-AR')}</span>
+                      <div className="flex items-center justify-between gap-1 pt-1">
+                        <span className="text-[7px] font-black text-[#009EE3]/75 uppercase tracking-widest block">Cobros Digitales</span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMpTotal(prev => prev + 5000);
+                              showToast('+5.000 ARS Mercado Pago añadido', 'success');
+                            }}
+                            className="text-[7px] font-black text-white bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-[#009EE3]/25 transition-all"
+                          >
+                            +5k
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMpTotal(prev => Math.max(0, prev - 5000));
+                              showToast('-5.000 ARS Mercado Pago ajustado', 'success');
+                            }}
+                            className="text-[7px] font-black text-zinc-400 bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
+                          >
+                            -5k
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Barra de Distribución Visual */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[7px] font-bold text-[#bccbb9]/55 uppercase tracking-wider">
-                      <span>Efectivo (33%)</span>
-                      <span>Transferencias (67%)</span>
+                  {/* Barra de Distribución Visual Semáforo/Categorizada */}
+                  {(() => {
+                    const total = cashTotal + transferTotal + mpTotal || 1;
+                    const cp = (cashTotal / total) * 100;
+                    const tp = (transferTotal / total) * 100;
+                    const mpPercentageVal = (mpTotal / total) * 100;
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="flex flex-wrap justify-between text-[7px] font-extrabold text-[#bccbb9]/55 uppercase tracking-wider gap-x-3">
+                          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-zinc-500 rounded-full" /> Efectivo ({cp.toFixed(0)}%)</span>
+                          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-[#4be277] rounded-full" /> Transferencia ({tp.toFixed(0)}%)</span>
+                          <span className="flex items-center gap-1 text-[#009EE3]"><span className="w-1.5 h-1.5 bg-[#009EE3] rounded-full" /> Mercado Pago ({mpPercentageVal.toFixed(0)}%)</span>
+                        </div>
+                        <div className="h-2.5 w-full bg-zinc-950 rounded-full flex overflow-hidden border border-white/5 p-[1.5px]">
+                          <div className="h-full bg-zinc-600/70 rounded-l-full transition-all duration-500" style={{ width: `${cp}%` }} />
+                          <div className="h-full bg-[#4be277] transition-all duration-500" style={{ width: `${tp}%` }} />
+                          <div className="h-full bg-[#009EE3] rounded-r-full transition-all duration-500" style={{ width: `${mpPercentageVal}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* NUEVO: SIMULADOR DE COBROS DIGITALES MERCADO PAGO EN TIEMPO REAL */}
+                <div className="glass-panel rounded-3xl border border-[#009EE3]/15 p-5 bg-gradient-to-br from-zinc-950 via-zinc-950 to-[#009EE3]/5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-[#009EE3]/15 flex items-center justify-center border border-[#009EE3]/30 shrink-0">
+                        <Smartphone className="w-4 h-4 text-[#009EE3]" />
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-black text-[#009EE3] uppercase tracking-widest block font-sans">Pasarela y Simulador IPN / Checkout</span>
+                        <p className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block">Simula cobros en línea automáticos y valida acreditaciones</p>
+                      </div>
                     </div>
-                    <div className="h-2 w-full bg-zinc-950 rounded-full flex overflow-hidden border border-white/5 p-[1px]">
-                      <div className="h-full bg-zinc-700/60 rounded-l-full" style={{ width: '33.3%' }} />
-                      <div className="h-full bg-[#4be277] rounded-r-full" style={{ width: '66.7%' }} />
+                    <span className="text-[7.5px] text-[#009EE3] bg-[#009EE3]/10 border border-[#009EE3]/25 font-black uppercase px-2 py-0.5 rounded-lg tracking-widest">
+                      GATEWAY: SANDBOX SIMULATOR
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[8px] font-black text-[#bccbb9]/50 uppercase tracking-wider block mb-1">Nombre Jugador (Abonante)</label>
+                      <input 
+                        type="text" 
+                        id="sim_player_name"
+                        defaultValue="Juan Gómez"
+                        className="w-full h-9 bg-black/40 border border-white/10 rounded-xl px-3 text-[10.5px] font-black uppercase tracking-wider text-white outline-none focus:border-[#009EE3]"
+                        placeholder="Juan Gómez"
+                      />
                     </div>
+                    <div>
+                      <label className="text-[8px] font-black text-[#bccbb9]/50 uppercase tracking-wider block mb-1">Monto de Cobro (ARS)</label>
+                      <select 
+                        id="sim_charge_amount"
+                        defaultValue="12000"
+                        className="w-full h-9 bg-black/40 border border-white/10 rounded-xl px-3 text-[10.5px] font-black uppercase tracking-wider text-white outline-none focus:border-[#009EE3]"
+                      >
+                        <option value="6000" className="bg-zinc-950">Mínimo: $6.000 ARS</option>
+                        <option value="8000" className="bg-zinc-950">Intermedio: $8.000 ARS</option>
+                        <option value="12000" className="bg-zinc-950">Sintética: $12.000 ARS</option>
+                        <option value="15000" className="bg-zinc-950">Premium Turf: $15.000 ARS</option>
+                        <option value="25000" className="bg-zinc-950">Pack Complejo: $25.000 ARS</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const pInput = document.getElementById('sim_player_name') as HTMLInputElement;
+                          const aInput = document.getElementById('sim_charge_amount') as HTMLSelectElement;
+                          const player = (pInput?.value || 'Juan Gómez').trim().toUpperCase();
+                          const amount = parseInt(aInput?.value || '12000', 10);
+                          
+                          // Update Mercado Pago Total
+                          setMpTotal(prev => prev + amount);
+                          
+                          // Prepend payment tx object to our dynamic ledger transactions list
+                          const now = new Date();
+                          const timeStr = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+                          const newTx = {
+                            id: `tx_sim_${Date.now()}`,
+                            time: timeStr,
+                            detail: `${player} • Cancha Sintética (Pago On-Line)`,
+                            method: 'Mercado Pago (Aprobado)',
+                            amount: amount,
+                            type: 'mercadopago',
+                            labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20 animate-pulse'
+                          };
+                          setLedgerTransactions(prev => [newTx, ...prev.slice(0, 4)]);
+
+                          // Trigger High Impact system notification representing live webhook
+                          const systemWebNotification = {
+                            id: `mp_notkey_${Date.now()}`,
+                            title: 'PAGO AUTOMÁTICO MERCADO PAGO',
+                            body: `Aprobado con Éxito: El jugador ${player} abonó S/. ${(amount / 100).toFixed(2)} (${amount} ARS equivalente) vía la pasarela digital y su reserva fue AUTO-CONFIRMADA inmediatamente en Base de Datos. No requiere validación manual.`,
+                            time: 'Hace un instante',
+                            read: false
+                          };
+                          
+                          if (setNotifications) {
+                            setNotifications((prev: any[]) => [systemWebNotification, ...(prev || [])]);
+                          }
+
+                          showToast(`¡Simulación MP Exitosa! +$${amount.toLocaleString('es-AR')} acreditado.`, 'success');
+                        }}
+                        className="w-full h-9 bg-[#009EE3] hover:bg-sky-500 text-white font-black rounded-xl text-[8.5px] uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#009EE3]/15 active:scale-[0.98]"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} /> Simular Recibir Pago Mercado Pago
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest pt-1 flex items-center gap-1.5 leading-relaxed">
+                    <span>💡 <strong>PRO TIP:</strong> Tras simular un cobro, se sumará instantáneamente al total recaudado con su respectiva visualización en semáforos, actualizará el ledger inferior, e inyectará una notificación de alerta crítica en el Panel General.</span>
                   </div>
                 </div>
 
@@ -1612,28 +2153,41 @@ export default function ProfileView() {
                 <div className="glass-panel rounded-3xl border border-white/5 p-5 bg-zinc-950/60 space-y-3">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2.5">
                     <h5 className="text-[9px] font-black text-white uppercase italic tracking-widest font-bold">Ledger de Facturación Diaria</h5>
-                    <span className="text-[8px] font-mono text-[#bccbb9]/45">5 TRANSACCIONES RECIENTES</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLedgerTransactions([]);
+                        showToast('Ledger de transacciones limpiado', 'success');
+                      }}
+                      className="text-[7.5px] font-bold text-red-400 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 px-2 py-0.5 rounded transition-all uppercase tracking-widest"
+                    >
+                      Limpiar Tabla
+                    </button>
                   </div>
 
                   <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {[
-                      { time: '15:30', detail: 'Juan Pérez • Cancha Sintética (18:00)', method: 'Transferencia Bancaria', amount: '$12.000', labelColor: 'text-blue-400 bg-blue-500/10 border-blue-500/10' },
-                      { time: '14:15', detail: 'María Gómez • Cancha de Tenis (19:00)', method: 'Efectivo en Puerta', amount: '$8.000', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
-                      { time: '12:00', detail: 'Carlos Soto • Cancha Sintética (15:00)', method: 'Transferencia Bancaria', amount: '$12.000', labelColor: 'text-blue-400 bg-blue-500/10 border-blue-500/10' },
-                      { time: '10:45', detail: 'Lucas Díaz • Cancha de Pádel (16:30)', method: 'Efectivo en Puerta', amount: '$7.000', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
-                      { time: '09:15', detail: 'Andrés Ruiz • Cancha de Pádel (17:30)', method: 'Transferencia Bancaria', amount: '$6.000', labelColor: 'text-blue-400 bg-blue-500/10 border-blue-500/10' }
-                    ].map((tx, idx) => (
-                      <div key={idx} className="p-3 bg-black/40 border border-white/[0.03] rounded-xl flex justify-between items-center gap-3">
-                        <div className="text-left space-y-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-[8px] text-[#bccbb9]/40">{tx.time}</span>
-                            <span className={`text-[6.5px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-full border ${tx.labelColor}`}>{tx.method}</span>
-                          </div>
-                          <p className="text-[10px] font-black text-white uppercase italic tracking-wide font-bold">{tx.detail}</p>
-                        </div>
-                        <span className="font-mono text-xs font-black text-white">{tx.amount} ARS</span>
+                    {ledgerTransactions.length === 0 ? (
+                      <div className="p-8 text-center text-zinc-500 text-[9px] uppercase tracking-widest font-mono">
+                        No hay transacciones registradas hoy en el ledger.
                       </div>
-                    ))}
+                    ) : (
+                      ledgerTransactions.map((tx, idx) => (
+                        <div key={tx.id || idx} className="p-3 bg-black/40 border border-white/[0.03] rounded-xl flex justify-between items-center gap-3">
+                          <div className="text-left space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[8px] text-[#bccbb9]/40">{tx.time}</span>
+                              <span className={`text-[6.5px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-full border ${tx.labelColor}`}>
+                                {tx.method}
+                              </span>
+                            </div>
+                            <p className="text-[10px] font-black text-white uppercase italic tracking-wide font-bold">{tx.detail}</p>
+                          </div>
+                          <span className="font-mono text-xs font-black text-white">
+                            ${(tx.amount || 0).toLocaleString('es-AR')} ARS
+                          </span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -1651,17 +2205,6 @@ export default function ProfileView() {
                     <div className="grid grid-cols-2 gap-2.5">
                       <button
                         type="button"
-                        onClick={() => setSelectedExportRange('semanal')}
-                        className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
-                          selectedExportRange === 'semanal'
-                            ? 'bg-blue-500/20 border-blue-500/50 text-blue-400 font-black scale-[1.01]'
-                            : 'bg-zinc-900/40 border-white/5 text-[#bccbb9]/50 hover:bg-zinc-900'
-                        }`}
-                      >
-                        Reporte Semanal
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => setSelectedExportRange('mensual')}
                         className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
                           selectedExportRange === 'mensual'
@@ -1671,14 +2214,33 @@ export default function ProfileView() {
                       >
                         Reporte Mensual
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedExportRange('trimestral')}
+                        className={`h-11 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
+                          selectedExportRange === 'trimestral'
+                            ? 'bg-blue-500/20 border-blue-500/50 text-blue-400 font-black scale-[1.01]'
+                            : 'bg-zinc-900/40 border-white/5 text-[#bccbb9]/50 hover:bg-zinc-900'
+                        }`}
+                      >
+                        Reporte Trimestral
+                      </button>
                     </div>
 
                     <button
                       type="button"
                       onClick={() => generatePDFReport(selectedExportRange)}
-                      className="w-full h-12 bg-blue-500 hover:bg-blue-600 text-[#121414] font-black rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all outline-none italic shadow-[0_0_20px_rgba(59,130,246,0.2)] hover:opacity-95"
+                      className="w-full h-12 bg-blue-500 hover:bg-blue-600 text-[#121414] font-black rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all outline-none italic shadow-[0_0_20px_rgba(59,130,246,0.2)] hover:opacity-95 animate-pulse"
                     >
                       <FileText className="w-4 h-4" /> Generar & Descargar PDF ({selectedExportRange})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => exportToExcelReport(selectedExportRange)}
+                      className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-[#121414] font-black rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all outline-none italic shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:opacity-[0.98] mt-2.5"
+                    >
+                      <Database className="w-4 h-4" /> Exportar Planilla Excel (.CSV) ({selectedExportRange})
                     </button>
                   </div>
 
@@ -1832,6 +2394,12 @@ export default function ProfileView() {
                     <div className="w-full bg-black/90 rounded-2xl px-4 py-3 flex items-center overflow-hidden border border-white/5 relative">
                       <div className="whitespace-nowrap animate-marquee inline-block text-[10px] font-black tracking-[0.1em] uppercase italic">
                         <span className="text-[#FF9100]">{marqueeText}</span>
+                        {secondaryMarqueeText && (
+                          <span className="text-[#009EE3] ml-3 bg-[#009EE3]/15 px-2 py-0.5 rounded-lg border border-[#009EE3]/30 inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#009EE3] animate-ping shrink-0" />
+                            ⚡ {secondaryMarqueeText}
+                          </span>
+                        )}
                         {(() => {
                           const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
                           const tRange = isWeekend ? { open: newWeekendOpen, close: newWeekendClose } : { open: newWeekdayOpen, close: newWeekdayClose };
@@ -1864,6 +2432,14 @@ export default function ProfileView() {
                             </span>
                           );
                         })()}
+                        <span className="text-zinc-500 mx-5">•</span>
+                        <span className="text-[#FF9100]">{marqueeText}</span>
+                        {secondaryMarqueeText && (
+                          <span className="text-[#009EE3] ml-3 bg-[#009EE3]/15 px-2 py-0.5 rounded-lg border border-[#009EE3]/30 inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#009EE3] animate-ping shrink-0" />
+                            ⚡ {secondaryMarqueeText}
+                          </span>
+                        )}
                         <span className="text-zinc-500 mx-5">•</span>
                       </div>
                     </div>
@@ -1898,8 +2474,67 @@ export default function ProfileView() {
                     }}
                     className="w-full h-12 bg-amber-500 hover:bg-amber-600 text-black font-black rounded-xl uppercase text-[9px] tracking-widest italic shadow-lg shadow-[#FF9100]/15 flex items-center justify-center gap-2 transition-all outline-none active:scale-[0.98]"
                   >
-                    <Save className="w-4 h-4" /> Guardar Marquesina en la Nube
+                    <Save className="w-4 h-4" /> Guardar Marquesina
                   </button>
+
+                  {/* NUEVA SECCIÓN DE NOTICIA SECUNDARIA */}
+                  <div className="space-y-4 border-t border-white/5 pt-5 relative">
+                    <div className="absolute top-5 right-0 w-24 h-24 bg-[#009EE3]/5 rounded-full blur-2xl pointer-events-none" />
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-[#009EE3]/10 flex items-center justify-center border border-[#009EE3]/20">
+                          <Smartphone className="w-4.5 h-4.5 text-[#009EE3]" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black text-white uppercase tracking-wider block italic font-sans">Noticia Secundaria / Alerta Crítica (Opcional)</span>
+                          <span className="text-[7.5px] font-mono text-[#009EE3] tracking-wider block">COLOR AZUL NEÓN • VA ANTES DEL HORARIO ABIERTO/CERRADO</span>
+                        </div>
+                      </div>
+                      {secondaryMarqueeText && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await saveSettings({ secondary_marquee_text: '' });
+                              if (setSecondaryMarqueeText) setSecondaryMarqueeText('');
+                              setNewSecondaryMarqueeText('');
+                              addAuditLog('CAMBIO DE MARQUESINA SEC.', `Se eliminó la noticia secundaria de la marquesina`, 'success');
+                              showToast('Noticia secundaria eliminada con éxito', 'success');
+                            } catch (err) {
+                              showToast('Error al limpiar la noticia secundaria', 'error');
+                            }
+                          }}
+                          className="text-[7px] text-red-400 hover:text-red-300 font-extrabold uppercase tracking-widest bg-red-500/5 hover:bg-red-500/10 px-2 py-1 rounded-lg border border-red-500/10 transition-all self-start sm:self-center"
+                        >
+                          Eliminar Noticia
+                        </button>
+                      )}
+                    </div>
+
+                    <textarea
+                      rows={2}
+                      value={newSecondaryMarqueeText}
+                      onChange={(e) => setNewSecondaryMarqueeText(e.target.value)}
+                      placeholder="Escriba aquí la noticia secundaria (ej. ¡PROMO 2X1 CANCHA SINTÉTICA HOY DE 15 A 18 HS!)..."
+                      className="w-full bg-zinc-950/80 border border-white/10 rounded-xl p-3.5 text-xs text-white uppercase font-bold focus:border-[#009EE3]/60 transition-all outline-none resize-none leading-relaxed no-scrollbar"
+                    />
+
+                    <button 
+                      onClick={async () => {
+                        try {
+                          await saveSettings({ secondary_marquee_text: newSecondaryMarqueeText });
+                          if (setSecondaryMarqueeText) setSecondaryMarqueeText(newSecondaryMarqueeText);
+                          addAuditLog('CAMBIO DE MARQUESINA SEC.', `Se actualizó la noticia secundaria a: ${newSecondaryMarqueeText.toUpperCase()}`, 'success');
+                          showToast('Noticia secundaria guardada con éxito', 'success');
+                        } catch (err) {
+                          showToast('Error al actualizar la noticia secundaria', 'error');
+                        }
+                      }}
+                      className="w-full h-11 bg-zinc-900 hover:bg-zinc-800/80 text-[#009EE3] hover:text-sky-400 border border-[#009EE3]/15 hover:border-[#009EE3]/30 font-black rounded-xl uppercase text-[8.5px] tracking-widest italic flex items-center justify-center gap-2 transition-all outline-none active:scale-[0.98]"
+                    >
+                      <Save className="w-4 h-4" /> Guardar Noticia Secundaria
+                    </button>
+                  </div>
                 </div>
 
                 {/* NUEVO: CONFIGURACIÓN DE HORARIOS DE APERTURA Y CIERRE */}
@@ -2023,6 +2658,299 @@ export default function ProfileView() {
             )}
           </motion.div>
         )}
+
+        {/* VISTA ANALÍTICAS Y HEATMAPS (INTERACTIVO, BENTO-STYLE, RECHARTS DE ALTO POLISH) */}
+        {activeTab === 'analytics' && (
+          <motion.div
+            key="analytics"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6 text-left"
+          >
+            {/* Cabecera del Panel */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest font-mono">Consola Analítica Activa</span>
+                </div>
+                <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Panel de Ocupación e Inteligencia de Demanda</h3>
+                <p className="text-[10px] font-bold text-[#bccbb9]/50 uppercase tracking-widest max-w-xl">
+                  Visualice patrones de reserva histórica para planificar tarifas diferenciadas dinámicas (Horarios Pico vs. Horarios Valle).
+                </p>
+              </div>
+
+              {/* Selector Filtro de Cancha Bento */}
+              <div className="flex gap-1 p-1 bg-zinc-950 border border-white/5 rounded-xl shrink-0">
+                {['todos', 'cancha1', 'cancha2'].map((courtOpt) => (
+                  <button
+                    key={courtOpt}
+                    type="button"
+                    onClick={() => {
+                      // Interactividad local para simular la carga por cancha
+                      const savedFilter = localStorage.getItem('ramito_court_analytics_filter') || 'todos';
+                      localStorage.setItem('ramito_court_analytics_filter', courtOpt);
+                      // Force local refresh without full page reload
+                      showToast(`Filtrando analíticas por: ${courtOpt === 'todos' ? 'Todas las Canchas' : courtOpt === 'cancha1' ? 'Cancha 1' : 'Cancha 2'}`, 'success');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all ${
+                      (localStorage.getItem('ramito_court_analytics_filter') || 'todos') === courtOpt
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : 'text-[#bccbb9]/40 hover:text-white/80'
+                    }`}
+                  >
+                    {courtOpt === 'todos' ? 'Ambas Canchas' : courtOpt === 'cancha1' ? 'Cancha 1 • Césped' : 'Cancha 2 • Losa'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* BENTO GRID LAYOUT */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+              {/* CARD BENTO 1: HEATMAP MENSUAL DE OCUPACIÓN (7 Días x 8 Bloques Horarios) */}
+              <div className="lg:col-span-2 glass-panel rounded-[2rem] border border-white/5 p-6 bg-zinc-950/40 relative overflow-hidden flex flex-col justify-between space-y-4">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/[0.02] rounded-full blur-[100px] pointer-events-none" />
+                
+                <div className="space-y-1">
+                  <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest font-mono">Heatmap Semanal Dinámico</span>
+                  <p className="text-[11px] font-black text-white uppercase italic tracking-wider">Matriz de Ocupación por Día y Hora</p>
+                  <p className="text-[8.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider">
+                    Toque cualquier bloque para evaluar el nivel de saturación por franja horaria.
+                  </p>
+                </div>
+
+                {/* Grid Heatmap */}
+                <div className="space-y-4 mt-2">
+                  <div className="grid grid-cols-8 gap-1 text-center font-mono text-[7px] text-[#bccbb9]/30 font-black uppercase">
+                    <div>HORAS</div>
+                    <div>LUN</div>
+                    <div>MAR</div>
+                    <div>MIÉ</div>
+                    <div>JUE</div>
+                    <div>VIE</div>
+                    <div>SÁB</div>
+                    <div>DOM</div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {[
+                      { hour: '15:00 hs', load: [15, 20, 25, 20, 30, 65, 55], slotsStatus: ['v', 'v', 'v', 'v', 'v', 'p', 'p'] },
+                      { hour: '16:00 hs', load: [25, 30, 20, 35, 45, 80, 75], slotsStatus: ['v', 'v', 'v', 'v', 'v', 'p', 'p'] },
+                      { hour: '17:00 hs', load: [35, 40, 45, 45, 60, 95, 85], slotsStatus: ['v', 'v', 'v', 'v', 'p', 'p', 'p'] },
+                      { hour: '18:00 hs', load: [60, 65, 55, 70, 75, 100, 95], slotsStatus: ['p', 'p', 'v', 'p', 'p', 'p', 'p'] },
+                      { hour: '20:00 hs', load: [85, 95, 90, 95, 100, 95, 80], slotsStatus: ['p', 'p', 'p', 'p', 'p', 'p', 'p'] },
+                      { hour: '21:00 hs', load: [95, 100, 95, 100, 100, 100, 90], slotsStatus: ['p', 'p', 'p', 'p', 'p', 'p', 'p'] },
+                      { hour: '22:00 hs', load: [75, 80, 70, 85, 95, 90, 70], slotsStatus: ['p', 'p', 'p', 'p', 'p', 'p', 'p'] }
+                    ].map((row, idx) => (
+                      <div key={idx} className="grid grid-cols-8 gap-1.5 items-center">
+                        {/* Hour marker */}
+                        <div className="text-[8px] font-mono font-black text-[#bccbb9]/70 text-right pr-2">
+                          {row.hour}
+                        </div>
+
+                        {/* 7 Days heatmap blocks */}
+                        {row.load.map((pct, dayIdx) => {
+                          const filterType = localStorage.getItem('ramito_court_analytics_filter') || 'todos';
+                          let finalPct = pct;
+                          // Simulate dynamic filtering values
+                          if (filterType === 'cancha1') finalPct = Math.max(10, Math.round(pct * 0.9));
+                          if (filterType === 'cancha2') finalPct = Math.max(5, Math.round(pct * 0.75));
+
+                          let colorClass = 'bg-zinc-900 border-zinc-950 text-[#bccbb9]/20';
+                          if (finalPct > 0 && finalPct <= 30) colorClass = 'bg-[#10B981]/10 text-[#10B981] border-[#10B981]/25 hover:bg-[#10B981]/20';
+                          else if (finalPct > 30 && finalPct <= 60) colorClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/35 hover:bg-emerald-500/30';
+                          else if (finalPct > 60 && finalPct <= 85) colorClass = 'bg-[#FF9100]/20 text-[#FF9100] border-[#FF9100]/30 hover:bg-[#FF9100]/30';
+                          else if (finalPct > 85) colorClass = 'bg-red-500/20 text-red-400 border-red-500/35 hover:bg-red-500/30 animate-pulse';
+
+                          return (
+                            <button
+                              key={dayIdx}
+                              type="button"
+                              onClick={() => {
+                                showToast(`Franja: ${row.hour} • Carga estimada: ${finalPct}% de Ocupación`, 'success');
+                              }}
+                              className={`aspect-square sm:aspect-video rounded-lg border flex flex-col justify-center items-center text-[7px] md:text-[9px] font-mono font-bold transition-all transition-colors cursor-pointer ${colorClass}`}
+                              title={`Demanda: ${finalPct}%`}
+                            >
+                              <span className="text-[7.5px] font-mono font-black">{finalPct}%</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Leyenda Mapas */}
+                <div className="pt-2 border-t border-white/5 flex flex-wrap gap-x-4 gap-y-2 text-[8px] font-mono font-black text-[#bccbb9]/40 uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#10B981]/20 border border-[#10B981]/30" />
+                    <span>0-30% Valle</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/25 border border-emerald-500/30" />
+                    <span>30-60% Moderado</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#FF9100]/25 border border-[#FF9100]/30" />
+                    <span>60-85% Pico Intermedio</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500/25 border border-red-500/30" />
+                    <span>85-100% Saturation</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD BENTO 2: RECONOCIMIENTO INTELIGENTE DE TARIFAS (Intel Engine) */}
+              <div className="glass-panel rounded-[2rem] border border-white/5 p-6 bg-[#181a1a] relative overflow-hidden flex flex-col justify-between space-y-6">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.03] rounded-full blur-3xl pointer-events-none" />
+                
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest font-mono">Motor de Recomendación Inteligente</span>
+                    <p className="text-[11px] font-black text-white uppercase italic tracking-wider">Planificación de Tarifas Dinámicas</p>
+                  </div>
+
+                  <div className="p-3.5 bg-black/50 border border-white/5 rounded-2xl text-left space-y-2">
+                    <div className="flex items-center gap-1.5 text-red-400">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span className="text-[8.5px] font-black uppercase tracking-widest">Alerta de Bloques Críticos (Pico)</span>
+                    </div>
+                    <p className="text-[9.5px] font-bold text-white/90 leading-relaxed uppercase">
+                      Los turnos de 20:00 y 21:00 hs de Martes a Sábados exhiben ocupación saturada (&gt;95%).
+                    </p>
+                    <div className="pt-2 border-t border-white/5 mt-2">
+                      <span className="text-[8px] font-black text-[#4be277] uppercase tracking-wider block font-sans">Sugerencia Comercial:</span>
+                      <p className="text-[8.5px] font-medium text-[#bccbb9]/60 uppercase tracking-wide leading-relaxed mt-1">
+                        Establecer Tarifa Diferencial del +15% ($2,500 ARS extra) en este rango. Los jugadores están dispuestos a pagar premium debido a la escasez de turnos.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 bg-black/50 border border-white/5 rounded-2xl text-left space-y-2">
+                    <div className="flex items-center gap-1.5 text-[#10B981]">
+                      <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                      <span className="text-[8.5px] font-black uppercase tracking-widest">Optimización del Bloque Valle</span>
+                    </div>
+                    <p className="text-[9.5px] font-bold text-white/90 leading-relaxed uppercase">
+                      Lunes y Miércoles de 15:00 a 17:00 registran ocupación inferior al 25%.
+                    </p>
+                    <div className="pt-2 border-t border-white/5 mt-2">
+                      <span className="text-[8px] font-black text-amber-400 uppercase tracking-wider block font-sans">Sugerencia Comercial:</span>
+                      <p className="text-[8.5px] font-medium text-[#bccbb9]/60 uppercase tracking-wide leading-relaxed mt-1">
+                        Lanzar un descuento automático del -25% ("Happy Hour de Fútbol") para capturar estudiantes universitarios o deportistas vespertinos y balancear caja.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[8px] font-black text-[#bccbb9]/30 uppercase font-mono block">Auditoría Regulatoria de Tarifas</span>
+                  <p className="text-[8.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-none">
+                    Complejo Ramito Fut Show • Algoritmo de Carga de Red V1.6
+                  </p>
+                </div>
+              </div>
+
+            </div>
+
+            {/* SEGUNDA FILA: BENTO INFERIOR (Gráfico de Barras de Distribución Horaria & Distribución de Canchas) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-4">
+              
+              {/* CARD DE BARRAS DE DEMANDA (Pure SVG Bars with Dynamic interactive stats) */}
+              <div className="glass-panel rounded-[2rem] border border-white/5 p-6 bg-zinc-950/40 relative overflow-hidden flex flex-col justify-between space-y-4">
+                <div className="space-y-1">
+                  <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest font-mono">Curva de Demanda por Hora</span>
+                  <p className="text-[11px] font-black text-white uppercase italic tracking-wider">Carga de Tráfico Horario Consolidado</p>
+                </div>
+
+                {/* SVG Chart */}
+                <div className="h-44 flex items-end gap-3 px-2 pt-6 pb-2 border-b border-white/5">
+                  {[
+                    { slot: '15:00', val: 30, text: 'Valle' },
+                    { slot: '16:00', val: 40, text: 'Valle' },
+                    { slot: '17:00', val: 55, text: 'Moderado' },
+                    { slot: '18:00', val: 78, text: 'Intermedio' },
+                    { slot: '20:00', val: 95, text: 'Saturado' },
+                    { slot: '21:00', val: 100, text: 'Máximo' },
+                    { slot: '22:00', val: 82, text: 'Pico' }
+                  ].map((bar, bidx) => (
+                    <div key={bidx} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
+                      <div className="w-full relative rounded-t-lg bg-zinc-900 overflow-hidden h-32 flex items-end">
+                        <motion.div
+                          initial={{ height: 0 }}
+                          animate={{ height: `${bar.val}%` }}
+                          transition={{ duration: 0.8, delay: bidx * 0.05 }}
+                          className={`w-full rounded-t-lg relative transition-all group-hover:brightness-110 ${
+                            bar.val > 85 
+                              ? 'bg-gradient-to-t from-red-600 to-[#FF9100]' 
+                              : bar.val > 50 
+                              ? 'bg-gradient-to-t from-emerald-500 to-amber-400' 
+                              : 'bg-gradient-to-t from-emerald-600 to-[#10B981]'
+                          }`}
+                        />
+                        {/* Hover Popup Overlay */}
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black text-[#4be277] text-[7.5px] font-black font-mono py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">
+                          {bar.val}%
+                        </div>
+                      </div>
+                      <span className="text-[8px] font-mono font-black text-white">{bar.slot}</span>
+                      <span className="text-[7.5px] font-mono font-black text-[#bccbb9]/40 group-hover:text-emerald-400 transition-colors uppercase select-none">{bar.text}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-widest block italic leading-none">
+                  * Datos recopilados en base al total de {allBookings.length} reservas procesadas.
+                </span>
+              </div>
+
+              {/* CARD DE COMPARATIVA DE CANCHAS */}
+              <div className="glass-panel rounded-[2rem] border border-white/5 p-6 bg-zinc-950/40 relative overflow-hidden flex flex-col justify-between space-y-4">
+                <div className="space-y-1">
+                  <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest font-mono">Eficiencia de Infraestructura</span>
+                  <p className="text-[11px] font-black text-white uppercase italic tracking-wider">Corte de Ingresos y Reservas por Cancha</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div className="p-4 bg-zinc-900/30 rounded-2xl border border-white/5 space-y-2">
+                    <span className="text-[8px] font-mono text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Cancha 1 • El Maracaná</span>
+                    <p className="text-xl font-black text-white uppercase">62.5% <span className="text-xs text-emerald-400 font-bold">CARGA</span></p>
+                    <p className="text-[8px] font-mono font-black text-emerald-400 uppercase tracking-wider bg-emerald-500/5 py-0.5 px-1.5 rounded border border-emerald-500/10 w-max">
+                      Popularidad Alta (Césped)
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-zinc-900/30 rounded-2xl border border-white/5 space-y-2">
+                    <span className="text-[8px] font-mono text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Cancha 2 • La Bombonera</span>
+                    <p className="text-xl font-black text-white uppercase">37.5% <span className="text-xs text-amber-500 font-bold">CARGA</span></p>
+                    <p className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-wider bg-amber-500/5 py-0.5 px-1.5 rounded border border-amber-500/10 w-max">
+                      Popularidad Moderada (Losa)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ring chart preview */}
+                <div className="flex items-center gap-4 bg-black/20 p-3 rounded-2xl border border-white/5">
+                  <div className="relative w-11 h-11 rounded-full border-4 border-white/5 flex items-center justify-center shrink-0">
+                    <div className="absolute inset-0 rounded-full border-4 border-emerald-500 border-r-transparent border-b-transparent animate-spin duration-3000" />
+                    <span className="text-[8px] font-mono font-black text-white">62%</span>
+                  </div>
+                  <div className="text-left space-y-0.5">
+                    <span className="text-[9px] font-black text-white uppercase tracking-wider block italic">Preferencia de Césped Sintético</span>
+                    <p className="text-[8px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
+                      El Maracaná lidera la recaudación debido a que los equipos prefieren césped sintético sobre losa para el juego con botines de fútbol 5.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Ventana de Configuración Licencia Web (Detallada y Completa) */}
@@ -2033,7 +2961,7 @@ export default function ProfileView() {
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-600/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="relative w-full max-w-4xl mx-auto flex flex-col p-6 md:p-10 flex-1 justify-between">
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
                 <div className="flex items-center gap-4">
@@ -2053,7 +2981,7 @@ export default function ProfileView() {
                 </button>
               </div>
 
-              {isReadOnly && (
+              {isLicensingReadOnly && (
                 <div className="p-5 mb-8 bg-zinc-900 border border-amber-500/20 rounded-3xl space-y-4 text-left shadow-lg relative overflow-hidden w-full">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
                   <div className="flex items-start gap-4">
@@ -2061,7 +2989,10 @@ export default function ProfileView() {
                       <AlertTriangle className="w-5 h-5 text-amber-500" />
                     </div>
                     <div>
-                      <span className="text-[11px] font-black text-amber-500 tracking-wider block italic uppercase">👑 MODO LECTURA AUTORIZADO (VIP ADMIN)</span>
+                      <span className="text-[11px] font-black text-amber-500 tracking-wider flex items-center gap-1.5 italic uppercase">
+                        <Crown className="w-3.5 h-3.5 text-amber-500 inline shrink-0" strokeWidth={2.5} />
+                        MODO LECTURA AUTORIZADO (VIP ADMIN)
+                      </span>
                       <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
                         Solo el Administrador Élite puede modificar de manera directa los perímetros de licencias o configuraciones del servidor de producción. Los cupones de emergencia se aplican exclusivamente a la Licencia de la APP Móvil PWA.
                       </p>
@@ -2082,7 +3013,7 @@ export default function ProfileView() {
                         onClick={() => sendRenewalRequestToElite('web')}
                         className="w-full sm:w-auto px-6 h-10 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-500 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all whitespace-nowrap"
                       >
-                        🔔 Enviar Alerta de Renovación
+                        Enviar Alerta de Renovación
                       </button>
                     </div>
                   </div>
@@ -2277,15 +3208,15 @@ export default function ProfileView() {
                   Regresar / Salir sin Guardar
                 </button>
                 <button 
-                  disabled={isReadOnly}
+                  disabled={isLicensingReadOnly}
                   onClick={handleSaveWebConfig}
                   className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic ${
-                    isReadOnly 
+                    isLicensingReadOnly 
                       ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
                       : 'bg-emerald-500 text-black hover:opacity-90 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
                   }`}
                 >
-                  {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar Cambios de Licencia Web'}
+                  {isLicensingReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar Cambios de Licencia Web'}
                 </button>
               </div>
             </div>
@@ -2301,7 +3232,7 @@ export default function ProfileView() {
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-amber-600/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="relative w-full max-w-4xl mx-auto flex flex-col p-6 md:p-10 flex-1 justify-between">
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
                 <div className="flex items-center gap-4">
@@ -2321,7 +3252,7 @@ export default function ProfileView() {
                 </button>
               </div>
 
-              {isReadOnly && (
+              {isLicensingReadOnly && (
                 <div className="p-5 mb-8 bg-zinc-900 border border-amber-500/20 rounded-3xl space-y-4 text-left shadow-lg relative overflow-hidden w-full">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
                   <div className="flex items-start gap-4">
@@ -2329,7 +3260,10 @@ export default function ProfileView() {
                       <AlertTriangle className="w-5 h-5 text-amber-500" />
                     </div>
                     <div>
-                      <span className="text-[11px] font-black text-amber-500 tracking-wider block italic uppercase">👑 MODO LECTURA AUTORIZADO (VIP ADMIN)</span>
+                      <span className="text-[11px] font-black text-amber-500 tracking-wider flex items-center gap-1.5 italic uppercase">
+                        <Crown className="w-3.5 h-3.5 text-amber-500 inline shrink-0" strokeWidth={2.5} />
+                        MODO LECTURA AUTORIZADO (VIP ADMIN)
+                      </span>
                       <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
                         Solo el Administrador Élite puede modificar de manera directa los perímetros de licencias o configuraciones de la aplicación de producción.
                       </p>
@@ -2350,7 +3284,7 @@ export default function ProfileView() {
                         onClick={() => sendRenewalRequestToElite('app')}
                         className="w-full h-10 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-500 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all"
                       >
-                        🔔 Enviar Alerta de Renovación
+                        Enviar Alerta de Renovación
                       </button>
                     </div>
 
@@ -2373,7 +3307,7 @@ export default function ProfileView() {
                         <button
                           type="button"
                           onClick={() => validateActivationCode('app')}
-                          className="h-10 px-4 bg-amber-500 text-black rounded-xl font-black text-[9px] uppercase tracking-wider hover:opacity-90 transition-all font-mono"
+                          className="h-10 px-4 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/50 text-amber-500 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all font-mono"
                         >
                           VALIDAR
                         </button>
@@ -2520,7 +3454,7 @@ export default function ProfileView() {
                           showToast(`🔔 SUPABASE PUSH SENT: "${testPushMessage.toUpperCase()}"`, 'success');
                           setTestPushMessage('');
                         }}
-                        className="w-full h-10 bg-amber-500 hover:opacity-90 transition-all rounded-xl text-black font-black font-mono text-[9px] uppercase tracking-widest italic"
+                        className="w-full h-10 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/50 text-amber-500 font-black font-mono text-[9px] uppercase tracking-widest italic transition-all"
                       >
                         🚀 ENVIAR NOTIFICACIÓN AL INSTANTE
                       </button>
@@ -2538,15 +3472,15 @@ export default function ProfileView() {
                   Regresar / Salir sin Guardar
                 </button>
                 <button 
-                  disabled={isReadOnly}
+                  disabled={isLicensingReadOnly}
                   onClick={handleSaveAppConfig}
                   className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic ${
-                    isReadOnly 
+                    isLicensingReadOnly 
                       ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
-                      : 'bg-amber-500 text-black hover:opacity-90 shadow-[0_0_20px_rgba(245,158,11,0.3)]'
+                      : 'bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/50 text-amber-500 hover:border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
                   }`}
                 >
-                  {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar Cambios de Licencia App'}
+                  {isLicensingReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar Cambios de Licencia App'}
                 </button>
               </div>
             </div>
@@ -2562,7 +3496,7 @@ export default function ProfileView() {
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-red-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="relative w-full max-w-4xl mx-auto flex flex-col p-6 md:p-10 flex-1 justify-between">
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
                 <div className="flex items-center gap-4">
@@ -2590,7 +3524,10 @@ export default function ProfileView() {
                       <AlertTriangle className="w-5 h-5 text-red-500" />
                     </div>
                     <div>
-                      <span className="text-[11px] font-black text-red-500 tracking-wider block italic uppercase">👑 MODO DE SÓLO LECTURA (VIP ADMIN)</span>
+                      <span className="text-[11px] font-black text-red-500 tracking-wider flex items-center gap-1.5 italic uppercase">
+                        <Crown className="w-3.5 h-3.5 text-red-500 inline shrink-0" strokeWidth={2.5} />
+                        MODO DE SÓLO LECTURA (VIP ADMIN)
+                      </span>
                       <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
                         No posees permisos de Élite para suspender actividades en los servidores de producción de Ramito. Contacta al Administrador Principal para solicitar delegación temporal de llaves de emergencia.
                       </p>
@@ -2615,9 +3552,8 @@ export default function ProfileView() {
                       {!isReadOnly ? (
                         <button 
                           onClick={() => {
-                            const newVal = !maintenanceMode;
-                            setMaintenanceMode(newVal);
-                            localStorage.setItem('ramito_maintenance', String(newVal));
+                            const newVal = !emergencyMode;
+                            setEmergencyMode(newVal);
                             
                             addAuditLog(
                               newVal ? 'ACTIVACIÓN DE CIERRE DE EMERGENCIA' : 'DESACTIVACIÓN DE CIERRE DE EMERGENCIA',
@@ -2625,41 +3561,29 @@ export default function ProfileView() {
                               newVal ? 'alert' : 'success'
                             );
 
-                            if (showToast) showToast(newVal ? 'Modo Mantenimiento Activado' : 'Modo Mantenimiento Desactivado', newVal ? 'error' : 'success');
+                            // Trigger real system notification with high-impact details
+                            const emergencyMessageObj = {
+                              id: `emergency_${Date.now()}`,
+                              title: newVal ? 'CIERRE CRÍTICO DE EMERGENCIA' : 'REAPERTURA DE COMPLEJO',
+                              body: newVal 
+                                ? `La administración ha declarado un Cierre de Emergencia. Aviso oficial: ${emergencyMessage ? emergencyMessage.toUpperCase() : 'CONTRATIEMPO TÉCNICO / FUERZA MAYOR'}. Reservas bloqueadas.`
+                                : '¡Complejo Deportivo rehabilitado con éxito! Se reanuda la reserva de turnos online de forma inmediata.',
+                              time: 'Hace un momento',
+                              read: false
+                            };
+                            if (setNotifications) {
+                              setNotifications((prev: any[]) => [emergencyMessageObj, ...(prev || [])]);
+                            }
+
+                            if (showToast) showToast(newVal ? 'Cierre de Emergencia Activado' : 'Cierre de Emergencia Desactivado', 'success');
                           }}
-                          className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors shrink-0 ${maintenanceMode ? 'bg-red-500' : 'bg-white/10'}`}
+                          className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors shrink-0 ${emergencyMode ? 'bg-red-500' : 'bg-white/10'}`}
                         >
-                          <motion.div animate={{ x: maintenanceMode ? 24 : 0 }} className={`w-5 h-5 rounded-full ${maintenanceMode ? 'bg-white' : 'bg-zinc-400'}`} />
+                          <motion.div animate={{ x: emergencyMode ? 24 : 0 }} className={`w-5 h-5 rounded-full ${emergencyMode ? 'bg-white' : 'bg-zinc-400'}`} />
                         </button>
                       ) : (
                         <span className="text-[8px] font-black text-[#FF9100] bg-[#FF9100]/10 border border-[#FF9100]/20 px-2 py-1 rounded shrink-0">VIP READ ONLY</span>
                       )}
-                    </div>
-
-                    {/* Selector de Motivo */}
-                    <div className="space-y-1.5 font-sans text-left">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Motivo Oficial de la Suspensión (Escribir Manual)</label>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          disabled={isReadOnly}
-                          type="text"
-                          value={emergencyReason}
-                          onChange={(e) => setEmergencyReason(e.target.value)}
-                          placeholder="Ej: INCLEMENCIAS CLIMÁTICAS"
-                          className="flex-1 h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white uppercase font-bold focus:border-red-500 transition-all outline-none animate-none"
-                        />
-                        <button
-                          type="button"
-                          disabled={isReadOnly}
-                          onClick={() => {
-                            localStorage.setItem('ramito_emergency_reason', emergencyReason);
-                            if (showToast) showToast('Motivo guardado con éxito', 'success');
-                          }}
-                          className="h-12 px-4 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/15 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all outline-none shrink-0"
-                        >
-                          Guardar Motivo
-                        </button>
-                      </div>
                     </div>
                   </div>
  
@@ -2729,7 +3653,7 @@ export default function ProfileView() {
                           if (showToast) showToast('Alertas WhatsApp enviadas a capitanes de reservas activas de hoy', 'success');
                           addAuditLog(
                             'DISPARO DE ALERTAS MASIVAS',
-                            `Sincronización masiva instantánea vía webhook de WhatsApp concretada por ${emergencyReason.toUpperCase()}.`,
+                            `Sincronización masiva instantánea vía webhook de WhatsApp concretada por el aviso de cierre general.`,
                             'alert'
                           );
                         }}
@@ -2738,6 +3662,40 @@ export default function ProfileView() {
                       >
                         <MessageCircle className="w-5 h-5" /> Disparar WhatsApp de Alerta
                       </button>
+                    </div>
+                  </div>
+
+                  {/* Vista Previa en Tiempo Real de Cierre de Emergencia */}
+                  <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4 text-left">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-[10px] font-black text-red-500 uppercase tracking-widest italic animate-pulse">Previsualización del Diseño Emergencia</h5>
+                      <span className="text-[7.5px] font-mono text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
+                        En Vivo
+                      </span>
+                    </div>
+
+                    <p className="text-[9px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
+                      Esta es la pantalla inamovible de fuerza mayor que verán los jugadores al activar el Cierre de Emergencia.
+                    </p>
+
+                    <div className="flex justify-center py-2">
+                      {/* Smartphone Wrapper */}
+                      <div className="relative w-full max-w-[240px] h-[400px] bg-zinc-950 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col justify-between p-1.5 text-center select-none">
+                        <div className="w-full h-full rounded-[2.2rem] overflow-hidden relative bg-black">
+                          {/* Image rendering */}
+                          <img 
+                            src="/emergencia.png" 
+                            alt="Cierre de Emergencia" 
+                            className="w-full h-full object-cover select-none pointer-events-none"
+                            referrerPolicy="no-referrer"
+                          />
+                          
+                          {/* Dark glow container to represent phone notch */}
+                          <div className="absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-black/80 to-transparent flex justify-center">
+                            <div className="w-20 h-3 bg-black rounded-b-xl" />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2754,7 +3712,6 @@ export default function ProfileView() {
                 <button 
                   disabled={isReadOnly}
                   onClick={() => {
-                    localStorage.setItem('ramito_emergency_reason', emergencyReason);
                     localStorage.setItem('ramito_emergency_message', emergencyMessage);
                     localStorage.setItem('ramito_emergency_courts', affectedCourts);
                     addAuditLog('GUARDAR AJUSTES DE EMERGENCIA EN CONSOLA', `Se modificó y guardó la bitácora de catástrofes para campos: ${affectedCourts.toUpperCase()}.`, 'success');
@@ -2764,10 +3721,186 @@ export default function ProfileView() {
                   className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 ${
                     isReadOnly 
                       ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
-                      : 'bg-red-500 text-black hover:opacity-90 shadow-[0_0_20px_rgba(239,68,68,0.3)]'
+                      : 'bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 hover:border-red-500/50 text-red-400 hover:border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
                   }`}
                 >
                   <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Cambios de Emergencia'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Ventana de Configuración de Mantenimiento del Sistema Completa (Pantalla Completa) */}
+      <AnimatePresence>
+        {showMaintenanceWindow && (
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+            {/* Background elements Deco */}
+            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-amber-600/5 rounded-full blur-[120px] pointer-events-none" />
+
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                    <Wrench className="w-6 h-6 text-amber-500 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Módulo de Mantenimiento del Sistema</h4>
+                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
+                      GESTOR EXCLUSIVO PARA CONFIGURAR LA PANTALLA DE TRABAJOS DE MEJORA EN LA APP
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowMaintenanceWindow(false)}
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {isReadOnly && (
+                <div className="p-5 mb-8 bg-zinc-950/60 w-full rounded-3xl border border-red-500/20 space-y-4 text-left shadow-lg relative overflow-hidden animate-fade-in">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl pointer-events-none" />
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-black text-red-500 tracking-wider flex items-center gap-1.5 italic uppercase">
+                        MODO DE SÓLO LECTURA (VIP ADMIN)
+                      </span>
+                      <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
+                        No posees permisos de Élite para modificar con persistencia crítica algunos ajustes globales, pero puedes alternar momentáneamente o previsualizar el comportamiento de la app en mantenimiento.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Informative Status Widget */}
+              <div className="p-5 mb-8 bg-zinc-900/40 border border-amber-500/10 rounded-3xl text-left relative overflow-hidden">
+                <div className="absolute -right-16 -top-16 w-36 h-36 bg-amber-500/[0.03] rounded-full blur-2xl pointer-events-none animate-pulse" />
+                
+                <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block mb-2 italic">Estado de Conectividad App</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 font-sans">
+                  <div className="p-4 bg-zinc-950/50 border border-white/5 rounded-2xl">
+                    <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Pantalla Preventiva Activa</span>
+                    <span className="text-sm font-black text-white mt-1.5 block tracking-wider flex items-center gap-1.5 uppercase">
+                      <span className={`w-2 h-2 rounded-full ${maintenanceMode ? 'bg-red-500 animate-ping' : 'bg-green-500'}`} />
+                      {maintenanceMode ? 'Sí - Pantalla Bloqueante Activada' : 'No - Sistema ONLINE con normalidad'}
+                    </span>
+                    <span className="text-[8.5px] font-mono font-bold text-[#bccbb9]/40 mt-1 block uppercase">
+                      ID CONSOLE: LIC-SYS-MANT-2026-FUT
+                    </span>
+                  </div>
+
+                  <div className="p-4 bg-zinc-950/50 border border-white/5 rounded-2xl flex flex-col justify-between">
+                    <div>
+                      <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Diseño de Bloqueo</span>
+                      <span className="text-xs font-black text-white mt-1.5 block leading-none truncate uppercase">
+                        Imagen Recreada de Cristal (Inamovible)
+                      </span>
+                    </div>
+                    <span className="text-[7.5px] font-mono text-amber-400 block mt-1 truncate">
+                      ARCHIVO: /public/mantenimiento.png
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive configurations details */}
+              <div className="max-w-xl mx-auto space-y-6 relative mb-8">
+                {/* Switch de Mantenimiento */}
+                <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4 text-left">
+                  <h5 className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic mb-2">Interruptor Maestro de Bloqueo</h5>
+                  
+                  <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-2xl">
+                    <div>
+                      <span className="text-[10px] font-black text-white uppercase tracking-wider block font-sans">Activar Mantenimiento</span>
+                      <span className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block mt-0.5">Muestra la pantalla de trabajos de mejora técnica inmediatamente en la APP</span>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const newVal = !maintenanceMode;
+                        setMaintenanceMode(newVal);
+                        localStorage.setItem('ramito_maintenance', String(newVal));
+                        if (showToast) showToast(newVal ? 'Modo Mantenimiento Activado' : 'Modo Mantenimiento Desactivado', 'success');
+                      }}
+                      className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors shrink-0 ${maintenanceMode ? 'bg-red-500' : 'bg-white/10'}`}
+                    >
+                      <motion.div animate={{ x: maintenanceMode ? 24 : 0 }} className={`w-5 h-5 rounded-full ${maintenanceMode ? 'bg-white' : 'bg-zinc-400'}`} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Vista Previa en Tiempo Real de Mantenimiento / Bloqueo */}
+                <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4 text-left">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic">Previsualización del Diseño Recreado</h5>
+                    <span className="text-[7.5px] font-mono text-[#4be277] bg-[#4be277]/10 border border-[#4be277]/20 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">
+                      En Vivo
+                    </span>
+                  </div>
+
+                  <p className="text-[9px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
+                    Esta es la imagen y logotipo inamovible de cristal y luces de estadio que verán los usuarios al activar el bloqueo preventivo.
+                  </p>
+
+                  <div className="flex justify-center py-2">
+                    {/* Smartphone Wrapper */}
+                    <div className="relative w-full max-w-[270px] h-[450px] bg-zinc-950 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col justify-between p-1.5 text-center select-none">
+                      <div className="w-full h-full rounded-[2.2rem] overflow-hidden relative bg-black">
+                        {/* Image rendering */}
+                        <img 
+                          src="/mantenimiento.png" 
+                          alt="Mantenimiento" 
+                          className="w-full h-full object-cover select-none pointer-events-none"
+                          referrerPolicy="no-referrer"
+                        />
+                        
+                        {/* Dark glow container to represent phone notch and clean aesthetic */}
+                        <div className="absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-black/80 to-transparent flex justify-center">
+                          <div className="w-20 h-3 bg-black rounded-b-xl" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={() => setShowMaintenanceWindow(false)}
+                  className="flex-1 h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Ajustes
+                </button>
+                <button 
+                  disabled={isReadOnly}
+                  onClick={() => {
+                    localStorage.setItem('ramito_maintenance', String(maintenanceMode));
+                    localStorage.setItem('ramito_maintenance_msg', maintenanceCustomMsg);
+                    if (maintenanceBg) {
+                      localStorage.setItem('ramito_maintenance_bg', maintenanceBg);
+                    } else {
+                      localStorage.removeItem('ramito_maintenance_bg');
+                    }
+                    addAuditLog('GUARDAR AJUSTES DE MANTENIMIENTO EN CONSOLA', `Se actualizó el banner técnico y estado de visualización para la aplicación móvil.`, 'success');
+                    if (showToast) showToast('Ajustes de mantenimiento guardados y sincronizados', 'success');
+                    setShowMaintenanceWindow(false);
+                  }}
+                  className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 ${
+                    isReadOnly 
+                      ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
+                      : 'bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/50 text-amber-400 hover:border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                  }`}
+                >
+                  <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Cambios de Mantenimiento'}
                 </button>
               </div>
             </div>
@@ -2783,7 +3916,7 @@ export default function ProfileView() {
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#4be277]/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="relative w-full max-w-4xl mx-auto flex flex-col p-6 md:p-10 flex-1 justify-between">
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
                 <div className="flex items-center gap-4">
@@ -2813,7 +3946,10 @@ export default function ProfileView() {
                       <AlertTriangle className="w-5 h-5 text-red-500" />
                     </div>
                     <div>
-                      <span className="text-[11px] font-black text-red-500 tracking-wider block italic uppercase">👑 MODO DE SÓLO LECTURA (VIP ADMIN)</span>
+                      <span className="text-[11px] font-black text-red-500 tracking-wider flex items-center gap-1.5 italic uppercase">
+                        <Crown className="w-3.5 h-3.5 text-red-500 inline shrink-0" strokeWidth={2.5} />
+                        MODO DE SÓLO LECTURA (VIP ADMIN)
+                      </span>
                       <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
                         No posees permisos de Élite para modificar las cuentas de recepción de transferencias en producción. Contacta al Administrador Principal para solicitar delegación de cambios.
                       </p>
@@ -3029,6 +4165,673 @@ export default function ProfileView() {
         )}
       </AnimatePresence>
 
+      {/* Ventana de Configuración de Cantina, Bebidas y Extras */}
+      <AnimatePresence>
+        {showCantinaWindow && (
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+            {/* Glow Background */}
+            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#FF9100]/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
+
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#FF9100]/10 border border-[#FF9100]/20 flex items-center justify-center shrink-0">
+                    <GlassWater className="w-6 h-6 text-[#FF9100] animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Configuración de Catálogo & Tarifas</h4>
+                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
+                      TIENDA EN PUERTA INDEPENDIENTE Y EXTRAS DE RESERVA INTEGRADOS
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowCantinaWindow(false)}
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Informative notice */}
+              <div className="bg-[#FF9100]/5 border border-[#FF9100]/20 rounded-2xl p-4 mb-6 flex items-start gap-3 text-left">
+                <Info className="w-5 h-5 text-[#FF9100] shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[10px] font-black text-white uppercase tracking-wider block">Control General de Precios y Nombres</span>
+                  <p className="text-[8.5px] font-bold text-[#bccbb9]/70 uppercase tracking-widest mt-1 leading-relaxed">
+                    Cambia libremente el nombre e importe de venta para cada producto de hidratación o alquileres integrados. Los cambios se reflejarán inmediatamente en la pantalla de bienvenida y en el carrito de confirmación de reservas de los próximos usuarios.
+                  </p>
+                </div>
+              </div>
+
+              {/* CONFIGURACIÓN GLOBAL DE ALERTAS DE INVENTARIO */}
+              <div className="bg-zinc-950/60 border border-white/5 rounded-3xl p-5 mb-6 space-y-4 text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 shrink-0">
+                      <Bell className="w-4.5 h-4.5 text-white animate-pulse" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black text-white uppercase tracking-wider block">Parámetros y Alertas de Seguridad de Inventario</span>
+                      <p className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5">Control inteligente por semáforo de disponibilidad y mínimos</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest">SISTEMA: SEMÁFORO AUTOMÁTICO</span>
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse border border-emerald-400/55" />
+                  </div>
+                </div>
+
+                <div className="font-sans">
+                  {/* Umbral */}
+                  <div className="space-y-2">
+                    <label className="text-[8.5px] font-black text-[#bccbb9]/50 uppercase tracking-wider block">Límite Crítico (Valor de Seguridad del Semáforo)</label>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between bg-black/30 border border-white/5 p-3.5 rounded-2xl">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = Math.max(1, stockAlertThreshold - 1);
+                              setStockAlertThreshold(val);
+                              localStorage.setItem('ramito_stock_alert_threshold', String(val));
+                              showToast(`Valor de seguridad establecido en ${val} unidades`, 'success');
+                            }}
+                            className="w-10 h-10 bg-white/5 border border-r-0 border-white/10 text-white rounded-l-xl hover:bg-white/10 text-sm font-bold flex items-center justify-center shrink-0"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            value={stockAlertThreshold}
+                            onChange={(e) => {
+                              const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+                              setStockAlertThreshold(val);
+                              localStorage.setItem('ramito_stock_alert_threshold', String(val));
+                            }}
+                            className="w-14 h-10 bg-black/40 border-y border-white/10 text-center text-xs text-white font-mono font-bold outline-none focus:border-[#FF9100]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = stockAlertThreshold + 1;
+                              setStockAlertThreshold(val);
+                              localStorage.setItem('ramito_stock_alert_threshold', String(val));
+                              showToast(`Valor de seguridad establecido en ${val} unidades`, 'success');
+                            }}
+                            className="w-10 h-10 bg-white/5 border border-l-0 border-white/10 text-white rounded-r-xl hover:bg-white/10 text-sm font-bold flex items-center justify-center shrink-0"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest leading-relaxed">
+                          Notificar y activar alerta en el sistema cuando queden <strong className="text-[#FF9100] font-black">{stockAlertThreshold} unidades</strong> o menos.
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 py-1 px-3 bg-white/5 border border-white/5 rounded-xl text-[8px] font-black uppercase text-[#bccbb9]/60 tracking-wider">
+                        <span>🔴 CRÍTICO: 0 uds</span>
+                        <span>🟡 ALERTA: 1 a {stockAlertThreshold} uds</span>
+                        <span>🟢 OK: &gt; {stockAlertThreshold} uds</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista de Alertas de Stock Bajo Activas con Acciones de Carga */}
+                {(() => {
+                  const itemsLowStock = cantinaItems.filter(item => item.stock <= stockAlertThreshold);
+                  if (itemsLowStock.length === 0) {
+                    return (
+                      <div className="mt-2 p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl flex items-center gap-2.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-[8.5px] font-black text-emerald-400 uppercase tracking-wider">
+                          ¡Excelente! Todos los productos están con inventario óptimo (sobre valor de seguridad).
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="mt-4 p-4 border border-zinc-800 bg-zinc-950/40 rounded-2xl space-y-3">
+                      <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-wider text-white">
+                          Avisos de Semáforo Activos ({itemsLowStock.length} Alertas de Stock)
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {itemsLowStock.map(item => {
+                          const isAgotado = item.stock === 0;
+                          
+                          // Automatic Traffic Light colors for labels, borders and backgrounds
+                          const badgeColor = isAgotado ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+                          const trafficDot = isAgotado ? '🔴 CRÍTICO AGOTADO' : '🟡 ALERTA DE REPOSICIÓN';
+                          const stockColorText = isAgotado ? 'text-red-500 font-extrabold text-[12px] animate-pulse' : 'text-amber-500 font-extrabold text-[11px]';
+
+                          return (
+                            <div key={item.id} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-black/40 border p-3 rounded-xl transition-all ${isAgotado ? 'border-red-500/30' : 'border-amber-500/25'}`}>
+                              <div className="flex items-start gap-2.5">
+                                <span className="mt-0.5" title={isAgotado ? 'Agotado' : 'Bajo stock'}>
+                                  {isAgotado ? '🔴' : '🟡'}
+                                </span>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10.5px] font-black text-white uppercase tracking-wider">{item.name}</span>
+                                    <span className={`text-[7px] font-extrabold px-2 py-0.5 rounded-full border uppercase tracking-widest ${badgeColor}`}>
+                                      {trafficDot}
+                                    </span>
+                                  </div>
+                                  <span className="text-[8px] font-bold text-[#bccbb9]/50 uppercase tracking-widest block mt-1">
+                                    Disposici&oacute;n actual: <strong className={stockColorText}>{item.stock} unidades</strong> (Umbral cr&iacute;tico para sem&aacute;foro: {stockAlertThreshold})
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 self-start sm:self-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = cantinaItems.map(i => i.id === item.id ? { ...i, stock: i.stock + 10 } : i);
+                                    setCantinaItems(updated);
+                                    showToast(`Se añadieron +10 unidades de ${item.name}`, 'success');
+                                  }}
+                                  className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white active:scale-95 text-[8.5px] font-black uppercase tracking-widest rounded-lg border border-white/10 transition-all shrink-0"
+                                >
+                                  ⚡ RECARGAR +10
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = cantinaItems.map(i => i.id === item.id ? { ...i, stock: i.stock + 25 } : i);
+                                    setCantinaItems(updated);
+                                    showToast(`Se añadieron +25 unidades de ${item.name}`, 'success');
+                                  }}
+                                  className="px-3 py-1.5 bg-[#4be277]/10 hover:bg-[#4be277]/20 text-[#4be277] active:scale-95 text-[8.5px] font-black uppercase tracking-widest rounded-lg border border-[#4be277]/10 transition-all shrink-0"
+                                >
+                                  ⚡ RECARGAR +25
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Grid de Productos Dinámicos */}
+              <div className="space-y-6 lg:mb-10 mb-6 text-left font-sans">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                  <div>
+                    <h5 className="text-xs font-black text-white uppercase tracking-wider italic flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-[#FF9100]" />
+                      Catálogo General e Inventario ({cantinaItems.length} Productos)
+                    </h5>
+                    <p className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-1">
+                      Control de stock en tiempo real y visibilidad en pre-reservas
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = `custom_${Date.now()}`;
+                      const newItem: CantinaItem = {
+                        id: newId,
+                        name: 'NUEVO PRODUCTO',
+                        price: 5,
+                        stock: 10,
+                        type: 'drink',
+                        iconId: 'water',
+                        showInBooking: true
+                      };
+                      setCantinaItems([...cantinaItems, newItem]);
+                      showToast('Nuevo producto agregado al catálogo', 'success');
+                    }}
+                    className="px-4 py-2 bg-[#FF9100] hover:bg-[#FF9100]/90 text-black text-[9px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-1.5 italic self-start"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Agregar Nuevo Producto
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {cantinaItems.map((item, index) => {
+                    return (
+                      <div key={item.id} className="bg-zinc-950/60 border border-white/5 hover:border-white/10 rounded-2xl p-4 space-y-4 relative overflow-hidden transition-all">
+                        {/* Header Item */}
+                        <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[8px] font-black bg-white/10 text-[#FF9100] px-2 py-0.5 rounded-full font-mono">
+                              #{index + 1}
+                            </span>
+                            <span className="text-[8px] font-black text-white/50 uppercase tracking-widest font-mono">
+                              ID: {item.id}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCantinaItems(cantinaItems.filter(i => i.id !== item.id));
+                              showToast('Producto eliminado', 'success');
+                            }}
+                            className="text-zinc-500 hover:text-red-500 transition-colors p-1 rounded hover:bg-white/5 shrink-0"
+                            title="Eliminar Producto"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {/* Inputs */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="col-span-2 space-y-1">
+                            <label className="text-[8px] font-black text-[#bccbb9]/50 uppercase tracking-wider block">Nombre del Producto</label>
+                            <input
+                              type="text"
+                              value={item.name}
+                              onChange={(e) => {
+                                const updated = cantinaItems.map(i => i.id === item.id ? { ...i, name: e.target.value } : i);
+                                setCantinaItems(updated);
+                              }}
+                              className="w-full h-10 bg-black/40 border border-white/10 rounded-xl px-3 text-xs text-white uppercase font-bold outline-none focus:border-[#FF9100]"
+                              placeholder="Ej. FANTA 500ML"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-[#bccbb9]/50 uppercase tracking-wider block">Precio ($)</label>
+                            <input
+                              type="number"
+                              value={item.price || ''}
+                              onChange={(e) => {
+                                const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                const updated = cantinaItems.map(i => i.id === item.id ? { ...i, price: val } : i);
+                                setCantinaItems(updated);
+                              }}
+                              className="w-full h-10 bg-black/40 border border-white/10 rounded-xl px-3 text-xs text-white font-mono font-bold outline-none focus:border-[#FF9100]"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black text-[#bccbb9]/50 uppercase tracking-wider block">Inventario (Stock)</label>
+                            <div className="flex items-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = cantinaItems.map(i => i.id === item.id ? { ...i, stock: Math.max(0, i.stock - 1) } : i);
+                                  setCantinaItems(updated);
+                                }}
+                                className="w-10 h-10 bg-white/5 border border-r-0 border-white/10 text-white rounded-l-xl hover:bg-white/10 text-sm font-bold flex items-center justify-center shrink-0"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                value={item.stock}
+                                onChange={(e) => {
+                                  const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                                  const updated = cantinaItems.map(i => i.id === item.id ? { ...i, stock: val } : i);
+                                  setCantinaItems(updated);
+                                }}
+                                className={`w-full h-10 bg-black/40 border-y border-white/10 text-center text-xs font-mono font-bold outline-none ${
+                                  item.stock === 0 
+                                    ? 'text-red-500 focus:border-red-500' 
+                                    : item.stock <= stockAlertThreshold 
+                                      ? 'text-amber-500 focus:border-amber-500' 
+                                      : 'text-emerald-400 focus:border-emerald-400'
+                                }`}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = cantinaItems.map(i => i.id === item.id ? { ...i, stock: i.stock + 1 } : i);
+                                  setCantinaItems(updated);
+                                }}
+                                className="w-10 h-10 bg-white/5 border border-l-0 border-white/10 text-white rounded-r-xl hover:bg-white/10 text-sm font-bold flex items-center justify-center shrink-0"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <div className="mt-1">
+                              {item.stock === 0 ? (
+                                <span className="text-[7.5px] text-red-500 font-extrabold tracking-widest uppercase block animate-pulse">🔴 AGOTADO CRÍTICO</span>
+                              ) : item.stock <= stockAlertThreshold ? (
+                                <span className="text-[7.5px] text-amber-500 font-black tracking-widest uppercase block">🟡 BAJO STOCK (ALERTA)</span>
+                              ) : (
+                                <span className="text-[7.5px] text-[#4be277] font-medium tracking-widest uppercase block">🟢 DISPONIBLE OK</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="col-span-2 grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+                            {/* Type Selection */}
+                            <div className="space-y-1">
+                              <label className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-wider block">Tipo de Producto</label>
+                              <select
+                                value={item.type}
+                                onChange={(e) => {
+                                  const val = e.target.value as any;
+                                  const updated = cantinaItems.map(i => i.id === item.id ? { ...i, type: val } : i);
+                                  setCantinaItems(updated);
+                                }}
+                                className="w-full h-8 bg-black/60 border border-white/10 rounded-lg px-2 text-[10px] text-zinc-300 font-bold outline-none focus:border-[#FF9100]"
+                              >
+                                <option value="drink">🥤 BEBIDA / CANTINA</option>
+                                <option value="equipment">👕 EQUIPAMIENTO</option>
+                                <option value="extra">✨ ADICIONAL / EXTRAS</option>
+                              </select>
+                            </div>
+
+                            {/* Icon Picker */}
+                            <div className="space-y-1">
+                              <label className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-wider block">Ícono Visual</label>
+                              <select
+                                value={item.iconId}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const updated = cantinaItems.map(i => i.id === item.id ? { ...i, iconId: val } : i);
+                                  setCantinaItems(updated);
+                                }}
+                                className="w-full h-8 bg-black/60 border border-white/10 rounded-lg px-2 text-[10px] text-zinc-300 font-bold outline-none focus:border-[#FF9100]"
+                              >
+                                <option value="water">🥤 Vaso / Gaseosa</option>
+                                <option value="gatorade">🔥 Isotónica / Energía</option>
+                                <option value="beer">🍺 Cerveza / Bebida Fría</option>
+                                <option value="vests">👕 Chaleco / Indumentaria</option>
+                                <option value="ball">⚽ Pelota Oficial</option>
+                                <option value="bbq">🍖 Parrilla / Carbón</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Toggle Show in Checkout Booking */}
+                          <div className="col-span-full pt-1.5 flex items-center justify-between">
+                            <span className="text-[8px] font-black uppercase text-[#bccbb9]/60 tracking-wider">
+                              Ofrecer pre-venta en reservas
+                            </span>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                checked={item.showInBooking} 
+                                onChange={(e) => {
+                                  const updated = cantinaItems.map(i => i.id === item.id ? { ...i, showInBooking: e.target.checked } : i);
+                                  setCantinaItems(updated);
+                                }}
+                                className="sr-only peer" 
+                              />
+                              <div className="w-8 h-4 bg-zinc-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-zinc-400 peer-checked:after:bg-black peer-checked:bg-[#FF9100] after:rounded-full after:h-3 after:w-3.5 after:transition-all pointer-events-none" />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Botón de Guardado */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 border-t border-white/5 pt-8 mt-auto">
+                <button 
+                  onClick={() => setShowCantinaWindow(false)}
+                  className="w-full sm:w-auto px-6 h-14 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest italic font-sans transition-all active:scale-[0.97]"
+                >
+                  Volver a Ajustes
+                </button>
+                <button 
+                  onClick={handleSaveCantina}
+                  className="flex-1 w-full h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all bg-[#4be277] text-black hover:opacity-90 shadow-[0_0_20px_rgba(75,226,119,0.3)] flex items-center justify-center gap-1.5 italic"
+                >
+                  <Save className="w-4 h-4" /> Guardar y Sincronizar Tienda
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Ventana de Políticas y Advertencias de Cancha 1 */}
+      <AnimatePresence>
+        {showCourt1PolicyWindow && (
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+            {/* Background elements */}
+            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#4be277]/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-600/5 rounded-full blur-[120px] pointer-events-none" />
+
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#4be277]/10 border border-[#4be277]/20 flex items-center justify-center shrink-0">
+                    <Info className="w-6 h-6 text-[#4be277] animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Políticas de Reglas - Cancha 1 (Césped)</h4>
+                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
+                      CONFIGURACIÓN DE ADVERTENCIAS PARA EL USO ADECUADO DE LOS BOTINES Y CUALQUIER DIRECTRIZ DE CÉSPED
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowCourt1PolicyWindow(false)}
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {isReadOnly && (
+                <div className="p-5 mb-8 bg-zinc-950/60 w-full rounded-3xl border border-red-500/20 space-y-4 text-left shadow-lg relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl pointer-events-none" />
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-black text-red-500 tracking-wider flex items-center gap-1.5 italic uppercase">
+                        <Crown className="w-3.5 h-3.5 text-red-500 inline shrink-0" strokeWidth={2.5} />
+                        MODO DE SÓLO LECTURA (VIP ADMIN)
+                      </span>
+                      <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
+                        No posees permisos de Élite para modificar el mensaje o normativa de la Cancha 1 en producción. Contacta al Administrador Principal para solicitar delegación de cambios.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Form Container */}
+              <div className="space-y-6 flex-1 text-left animate-fade-in">
+                <div className="glass-panel p-6 rounded-3xl border border-white/5 space-y-4 bg-zinc-900/20">
+                  <span className="text-[10px] font-black text-[#4be277] uppercase tracking-wider block italic">Mensaje de Advertencia Activo</span>
+                  <p className="text-[9.5px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
+                    Este mensaje se mostrará a todos los usuarios antes de confirmar su turno de reserva para la Cancha 1 (Césped). Se utiliza principalmente para detallar las normas como calzado prohibido (v.g. botines con tapones o chimpunes de cocos grandes), cancelaciones y cuidados.
+                  </p>
+
+                  <div className="space-y-2 pt-2 font-sans">
+                    <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block font-sans">Mensaje de la Normativa</label>
+                    <textarea
+                      rows={4}
+                      disabled={isReadOnly}
+                      value={court1Policy}
+                      onChange={(e) => setCourt1Policy(e.target.value)}
+                      placeholder="Escribe la política o advertencia aquí..."
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-white focus:border-[#4be277] transition-all outline-none font-bold placeholder-zinc-700 hover:border-[#4be277]/30 uppercase leading-relaxed font-sans"
+                    />
+                  </div>
+                  
+                  {/* Vista Previa en Tiempo Real */}
+                  <div className="pt-4 border-t border-white/5 font-sans">
+                    <span className="text-[9px] font-black text-[#bccbb9]/40 uppercase tracking-wider block mb-2 font-sans">Vista Previa Visual del Mensaje en Reserva de Cancha 1</span>
+                    <div className="bg-[#1e2020] rounded-2xl p-4 flex gap-4 border border-white/5">
+                      <Info className="w-5 h-5 text-[#4be277] flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] font-semibold text-[#bccbb9] leading-relaxed uppercase tracking-wider font-sans">
+                          {court1Policy || 'SIN CONTENIDO CONFIGURADO'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Footer Buttons */}
+              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3 mt-8">
+                <button 
+                  onClick={() => setShowCourt1PolicyWindow(false)}
+                  className="flex-1 h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Consola Principal
+                </button>
+                <button 
+                  disabled={isReadOnly}
+                  onClick={() => {
+                    localStorage.setItem('ramito_court1_policy', court1Policy);
+                    
+                    addAuditLog(
+                      'ACTUALIZACIÓN POLÍTICAS DE CANCHA 1', 
+                      `El operador actualizó la normativa de Cancha 1: "${court1Policy.substring(0, 100)}...".`, 
+                      'success'
+                    );
+                    
+                    if (showToast) showToast('Normativa de Cancha 1 guardada con éxito', 'success');
+                    setShowCourt1PolicyWindow(false);
+                  }}
+                  className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 ${
+                    isReadOnly 
+                      ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
+                      : 'bg-[#4be277] text-black hover:opacity-90 shadow-[0_0_20px_rgba(75,226,119,0.3)]'
+                  }`}
+                >
+                  <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Reglas'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Ventana de Políticas y Advertencias de Cancha 2 */}
+      <AnimatePresence>
+        {showCourt2PolicyWindow && (
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+            {/* Background elements */}
+            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-yellow-600/5 rounded-full blur-[120px] pointer-events-none" />
+
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                    <Info className="w-6 h-6 text-amber-500 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Políticas de Reglas - Cancha 2 (Sin Césped)</h4>
+                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
+                      CONFIGURACIÓN DE ADVERTENCIAS PARA EL USO ADECUADO DE LA LOSA DEPORTIVA (FUTSAL / MULTIUSO)
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowCourt2PolicyWindow(false)}
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {isReadOnly && (
+                <div className="p-5 mb-8 bg-zinc-950/60 w-full rounded-3xl border border-red-500/20 space-y-4 text-left shadow-lg relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl pointer-events-none" />
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-red-500" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-black text-red-500 tracking-wider flex items-center gap-1.5 italic uppercase">
+                        <Crown className="w-3.5 h-3.5 text-red-500 inline shrink-0" strokeWidth={2.5} />
+                        MODO DE SÓLO LECTURA (VIP ADMIN)
+                      </span>
+                      <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
+                        No posees permisos de Élite para modificar el mensaje o normativa de la Cancha 2 en producción. Contacta al Administrador Principal para solicitar delegación de cambios.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Form Container */}
+              <div className="space-y-6 flex-1 text-left animate-fade-in">
+                <div className="glass-panel p-6 rounded-3xl border border-white/5 space-y-4 bg-zinc-900/20">
+                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider block italic">Mensaje de Advertencia Activo</span>
+                  <p className="text-[9.5px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
+                    Este mensaje se mostrará a todos los usuarios antes de confirmar su turno de reserva para la Cancha 2 (Sin Césped / Losa). Se utiliza principalmente para detallar las normas como exigir calzado con suela lisa de goma (futsal / zapatillas comunes), prohibición rigurosa de botines con cocós o tapones, cancelaciones y cuidados.
+                  </p>
+
+                  <div className="space-y-2 pt-2 font-sans">
+                    <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block font-sans">Mensaje de la Normativa</label>
+                    <textarea
+                      rows={4}
+                      disabled={isReadOnly}
+                      value={court2Policy}
+                      onChange={(e) => setCourt2Policy(e.target.value)}
+                      placeholder="Escribe la política o advertencia aquí..."
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-white focus:border-amber-500 transition-all outline-none font-bold placeholder-zinc-700 hover:border-amber-500/30 uppercase leading-relaxed font-sans"
+                    />
+                  </div>
+                  
+                  {/* Vista Previa en Tiempo Real */}
+                  <div className="pt-4 border-t border-white/5 font-sans">
+                    <span className="text-[9px] font-black text-[#bccbb9]/40 uppercase tracking-wider block mb-2 font-sans">Vista Previa Visual del Mensaje en Reserva de Cancha 2</span>
+                    <div className="bg-[#1e2020] rounded-2xl p-4 flex gap-4 border border-white/5">
+                      <Info className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-[10px] font-semibold text-[#bccbb9] leading-relaxed uppercase tracking-wider font-sans">
+                          {court2Policy || 'SIN CONTENIDO CONFIGURADO'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Form Footer Buttons */}
+              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3 mt-8">
+                <button 
+                  onClick={() => setShowCourt2PolicyWindow(false)}
+                  className="flex-1 h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Consola Principal
+                </button>
+                <button 
+                  disabled={isReadOnly}
+                  onClick={() => {
+                    localStorage.setItem('ramito_court2_policy', court2Policy);
+                    
+                    addAuditLog(
+                      'ACTUALIZACIÓN POLÍTICAS DE CANCHA 2', 
+                      `El operador actualizó la normativa de Cancha 2: "${court2Policy.substring(0, 100)}...".`, 
+                      'success'
+                    );
+                    
+                    if (showToast) showToast('Normativa de Cancha 2 guardada con éxito', 'success');
+                    setShowCourt2PolicyWindow(false);
+                  }}
+                  className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 ${
+                    isReadOnly 
+                      ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
+                      : 'bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/50 text-amber-500 hover:border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                  }`}
+                >
+                  <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Reglas'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Ventana de Métricas de Conexión Vercel */}
       <AnimatePresence>
         {showVercelMetricsWindow && (
@@ -3037,7 +4840,7 @@ export default function ProfileView() {
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="relative w-full max-w-4xl mx-auto flex flex-col p-6 md:p-10 flex-1 justify-between">
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
                 <div className="flex items-center gap-4">
@@ -3081,43 +4884,53 @@ export default function ProfileView() {
                 <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl relative overflow-hidden">
                   <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Ancho de Banda</span>
                   <div className="flex items-baseline gap-1 mt-1.5">
-                    <span className="text-2xl font-black text-white tracking-tight">4.82 GB</span>
+                    <span className="text-2xl font-black text-white tracking-tight">{webLicenseActive ? '4.82 GB' : '0.00 GB'}</span>
                     <span className="text-[9px] font-bold text-zinc-500 uppercase">/ 100 GB</span>
                   </div>
                   <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden mt-3">
-                    <div className="h-full bg-blue-500 rounded-full" style={{ width: '4.82%' }} />
+                    <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: webLicenseActive ? '4.82%' : '0%' }} />
                   </div>
-                  <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider mt-2 block">4.82% de cuota mensual usado</span>
+                  <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider mt-2 block">
+                    {webLicenseActive ? '4.82% de cuota mensual usado' : '0.00% (LICENCIA WEB EXPIRADA)'}
+                  </span>
                 </div>
 
                 {/* Stat 2 */}
                 <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl">
                   <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Peticiones Edge (24hs)</span>
                   <div className="flex items-baseline gap-1 mt-1.5">
-                    <span className="text-2xl font-black text-white tracking-tight">18,482</span>
-                    <span className="text-[9px] font-semibold text-emerald-400 uppercase tracking-wide">▲ 14%</span>
+                    <span className="text-2xl font-black text-white tracking-tight">{webLicenseActive ? '18,482' : '0'}</span>
+                    <span className={`text-[9px] font-semibold uppercase tracking-wide ${webLicenseActive ? 'text-emerald-400' : 'text-zinc-500'}`}>{webLicenseActive ? '▲ 14%' : '0%'}</span>
                   </div>
-                  <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-4 block">Tiempo respuesta: 14ms (A+)</span>
+                  <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-4 block">
+                    {webLicenseActive ? 'Tiempo respuesta: 14ms (A+)' : 'SITIO WEB SUSPENDIDO'}
+                  </span>
                 </div>
 
                 {/* Stat 3 */}
                 <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl">
                   <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Invocaciones Serverless</span>
                   <div className="flex items-baseline gap-1 mt-1.5">
-                    <span className="text-2xl font-black text-white tracking-tight">2,842</span>
+                    <span className="text-2xl font-black text-white tracking-tight">
+                      {webLicenseActive && appLicenseActive ? '2,842' : (webLicenseActive || appLicenseActive ? '1,421' : '0')}
+                    </span>
                     <span className="text-[9px] font-bold text-zinc-500 uppercase">INVS</span>
                   </div>
-                  <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-4 block">Promedio duración: 112ms</span>
+                  <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-4 block">
+                    {webLicenseActive || appLicenseActive ? 'Promedio duración: 112ms' : 'CONSOLAS DE APPORTACIÓN INACTIVAS'}
+                  </span>
                 </div>
 
                 {/* Stat 4 */}
                 <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl">
                   <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Uso de Tokens Diario</span>
                   <div className="flex items-baseline gap-1 mt-1.5">
-                    <span className="text-2xl font-black text-white tracking-tight">15.4K</span>
+                    <span className="text-2xl font-black text-white tracking-tight">{appLicenseActive ? '15.4K' : '0.0K'}</span>
                     <span className="text-[9px] font-bold text-zinc-500 uppercase">TOKENS</span>
                   </div>
-                  <span className="text-[8px] font-black text-[#4be277] uppercase tracking-widest mt-4 block">Licencia ACTIVA y persistida</span>
+                  <span className={`text-[8px] font-black uppercase tracking-widest mt-4 block ${appLicenseActive ? 'text-[#4be277]' : 'text-red-500'}`}>
+                    {appLicenseActive ? 'Licencia ACTIVA y persistida' : 'LICENCIA APP EXPIRADA'}
+                  </span>
                 </div>
               </div>
 
@@ -3215,7 +5028,7 @@ export default function ProfileView() {
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="relative w-full max-w-4xl mx-auto flex flex-col p-6 md:p-10 flex-1 justify-between">
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
                 <div className="flex items-center gap-4">
@@ -3408,7 +5221,7 @@ export default function ProfileView() {
                           ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed'
                           : isSimulatingBackup
                             ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
-                            : 'bg-amber-500 text-black hover:opacity-90 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
+                            : 'bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/50 text-amber-500 hover:border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
                       }`}
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isSimulatingBackup ? 'animate-spin' : ''}`} />
@@ -3485,7 +5298,7 @@ export default function ProfileView() {
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-[#4be277]/5 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="relative w-full max-w-lg mx-auto flex flex-col p-6 min-h-screen justify-between">
+            <div className="relative w-full max-w-lg mx-auto flex flex-col pt-16 pb-6 px-6 min-h-screen justify-between">
               
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/5 pb-5 mb-6">
@@ -3512,34 +5325,46 @@ export default function ProfileView() {
                 <div className="space-y-4">
                   <span className="text-[8px] sm:text-[9px] font-black text-[#4be277] uppercase tracking-widest block font-bold">1. Datos Personales</span>
                   
-                  {/* Photo of Operator */}
-                  <div className="glass-panel rounded-3xl border border-white/5 p-4 flex items-center justify-between gap-4 bg-zinc-950/40">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-12 h-12 rounded-xl bg-[#121414] border border-white/10 flex items-center justify-center overflow-hidden cursor-pointer relative group"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        {avatar ? (
-                          <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-6 h-6 text-[#bccbb9]/60" />
-                        )}
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <span className="text-[5.5px] font-black uppercase text-white tracking-widest text-center">Subir</span>
-                        </div>
-                      </div>
-                      <div className="text-left">
-                        <span className="text-[10px] font-black text-white uppercase tracking-wider block italic font-bold">Foto del Operador</span>
-                        <span className="text-[7.5px] font-mono text-[#bccbb9]/40 uppercase tracking-widest">Dimensiones recomendadas: 1:1</span>
-                      </div>
+                  {/* Galería de Avatares Oficiales de Fútbol y Copa del Mundo */}
+                  <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-3 bg-zinc-950/40">
+                    <span className="text-[8.5px] font-black text-[#4be277] uppercase tracking-widest block font-bold">⚽ ELIGE TU AVATAR OFICIAL DE JUGADOR / OPERADOR</span>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { name: 'Balón Campeón', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%2314B8A6" stroke-width="2" stroke-opacity="0.3"/><circle cx="50" cy="50" r="26" fill="%2314B8A6" fill-opacity="0.1" stroke="%2314B8A6" stroke-width="2"/><polygon points="50,35 60,42 56,54 44,54 40,42" fill="none" stroke="%2314B8A6" stroke-width="2"/><line x1="50" y1="35" x2="50" y2="24" stroke="%2314B8A6" stroke-width="2"/><line x1="40" y1="42" x2="29" y2="39" stroke="%2314B8A6" stroke-width="2"/><line x1="60" y1="42" x2="71" y2="39" stroke="%2314B8A6" stroke-width="2"/><line x1="44" y1="54" x2="36" y2="65" stroke="%2314B8A6" stroke-width="2"/><line x1="56" y1="54" x2="64" y2="65" stroke="%2314B8A6" stroke-width="2"/></svg>' },
+                        { name: 'Mundial Oro', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23FBBF24" stroke-width="2" stroke-opacity="0.3"/><path d="M 35,30 L 65,30 A 15,15 0 0,1 50,60 A 15,15 0 0,1 35,30 Z" fill="%23FBBF24" fill-opacity="0.1" stroke="%23FBBF24" stroke-width="2"/><path d="M 35,38 H 28 A 5,5 0 0,1 28,48 H 35" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 65,38 H 72 A 5,5 0 0,0 72,48 H 65" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,60 V 70 M 40,70 H 60" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,16 L 52,21 L 57,21 L 53,24 L 55,29 L 50,26 L 45,29 L 47,24 L 43,21 L 48,21 Z" fill="%23FBBF24" fill-opacity="0.2" stroke="%23FBBF24" stroke-width="1"/></svg>' },
+                        { name: 'Botín de Oro', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23F97316" stroke-width="2" stroke-opacity="0.3"/><path d="M 22,50 C 22,38 35,35 48,42 L 78,54 C 80,55 82,58 78,62 C 72,66 45,66 32,66 C 25,66 22,60 22,50 Z" fill="%23F97316" fill-opacity="0.1" stroke="%23F97316" stroke-width="2"/><path d="M 45,43 Q 50,55 42,65 M 52,45 Q 57,55 49,65" stroke="%23FBBF24" stroke-width="2" fill="none"/></svg>' },
+                        { name: 'Camiseta Copa', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%2306B6D4" stroke-width="2" stroke-opacity="0.3"/><path d="M 32,32 L 42,32 A 8,8 0 0,0 58,32 L 68,32 L 76,46 L 66,52 L 62,48 L 62,74 L 38,74 L 38,48 L 34,52 L 24,46 Z" fill="%2306B6D4" fill-opacity="0.1" stroke="%2306B6D4" stroke-width="2"/><text x="50" y="60" font-family="sans-serif" font-weight="900" font-size="16" fill="%2306B6D4" text-anchor="middle">10</text></svg>' },
+                        { name: 'Guantes Pro', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.7" stroke="%238B5CF6" stroke-width="2" stroke-opacity="0.3"/><path d="M 38,34 Q 28,38 34,54 L 38,68 A 12,12 0 0,0 62,68 L 66,54 Q 72,38 62,34 A 8,8 0 0,0 50,44 A 8,8 0 0,0 38,34 Z" fill="%23A78BFA" fill-opacity="0.1" stroke="%23A78BFA" stroke-width="2" stroke-linejoin="round"/><path d="M 44,52 H 56 M 46,60 H 54" stroke="%23A78BFA" stroke-width="1.5" stroke-opacity="0.7"/></svg>' },
+                        { name: 'Estrategia', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%2310B981" stroke-width="2" stroke-opacity="0.3"/><rect x="24" y="24" width="52" height="48" fill="none" stroke="%2310B981" stroke-width="2" stroke-opacity="0.8"/><line x1="50" y1="24" x2="50" y2="72" stroke="%2310B981" stroke-width="1.5"/><circle cx="50" cy="48" r="10" fill="none" stroke="%2310B981" stroke-width="1.5"/><circle cx="50" cy="48" r="2.5" fill="%2310B981"/></svg>' },
+                        { name: 'Silbato Juez', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23F43F5E" stroke-width="2" stroke-opacity="0.3"/><path d="M 32,58 H 68 V 72 H 56 L 40,78 V 72 H 32 Z" fill="%23F43F5E" fill-opacity="0.1" stroke="%23F43F5E" stroke-width="2"/><path d="M 68,62 H 78 V 68 H 68 Z" fill="none" stroke="%23F43F5E" stroke-width="2"/><circle cx="28" cy="65" r="4" stroke="%23F43F5E" stroke-width="2" fill="none"/></svg>' },
+                        { name: 'Medalla Oro', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23CA8A04" stroke-width="2" stroke-opacity="0.3"/><path d="M 42,20 L 34,44 L 50,54 L 66,44 L 58,20" fill="none" stroke="%23EF4444" stroke-width="2"/><circle cx="50" cy="58" r="18" fill="%23CA8A04" fill-opacity="0.1" stroke="%23CA8A04" stroke-width="2"/><path d="M 50,49 L 52,54 L 57,54 L 53,57 L 55,62 L 50,59 L 54,63 L 53,57 L 58,54 L 53,52 Z" fill="%23FBBF24" fill-opacity="0.4" stroke="%23CA8A04" stroke-width="1"/></svg>' }
+                      ].map((item, index) => {
+                        const isSelected = avatar === item.url;
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => {
+                              setAvatar(item.url);
+                              setUserAvatar(item.url);
+                              showToast(`Avatar de ${item.name} seleccionado`, 'success');
+                            }}
+                            className={`relative aspect-square rounded-2xl overflow-hidden border-2 transition-all hover:scale-105 active:scale-95 ${
+                              isSelected ? 'border-[#4be277] shadow-[0_0_15px_rgba(75,226,119,0.25)]' : 'border-white/5 hover:border-white/20'
+                            }`}
+                          >
+                            <img src={item.url} alt={item.name} className="w-full h-full object-cover animate-fade-in" referrerPolicy="no-referrer" />
+                            {isSelected && (
+                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                <div className="p-1 rounded-full bg-[#4be277] text-black">
+                                  <Check className="w-2.5 h-2.5 stroke-[4]" />
+                                </div>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
-                    <button 
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg text-[7.5px] font-black uppercase tracking-widest transition-all"
-                    >
-                      Subir Imagen
-                    </button>
                   </div>
 
                   {/* Name Input */}
@@ -3602,55 +5427,69 @@ export default function ProfileView() {
                   </div>
                 </div>
 
-                {/* SECCIÓN 3: LLAVES MAESTRAS DE REGISTRO */}
-                {(userRole === 'admin_elite' || userRole === 'admin_vip') && (
-                  <div className="space-y-4 font-sans">
-                    <span className="text-[8px] sm:text-[9px] font-black text-[#4be277] uppercase tracking-widest block font-bold">3. Llaves Maestras de Registro (Personal)</span>
+                {/* SECCIÓN 3: LLAVE MAESTRA DE REGISTRO */}
+                {userRole === 'admin_elite' && (
+                  <div className="space-y-4 font-sans text-left">
+                    <span className="text-[8px] sm:text-[9px] font-black text-[#4be277] uppercase tracking-widest block font-bold">
+                      3. Llave Maestra de Registro Élite
+                    </span>
                     
-                    <div className="glass-panel rounded-3xl border border-white/5 p-4 space-y-4 bg-zinc-950/40">
-                      {userRole === 'admin_elite' && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center px-1">
-                            <label className="text-[9px] font-black text-[#4be277] uppercase tracking-widest italic block font-bold">👑 Llave Registro Élite Admin</label>
-                            <button 
-                              type="button" 
-                              onClick={() => generateStrongKey('elite')}
-                              className="text-[7.5px] font-black text-[#4be277]/80 hover:text-[#4be277] uppercase tracking-widest hover:underline flex items-center gap-1 font-mono transition-colors"
-                            >
-                              <RefreshCw className="w-2.5 h-2.5" /> Auto-Sugerir
-                            </button>
-                          </div>
-                          <input 
-                            type="text" 
-                            value={newEliteKey} 
-                            onChange={(e) => setNewEliteKey(e.target.value)} 
-                            className="w-full h-11 bg-black/50 border border-[#4be277]/30 rounded-xl px-4 text-white text-xs font-mono font-black tracking-widest outline-none focus:border-[#4be277] transition-all cursor-text" 
-                            placeholder="CÓDIGO ÉLITE REGISTRO"
-                          />
+                    <div className="glass-panel rounded-3xl border border-white/5 p-4 bg-zinc-950/40">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center px-1">
+                          <label className="text-[9px] font-black text-[#4be277] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
+                            <Crown className="w-3.5 h-3.5 text-[#4be277]" strokeWidth={2.5} />
+                            Llave Registro Élite Admin
+                          </label>
+                          <button 
+                            type="button" 
+                            onClick={() => generateStrongKey('elite')}
+                            className="text-[7.5px] font-black text-[#4be277]/80 hover:text-[#4be277] uppercase tracking-widest hover:underline flex items-center gap-1 font-mono transition-colors"
+                          >
+                            <RefreshCw className="w-2.5 h-2.5" /> Auto-Sugerir
+                          </button>
                         </div>
-                      )}
+                        <input 
+                          type="text" 
+                          value={newEliteKey} 
+                          onChange={(e) => setNewEliteKey(e.target.value)} 
+                          className="w-full h-11 bg-black/50 border border-[#4be277]/30 rounded-xl px-4 text-white text-xs font-mono font-black tracking-widest outline-none focus:border-[#4be277] transition-all cursor-text" 
+                          placeholder="CÓDIGO ÉLITE REGISTRO"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                      {(userRole === 'admin_elite' || userRole === 'admin_vip') && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center px-1">
-                            <label className="text-[9px] font-black text-[#FFD600] uppercase tracking-widest italic block font-bold">💎 Llave Registro VIP Admin</label>
-                            <button 
-                              type="button" 
-                              onClick={() => generateStrongKey('vip')}
-                              className="text-[7.5px] font-black text-[#FFD600]/80 hover:text-[#FFD600] uppercase tracking-widest hover:underline flex items-center gap-1 font-mono transition-colors"
-                            >
-                              <RefreshCw className="w-2.5 h-2.5" /> Auto-Sugerir
-                            </button>
-                          </div>
-                          <input 
-                            type="text" 
-                            value={newVipKey} 
-                            onChange={(e) => setNewVipKey(e.target.value)} 
-                            className="w-full h-11 bg-black/50 border border-[#FFD600]/30 rounded-xl px-4 text-white text-xs font-mono font-black tracking-widest outline-none focus:border-[#FFD600] transition-all cursor-text" 
-                            placeholder="CÓDIGO VIP REGISTRO"
-                          />
+                {userRole === 'admin_vip' && (
+                  <div className="space-y-4 font-sans text-left">
+                    <span className="text-[8px] sm:text-[9px] font-black text-[#FFD600] uppercase tracking-widest block font-bold">
+                      3. Llave Maestra de Registro VIP
+                    </span>
+                    
+                    <div className="glass-panel rounded-3xl border border-white/5 p-4 bg-zinc-950/40">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center px-1">
+                          <label className="text-[9px] font-black text-[#FFD600] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
+                            <Gem className="w-3.5 h-3.5 text-[#FFD600]" strokeWidth={2.5} />
+                            Llave Registro VIP Admin
+                          </label>
+                          <button 
+                            type="button" 
+                            onClick={() => generateStrongKey('vip')}
+                            className="text-[7.5px] font-black text-[#FFD600]/80 hover:text-[#FFD600] uppercase tracking-widest hover:underline flex items-center gap-1 font-mono transition-colors"
+                          >
+                            <RefreshCw className="w-2.5 h-2.5" /> Auto-Sugerir
+                          </button>
                         </div>
-                      )}
+                        <input 
+                          type="text" 
+                          value={newVipKey} 
+                          onChange={(e) => setNewVipKey(e.target.value)} 
+                          className="w-full h-11 bg-black/50 border border-[#FFD600]/30 rounded-xl px-4 text-white text-xs font-mono font-black tracking-widest outline-none focus:border-[#FFD600] transition-all cursor-text" 
+                          placeholder="CÓDIGO VIP REGISTRO"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}

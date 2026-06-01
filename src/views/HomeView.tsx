@@ -1,13 +1,43 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn, Calendar, Clock, PlayCircle, DollarSign, Power, Globe, Smartphone, Newspaper, Database, HardDrive, Activity, Info, RefreshCw } from 'lucide-react';
+import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn, Calendar, Clock, PlayCircle, DollarSign, Power, Globe, Smartphone, Newspaper, Database, HardDrive, Activity, Info, RefreshCw, Sparkles, GlassWater, Flame, Trophy, Shirt } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { getCantinaItems } from '../lib/cantina';
 
+
+const USER_AVATARS: Record<string, string> = {
+  'CARLOS MENDOZA': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23FBBF24" stroke-width="2" stroke-opacity="0.3"/><path d="M 35,30 L 65,30 A 15,15 0 0,1 50,60 A 15,15 0 0,1 35,30 Z" fill="%23FBBF24" fill-opacity="0.1" stroke="%23FBBF24" stroke-width="2"/><path d="M 35,38 H 28 A 5,5 0 0,1 28,48 H 35" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 65,38 H 72 A 5,5 0 0,0 72,48 H 65" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,60 V 70 M 40,70 H 60" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,16 L 52,21 L 57,21 L 53,24 L 55,29 L 50,26 L 45,29 L 47,24 L 43,21 L 48,21 Z" fill="%23FBBF24" fill-opacity="0.2" stroke="%23FBBF24" stroke-width="1"/></svg>', // Mundial Oro
+  'SOFÍA RODRÍGUEZ': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%2306B6D4" stroke-width="2" stroke-opacity="0.3"/><path d="M 32,32 L 42,32 A 8,8 0 0,0 58,32 L 68,32 L 76,46 L 66,52 L 62,48 L 62,74 L 38,74 L 38,48 L 34,52 L 24,46 Z" fill="%2306B6D4" fill-opacity="0.1" stroke="%2306B6D4" stroke-width="2"/><text x="50" y="60" font-family="sans-serif" font-weight="900" font-size="16" fill="%2306B6D4" text-anchor="middle">10</text></svg>', // Camiseta Copa 10
+  'MATEO SILVA': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.7" stroke="%238B5CF6" stroke-width="2" stroke-opacity="0.3"/><path d="M 38,34 Q 28,38 34,54 L 38,68 A 12,12 0 0,0 62,68 L 66,54 Q 72,38 62,34 A 8,8 0 0,0 50,44 A 8,8 0 0,0 38,34 Z" fill="%23A78BFA" fill-opacity="0.1" stroke="%23A78BFA" stroke-width="2" stroke-linejoin="round"/><path d="M 44,52 H 56 M 46,60 H 54" stroke="%23A78BFA" stroke-width="1.5" stroke-opacity="0.7"/></svg>', // Guantes Pro
+  'CAMILA ESPINOZA': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23CA8A04" stroke-width="2" stroke-opacity="0.3"/><path d="M 42,20 L 34,44 L 50,54 L 66,44 L 58,20" fill="none" stroke="%23EF4444" stroke-width="2"/><circle cx="50" cy="58" r="18" fill="%23CA8A04" fill-opacity="0.1" stroke="%23CA8A04" stroke-width="2"/><path d="M 50,49 L 52,54 L 57,54 L 53,57 L 55,62 L 50,59 L 45,62 L 47,57 L 43,54 L 48,54 Z" fill="%23FBBF24" fill-opacity="0.4" stroke="%23CA8A04" stroke-width="1"/></svg>', // Medalla Oro
+  'JAVIER ORTEGA': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%2310B981" stroke-width="2" stroke-opacity="0.3"/><rect x="24" y="24" width="52" height="48" fill="none" stroke="%2310B981" stroke-width="2" stroke-opacity="0.8"/><line x1="50" y1="24" x2="50" y2="72" stroke="%2310B981" stroke-width="1.5"/><circle cx="50" cy="48" r="10" fill="none" stroke="%2310B981" stroke-width="1.5"/><circle cx="50" cy="48" r="2.5" fill="%2310B981"/></svg>', // Estrategia
+};
 
 export default function HomeView() {
   const navigate = useNavigate();
-  const { eliteKey, vipKey, adminPhone, showToast, webLicenseActive, appLicenseActive, saveSettings, stadiumName, courts, allBookings } = useApp();
+  const { 
+    eliteKey, vipKey, adminPhone, showToast, webLicenseActive, appLicenseActive, saveSettings, 
+    stadiumName, courts, allBookings, userName, userRole: role, userAvatar, setUserName, setUserRole,
+    cashTotal, transferTotal, mpTotal, cantinaItems 
+  } = useApp();
+
+  const renderIconById = (iconId?: string) => {
+    switch (iconId) {
+      case 'gatorade':
+        return <Flame className="w-4 h-4 text-orange-400 animate-pulse" />;
+      case 'beer':
+        return <GlassWater className="w-4 h-4 text-amber-300" />;
+      case 'vests':
+        return <Shirt className="w-4 h-4 text-blue-400" />;
+      case 'ball':
+        return <Trophy className="w-4 h-4 text-yellow-500" />;
+      case 'bbq':
+        return <Flame className="w-4 h-4 text-red-500" />;
+      default:
+        return <GlassWater className="w-4 h-4 text-cyan-400" />;
+    }
+  };
 
   const court1Obj = courts?.find((c: any) => c.id === '1') || { name: 'Cancha 1 • El Maracaná', features: ['Césped Sintético Pro'] };
   const court2Obj = courts?.find((c: any) => c.id === '2') || { name: 'Cancha 2 • La Bombonera', features: ['Sin Césped'] };
@@ -94,9 +124,12 @@ export default function HomeView() {
     return () => clearInterval(timer);
   }, [cancha1Active, cancha2Active, showToast]);
 
-  const isLogged = !!localStorage.getItem('ramito_user_name');
-  const role = localStorage.getItem('ramito_user_role');
+  const isLogged = !!userName;
   const isAdmin = role === 'admin_vip' || role === 'admin_elite';
+
+  const totalCaja = cashTotal + transferTotal + mpTotal;
+
+  const formattedCaja = totalCaja > 0 ? `$ ${totalCaja.toLocaleString('es-AR')}` : '$ 0';
 
   // Auto-Login for Master Keys
   React.useEffect(() => {
@@ -105,9 +138,11 @@ export default function HomeView() {
       localStorage.setItem('ramito_user_role', r);
       localStorage.setItem('ramito_user_name', r === 'admin_elite' ? 'Elite Admin' : 'VIP Admin');
       localStorage.setItem('ramito_user_id', 'master_access');
+      setUserName(r === 'admin_elite' ? 'Elite Admin' : 'VIP Admin');
+      setUserRole(r);
       navigate('/profile');
     }
-  }, [adminKey, eliteKey, vipKey, navigate]);
+  }, [adminKey, eliteKey, vipKey, navigate, setUserName, setUserRole]);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,6 +167,8 @@ export default function HomeView() {
         localStorage.setItem('ramito_user_role', user.role);
         localStorage.setItem('ramito_user_name', user.name);
         localStorage.setItem('ramito_user_id', user.id);
+        setUserName(user.name);
+        setUserRole(user.role);
         navigate('/profile');
       } else {
         setError(true);
@@ -346,16 +383,15 @@ export default function HomeView() {
                   </div>
                   <div className="flex flex-col text-left">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-black text-white uppercase tracking-wider">{court1Name}</span>
-                      <span className="text-[7.5px] font-bold bg-[#4be277]/15 text-[#4be277] px-1 rounded-sm border border-[#4be277]/20">Césped</span>
+                      <span className="text-[10px] font-black text-[#4be277] uppercase tracking-wider">{court1Name}</span>
                     </div>
                     {cancha1Active ? (
-                      <span className="text-[12px] font-black text-[#4be277] uppercase tracking-wide leading-none mt-1">
+                      <span className="text-[12px] font-black text-white uppercase tracking-wide leading-none mt-1">
                         {cancha1Team}
                       </span>
                     ) : (
-                      <span className="text-[11px] font-medium text-[#bccbb9]/40 uppercase tracking-wide leading-none mt-1 font-mono italic">
-                        Disponible / Guardería Vacía
+                      <span className="text-[13px] font-black text-[#4be277] uppercase tracking-wider leading-none mt-1">
+                        Libre
                       </span>
                     )}
                   </div>
@@ -369,11 +405,7 @@ export default function HomeView() {
                         {cancha1TimeLeft}
                       </span>
                     </>
-                  ) : (
-                    <span className="text-[8px] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider leading-none">
-                      LIBRE
-                    </span>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
@@ -383,7 +415,10 @@ export default function HomeView() {
                 if (bookings.length === 0) return null;
                 return (
                   <div className="px-3.5 py-2.5 bg-emerald-500/5 hover:bg-emerald-500/10 border-t border-emerald-500/20 text-left transition-all flex flex-col gap-1.5">
-                    <span className="text-[7.5px] font-black text-[#4be277] uppercase tracking-widest block mb-0.5">⚽ PROXIMAS RESERVAS</span>
+                    <span className="text-[7.5px] font-black text-[#4be277] uppercase tracking-widest flex items-center gap-1.5 mb-0.5">
+                      <Calendar className="w-3 h-3 text-[#4be277]" />
+                      PROXIMAS RESERVAS
+                    </span>
                     <div className="space-y-1">
                       {bookings.map((b) => (
                         <div key={b.id} className="flex items-center justify-between text-[10px] font-bold text-white uppercase border-b border-white/[0.02] last:border-0 pb-1 last:pb-0">
@@ -427,9 +462,10 @@ export default function HomeView() {
                       setQuickTimeCancha1('60');
                       setShowCancha1Modal(true);
                     }}
-                    className="text-[8px] font-black text-[#4be277] hover:text-[#4be277]/85 uppercase tracking-widest px-3 py-1 rounded bg-[#4be277]/10 hover:bg-[#4be277]/15 border border-[#4be277]/20 transition-all ml-auto flex items-center gap-1"
+                    className="text-[8px] font-black text-[#4be277] hover:text-[#4be277]/85 uppercase tracking-widest px-3 py-1 rounded bg-[#4be277]/10 hover:bg-[#4be277]/15 border border-[#4be277]/20 transition-all ml-auto flex items-center gap-1.5"
                   >
-                    ⚡ INICIAR TURNO RÁPIDO
+                    <Zap className="w-3 h-3 text-[#4be277]" />
+                    INICIAR TURNO RÁPIDO
                   </button>
                 )}
               </div>
@@ -440,7 +476,7 @@ export default function HomeView() {
               layout
               className={`relative overflow-hidden transition-all duration-300 rounded-2xl border ${
                 cancha2Active 
-                  ? 'bg-gradient-to-r from-emerald-950/20 to-emerald-900/10 border-emerald-500/30 shadow-[0_4px_20px_rgba(75,226,119,0.06)]' 
+                  ? 'bg-gradient-to-r from-amber-950/20 to-amber-900/10 border-amber-500/30 shadow-[0_4px_20px_rgba(245,158,11,0.06)]' 
                   : 'bg-white/[0.01] border-white/5 opacity-80'
               }`}
             >
@@ -448,23 +484,22 @@ export default function HomeView() {
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all ${
                     cancha2Active 
-                      ? 'bg-[#4be277]/10 border-[#4be277]/30 text-[#4be277] animate-pulse' 
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 animate-pulse' 
                       : 'bg-white/5 border-white/10 text-white/30'
                   }`}>
                     <PlayCircle className="w-4.5 h-4.5" />
                   </div>
                   <div className="flex flex-col text-left">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-black text-white uppercase tracking-wider">{court2Name}</span>
-                      <span className="text-[7.5px] font-bold bg-amber-500/15 text-amber-500 px-1 rounded-sm border border-amber-500/20">Sin Césped</span>
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider">{court2Name}</span>
                     </div>
                     {cancha2Active ? (
-                      <span className="text-[12px] font-black text-[#4be277] uppercase tracking-wide leading-none mt-1">
+                      <span className="text-[12px] font-black text-amber-500 uppercase tracking-wide leading-none mt-1">
                         {cancha2Team}
                       </span>
                     ) : (
-                      <span className="text-[11px] font-medium text-[#bccbb9]/40 uppercase tracking-wide leading-none mt-1 font-mono italic">
-                        Disponible / Guardería Vacía
+                      <span className="text-[13px] font-black text-white uppercase tracking-wider leading-none mt-1">
+                        Libre
                       </span>
                     )}
                   </div>
@@ -478,11 +513,7 @@ export default function HomeView() {
                         {cancha2TimeLeft}
                       </span>
                     </>
-                  ) : (
-                    <span className="text-[8px] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider leading-none">
-                      LIBRE
-                    </span>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
@@ -491,8 +522,11 @@ export default function HomeView() {
                 const bookings = getUpcomingBookingsForCourt('2', court2Name);
                 if (bookings.length === 0) return null;
                 return (
-                  <div className="px-3.5 py-2.5 bg-emerald-500/5 hover:bg-emerald-500/10 border-t border-emerald-500/20 text-left transition-all flex flex-col gap-1.5">
-                    <span className="text-[7.5px] font-black text-[#4be277] uppercase tracking-widest block mb-0.5">⚽ PROXIMAS RESERVAS</span>
+                  <div className="px-3.5 py-2.5 bg-amber-500/5 hover:bg-amber-500/10 border-t border-amber-500/20 text-left transition-all flex flex-col gap-1.5">
+                    <span className="text-[7.5px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-1.5 mb-0.5">
+                      <Calendar className="w-3 h-3 text-amber-400" />
+                      PROXIMAS RESERVAS
+                    </span>
                     <div className="space-y-1">
                       {bookings.map((b) => (
                         <div key={b.id} className="flex items-center justify-between text-[10px] font-bold text-white uppercase border-b border-white/[0.02] last:border-0 pb-1 last:pb-0">
@@ -536,9 +570,10 @@ export default function HomeView() {
                       setQuickTimeCancha2('60');
                       setShowCancha2Modal(true);
                     }}
-                    className="text-[8px] font-black text-[#4be277] hover:text-[#4be277]/85 uppercase tracking-widest px-3 py-1 rounded bg-[#4be277]/10 hover:bg-[#4be277]/15 border border-[#4be277]/20 transition-all ml-auto flex items-center gap-1"
+                    className="text-[8px] font-black text-[#4be277] hover:text-[#4be277]/85 uppercase tracking-widest px-3 py-1 rounded bg-[#4be277]/10 hover:bg-[#4be277]/15 border border-[#4be277]/20 transition-all ml-auto flex items-center gap-1.5"
                   >
-                    ⚡ INICIAR TURNO RÁPIDO
+                    <Zap className="w-3 h-3 text-[#4be277]" />
+                    INICIAR TURNO RÁPIDO
                   </button>
                 )}
               </div>
@@ -547,23 +582,67 @@ export default function HomeView() {
 
           {/* Caja del día & Cierre emergencia */}
           <div className="flex flex-col gap-3">
+            {/* Redesigned Premium "Caja del Día" Bento Card */}
             <button
               onClick={() => {
                 navigate('/profile?tab=seguridad');
                 if (showToast) showToast('Redirigiendo a Auditoría de Ingresos...', 'success');
               }}
-              className="w-full glass-panel p-4 rounded-2xl border border-[#FF9100]/25 bg-white/[0.02] flex flex-row items-center justify-between text-left hover:bg-[#FF9100]/5 hover:border-[#FF9100]/40 transition-all group outline-none"
+              className="w-full relative overflow-hidden glass-panel p-5 rounded-3xl border border-amber-500/10 bg-gradient-to-br from-white/[0.01] to-white/[0.04] text-left hover:bg-amber-500/[0.03] hover:border-amber-500/30 transition-all duration-300 group outline-none shadow-2xl flex flex-col gap-4"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#FF9100]/10 flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <DollarSign className="w-5 h-5 text-[#FF9100]" />
+              <div className="absolute -right-10 -bottom-10 w-32 h-32 rounded-full bg-amber-500/5 blur-3xl group-hover:bg-amber-500/10 transition-colors pointer-events-none" />
+              
+              <div className="flex justify-between items-start w-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-center group-hover:scale-105 group-hover:border-amber-500/40 transition-all duration-300">
+                    <DollarSign className="w-5 h-5 text-amber-400 stroke-[1.5]" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.14em] leading-none mb-1">
+                      Caja del Día
+                    </span>
+                    <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest leading-none">
+                      Métrica consolidada
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-[10px] font-black text-[#bccbb9]/80 uppercase tracking-widest leading-none">Caja del Día</span>
-                  <span className="text-[7.5px] font-bold text-[#bccbb9]/45 uppercase tracking-widest mt-1">Suma acumulada de reservas de hoy</span>
+                
+                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/15 px-2.5 py-1 rounded-full">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-[7.5px] font-black text-emerald-400 uppercase tracking-widest font-mono">
+                    En Tiempo Real
+                  </span>
                 </div>
               </div>
-              <span className="text-base font-mono font-black text-white tracking-widest">$45.000</span>
+
+              <div className="flex items-baseline justify-between w-full pt-1">
+                <div className="flex flex-col">
+                  <span className="text-3xl font-mono font-black text-white tracking-widest leading-none block drop-shadow-[0_2px_10px_rgba(255,255,255,0.05)]">
+                    {formattedCaja}
+                  </span>
+                  <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-wider block mt-1.5">
+                    Pesos Argentinos (ARS)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 text-[#bccbb9]/60 group-hover:text-amber-400 text-[9px] font-black uppercase tracking-widest transition-colors">
+                  Auditar Caja
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+
+              <div className="w-full border-t border-white/[0.04] pt-3.5 flex flex-wrap justify-between items-center gap-2">
+                <span className="text-[8px] font-bold text-[#bccbb9]/50 uppercase tracking-wider flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-white/30" />
+                  {allBookings?.filter(b => b.status === 'completed' || b.status === 'upcoming').length || 0} Reservas Hoy
+                </span>
+                <span className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block font-mono">
+                  Complejo Abierto • Turnos Registrados
+                </span>
+              </div>
             </button>
 
             <button
@@ -607,28 +686,78 @@ export default function HomeView() {
                 navigate('/profile?tab=ajustes&modal=backup');
                 if (showToast) showToast('Redirigiendo a Administración de Resguardos...', 'success');
               }}
-              className="w-full glass-panel p-4 rounded-2xl border border-amber-500/25 bg-white/[0.02] flex flex-row items-center justify-between text-left hover:bg-amber-500/5 hover:border-amber-500/40 transition-all group outline-none"
+              className="w-full glass-panel p-4 rounded-2xl border border-amber-500/25 bg-white/[0.02] flex flex-col gap-4 text-left hover:bg-amber-500/5 hover:border-amber-500/40 transition-all group outline-none"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
-                  <Database className="w-5 h-5 text-amber-500" />
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-[10px] font-black text-[#bccbb9]/80 uppercase tracking-widest leading-none">Cómputo & Storage Backend</span>
-                  <p className="text-[7.5px] font-bold text-[#bccbb9]/45 uppercase tracking-widest mt-1">
-                    Almacenamiento de comprobantes en Supabase Storage
-                  </p>
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <div className="w-16 h-1 bg-white/5 rounded-full overflow-hidden shrink-0">
-                      <div className="h-full bg-amber-500 rounded-full" style={{ width: '13.9%' }} />
+              <div className="flex flex-row items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                    <Database className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <div className="flex items-center gap-1.5 leading-none">
+                      <span className="text-[10px] font-black text-[#bccbb9] uppercase tracking-wider leading-none">Cómputo & Storage Backend</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping shrink-0" />
                     </div>
-                    <span className="text-[7.5px] font-mono font-black text-amber-400 uppercase">13.9% de uso</span>
+                    <p className="text-[7.5px] font-bold text-[#bccbb9]/45 uppercase tracking-widest mt-1.5">
+                      Respaldos en Supabase Storage
+                    </p>
                   </div>
                 </div>
+                <div className="text-right shrink-0 pl-2">
+                  <span className="text-[13px] font-mono font-black text-white tracking-widest block drop-shadow-md">142.5 MB</span>
+                  <span className="text-[6.5px] font-bold text-amber-500 uppercase tracking-widest font-mono block mt-1 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/10">TOTAL USADO (13.9%)</span>
+                </div>
               </div>
-              <div className="text-right shrink-0">
-                <span className="text-xs font-mono font-black text-white tracking-wider block">142.5 MB</span>
-                <span className="text-[7px] font-bold text-[#bccbb9]/30 uppercase tracking-widest font-mono block mt-0.5">/ 1.0 GB Limit</span>
+
+              {/* Stacked loading bars structure (Secciones) */}
+              <div className="w-full space-y-3 pt-2 border-t border-white/5">
+                {/* Sección 1: Base de Datos */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-[7.5px] font-black uppercase tracking-wider text-[#bccbb9]">
+                    <span className="flex items-center gap-1">
+                      <span className="w-1 h-1 rounded-full bg-amber-500" />
+                      Estructura & Tablas SQL
+                    </span>
+                    <span className="font-mono text-amber-400">12.4 MB / 200 MB</span>
+                  </div>
+                  <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                    <div className="h-full bg-amber-500 rounded-full" style={{ width: '6.2%' }} />
+                  </div>
+                </div>
+
+                {/* Sección 2: Comprobantes & Fotos */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-[7.5px] font-black uppercase tracking-wider text-[#bccbb9]">
+                    <span className="flex items-center gap-1">
+                      <span className="w-1 h-1 rounded-full bg-yellow-500" />
+                      Comprobantes & Capturas
+                    </span>
+                    <span className="font-mono text-amber-400">95.8 MB / 600 MB</span>
+                  </div>
+                  <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                    <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 rounded-full" style={{ width: '15.9%' }} />
+                  </div>
+                </div>
+
+                {/* Sección 3: Logs y temporales */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-[7.5px] font-black uppercase tracking-wider text-[#bccbb9]">
+                    <span className="flex items-center gap-1">
+                      <span className="w-1 h-1 rounded-full bg-amber-600" />
+                      Historial & Logs de Auditoría
+                    </span>
+                    <span className="font-mono text-amber-400">34.3 MB / 200 MB</span>
+                  </div>
+                  <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                    <div className="h-full bg-amber-600 rounded-full" style={{ width: '17.15%' }} />
+                  </div>
+                </div>
+
+                {/* Límite global */}
+                <div className="pt-2 border-t border-white/[0.03] flex items-center justify-between">
+                  <span className="text-[6.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest font-mono">Límite Global: 1.0 GB</span>
+                  <span className="text-[6.5px] font-mono font-black bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-white/50">Cómputo en tiempo real</span>
+                </div>
               </div>
             </button>
           </div>
@@ -651,11 +780,11 @@ export default function HomeView() {
                 <div className="absolute top-0 right-0 w-8 h-8 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
                 <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block leading-none">Ancho de Banda</span>
                 <div className="flex items-baseline gap-1 mt-1.5">
-                  <span className="text-sm font-black text-white font-mono">4.82 GB</span>
+                  <span className="text-sm font-black text-white font-mono">{webLicenseActive ? '4.82 GB' : '0.00 GB'}</span>
                   <span className="text-[7.5px] font-bold text-zinc-500 font-mono">/ 100G</span>
                 </div>
                 <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-2">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: '4.82%' }} />
+                  <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: webLicenseActive ? '4.82%' : '0%' }} />
                 </div>
               </div>
 
@@ -664,30 +793,38 @@ export default function HomeView() {
                 <div className="absolute top-0 right-0 w-8 h-8 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
                 <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block leading-none font-sans">Peticiones Edge</span>
                 <div className="flex items-baseline gap-1 mt-1.5">
-                  <span className="text-sm font-black text-white font-mono">18,482</span>
-                  <span className="text-[7.5px] font-black text-emerald-400 font-mono">▲14%</span>
+                  <span className="text-sm font-black text-white font-mono">{webLicenseActive ? '18,482' : '0'}</span>
+                  <span className={`text-[7.5px] font-black font-mono ${webLicenseActive ? 'text-emerald-400' : 'text-zinc-500'}`}>{webLicenseActive ? '▲14%' : '0%'}</span>
                 </div>
-                <span className="text-[7px] font-bold text-zinc-500 uppercase font-mono block mt-2 leading-none">Resp: 14ms (A+)</span>
+                <span className="text-[7px] font-bold text-zinc-500 uppercase font-mono block mt-2 leading-none">
+                  {webLicenseActive ? 'Resp: 14ms (A+)' : 'SITIO SUSPENDIDO'}
+                </span>
               </div>
 
               {/* Card 3: Invocaciones Serverless */}
               <div className="p-3.5 bg-white/[0.01] border border-white/5 rounded-2xl text-left relative overflow-hidden">
                 <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block leading-none">Serverless INVS</span>
                 <div className="flex items-baseline gap-1 mt-1.5">
-                  <span className="text-sm font-black text-white font-mono">2,842</span>
+                  <span className="text-sm font-black text-white font-mono">
+                    {webLicenseActive && appLicenseActive ? '2,842' : (webLicenseActive || appLicenseActive ? '1,421' : '0')}
+                  </span>
                   <span className="text-[7.5px] font-bold text-zinc-500 font-mono">REQS</span>
                 </div>
-                <span className="text-[7px] font-bold text-zinc-500 uppercase font-mono block mt-2 leading-none">Duración: 112ms</span>
+                <span className="text-[7px] font-bold text-zinc-500 uppercase font-mono block mt-2 leading-none">
+                  {webLicenseActive || appLicenseActive ? 'Duración: 112ms' : 'CONSOLA APAGADA'}
+                </span>
               </div>
 
               {/* Card 4: Tokens Consumidos */}
               <div className="p-3.5 bg-white/[0.01] border border-white/5 rounded-2xl text-left relative overflow-hidden">
                 <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block leading-none">Tokens Diarios</span>
                 <div className="flex items-baseline gap-1 mt-1.5">
-                  <span className="text-sm font-black text-white font-mono">15.4K</span>
+                  <span className="text-sm font-black text-white font-mono">{appLicenseActive ? '15.4K' : '0.0K'}</span>
                   <span className="text-[7.5px] font-bold text-[#4be277] font-mono">TOKENS</span>
                 </div>
-                <span className="text-[7px] font-bold text-[#4be277] uppercase font-mono block mt-2 leading-none">LICENCIA ACTIVA</span>
+                <span className={`text-[7px] font-bold uppercase font-mono block mt-2 leading-none ${appLicenseActive ? 'text-[#4be277]' : 'text-red-500'}`}>
+                  {appLicenseActive ? 'LICENCIA ACTIVA' : 'SITIO SUSPENDIDO'}
+                </span>
               </div>
             </div>
 
@@ -730,7 +867,8 @@ export default function HomeView() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <h3 className="text-sm font-black text-white uppercase italic tracking-wider mb-4 flex items-center gap-2 border-b border-white/5 pb-2">
-                  <span>⚽ Cancha 1 • {court1Name}</span>
+                  <Trophy className="w-4 h-4 text-[#4be277]" />
+                  <span>Cancha 1 • {court1Name}</span>
                 </h3>
                 <div className="space-y-4">
                   <div>
@@ -807,7 +945,8 @@ export default function HomeView() {
                 onClick={(e) => e.stopPropagation()}
               >
                 <h3 className="text-sm font-black text-white uppercase italic tracking-wider mb-4 flex items-center gap-2 border-b border-white/5 pb-2">
-                  <span>⚽ Cancha 2 • {court2Name}</span>
+                  <Trophy className="w-4 h-4 text-[#4be277]" />
+                  <span>Cancha 2 • {court2Name}</span>
                 </h3>
                 <div className="space-y-4">
                   <div>
@@ -876,27 +1015,44 @@ export default function HomeView() {
     <main className="relative flex-grow flex flex-col items-center min-h-[100dvh] pt-12 pb-28 px-6 overflow-hidden">
       <div className="absolute inset-0 bg-pitch opacity-20 pointer-events-none" />
 
-      {/* Botón Acceso Staff (solo si no es admin) */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-sm mb-6 z-10"
-      >
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setShowAdminLogin(true)}
-          className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all opacity-60 hover:opacity-100"
+      {/* Botones de acción principales arriba (solo cuando no está logueado para priorizar la experiencia del jugador) */}
+      {!isLogged && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm mb-6 z-10 flex flex-col gap-3"
         >
-          <div className="w-8 h-8 rounded-lg bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20">
-            <ShieldCheck className="w-4 h-4 text-[#4be277]" />
-          </div>
-          <div className="flex flex-col items-start">
-            <span className="text-[10px] font-black uppercase text-white">Acceso Staff</span>
-            <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">Administración</span>
-          </div>
-          <ChevronRight className="w-4 h-4 text-[#bccbb9]/20 ml-auto" />
-        </motion.button>
-      </motion.div>
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/login', { state: { mode: 'register' } })}
+            className="w-full flex items-center gap-4 p-4 rounded-3xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20">
+              <UserPlus className="w-5 h-5 text-[#4be277]" />
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-black uppercase italic tracking-tighter text-white">Soy Nuevo</span>
+              <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest">Registrarse</span>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[#bccbb9]/20 ml-auto" />
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/login', { state: { mode: 'login' } })}
+            className="w-full flex items-center gap-4 p-4 rounded-3xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#FF9100]/10 flex items-center justify-center border border-[#FF9100]/20">
+              <LogIn className="w-5 h-5 text-[#FF9100]" />
+            </div>
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-black uppercase italic tracking-tighter text-white">Soy Jugador</span>
+              <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest">Ingresar</span>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[#bccbb9]/20 ml-auto" />
+          </motion.button>
+        </motion.div>
+      )}
 
       {/* Logo central */}
       <motion.div
@@ -912,59 +1068,173 @@ export default function HomeView() {
         />
       </motion.div>
 
-      {/* Botones de acción */}
+      {/* Botones de acción en la parte inferior */}
       <div className="w-full max-w-sm flex flex-col gap-3 z-10">
         {!isLogged ? (
-          <>
+          /* Botón Acceso Staff en la parte inferior si no está logueado en dispositivo móvil */
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full"
+          >
             <motion.button
               whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/login', { state: { mode: 'register' } })}
-              className="w-full flex items-center gap-4 p-4 rounded-3xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all group"
+              onClick={() => setShowAdminLogin(true)}
+              className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all opacity-60 hover:opacity-100"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20">
-                <UserPlus className="w-5 h-5 text-[#4be277]" />
+              <div className="w-8 h-8 rounded-lg bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20">
+                <ShieldCheck className="w-4 h-4 text-[#4be277]" />
               </div>
               <div className="flex flex-col items-start">
-                <span className="text-sm font-black uppercase italic tracking-tighter text-white">Soy Nuevo</span>
-                <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest">Registrarse</span>
+                <span className="text-[10px] font-black uppercase text-white">Acceso Staff</span>
+                <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">Administración</span>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#bccbb9]/20 ml-auto" />
+              <ChevronRight className="w-4 h-4 text-[#bccbb9]/20 ml-auto" />
             </motion.button>
+          </motion.div>
+        ) : (
+          <div className="space-y-3">
+            {/* Tarjeta de Perfil Activo con Avatar */}
+            <div className="p-4 bg-[#1a1c1c]/50 border border-white/5 rounded-3xl flex items-center gap-3.5 text-left">
+              <div className="w-12 h-12 rounded-2xl overflow-hidden border border-[#4be277]/20 shrink-0 flex items-center justify-center bg-black/40 text-[#4be277]">
+                {(() => {
+                  const savedName = userName || 'Jugador';
+                  const savedAvatar = userAvatar;
+                  const cleanName = savedName.toUpperCase().trim();
+                  const avatarUrl = savedAvatar || USER_AVATARS[cleanName];
+                  if (avatarUrl) {
+                    return <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover animate-fade-in" referrerPolicy="no-referrer" />;
+                  } else {
+                    return <User className="w-6 h-6 stroke-[1.5]" />;
+                  }
+                })()}
+              </div>
+              <div className="flex-grow min-w-0">
+                <span className="text-[8px] font-black text-[#4be277] uppercase tracking-[0.2em] leading-none block mb-1">
+                  Sesión Activa • {role?.includes('admin') ? 'Administrador' : 'Jugador'}
+                </span>
+                <span className="text-sm font-black text-white uppercase italic truncate block">
+                  {userName || 'Jugador'}
+                </span>
+              </div>
+              <button
+                onClick={() => navigate('/profile')}
+                className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[8px] font-black uppercase tracking-widest text-[#bccbb9] transition-all shrink-0"
+              >
+                Perfil
+              </button>
+            </div>
 
             <motion.button
               whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/login', { state: { mode: 'login' } })}
-              className="w-full flex items-center gap-4 p-4 rounded-3xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all group"
+              onClick={() => navigate('/booking')}
+              className="w-full flex items-center gap-4 p-5 rounded-3xl bg-[#FF9100]/10 border border-[#FF9100]/30 hover:bg-[#FF9100]/20 transition-all group"
             >
-              <div className="w-10 h-10 rounded-xl bg-[#FF9100]/10 flex items-center justify-center border border-[#FF9100]/20">
-                <LogIn className="w-5 h-5 text-[#FF9100]" />
+              <div className="w-12 h-12 rounded-xl bg-[#FF9100]/20 flex items-center justify-center border border-[#FF9100]/40">
+                <Zap className="w-7 h-7 text-[#FF9100] animate-pulse" />
               </div>
               <div className="flex flex-col items-start">
-                <span className="text-sm font-black uppercase italic tracking-tighter text-white">Soy Jugador</span>
-                <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest">Ingresar</span>
+                <span className="text-lg font-black uppercase italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white to-[#FF9100]">
+                  Reservar Cancha
+                </span>
+                <span className="text-[9px] font-black text-[#FF9100] uppercase tracking-widest">Jugar Ahora</span>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#bccbb9]/20 ml-auto" />
+              <ChevronRight className="w-6 h-6 text-[#FF9100]/40 ml-auto" />
             </motion.button>
-          </>
-        ) : (
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate('/booking')}
-            className="w-full flex items-center gap-4 p-5 rounded-3xl bg-[#FF9100]/10 border border-[#FF9100]/30 hover:bg-[#FF9100]/20 transition-all group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-[#FF9100]/20 flex items-center justify-center border border-[#FF9100]/40">
-              <Zap className="w-7 h-7 text-[#FF9100] animate-pulse" />
-            </div>
-            <div className="flex flex-col items-start">
-              <span className="text-lg font-black uppercase italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white to-[#FF9100]">
-                Reservar Cancha
-              </span>
-              <span className="text-[9px] font-black text-[#FF9100] uppercase tracking-widest">Jugar Ahora</span>
-            </div>
-            <ChevronRight className="w-6 h-6 text-[#FF9100]/40 ml-auto" />
-          </motion.button>
+
+            {/* Botón Acceso Staff (ahora en la parte inferior para dar prioridad al juego de los usuarios) */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full pt-2"
+            >
+              <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setShowAdminLogin(true)}
+                className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all opacity-60 hover:opacity-100"
+              >
+                <div className="w-8 h-8 rounded-lg bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20">
+                  <ShieldCheck className="w-4 h-4 text-[#4be277]" />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="text-[10px] font-black uppercase text-white">Acceso Staff</span>
+                  <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">Administración</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-[#bccbb9]/20 ml-auto" />
+              </motion.button>
+            </motion.div>
+          </div>
         )}
       </div>
+
+      {/* CANTINA & MINI-SHOP (Only for logged players) */}
+      {isLogged && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="w-full max-w-sm mt-6 z-10 space-y-4"
+        >
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] italic flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <GlassWater className="w-3.5 h-3.5 text-amber-500 shrink-0" /> CANTINA & MINI-SHOP RAMITO
+            </span>
+            <span className="text-[8px] font-black font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded uppercase tracking-widest">
+              MENU SPOT
+            </span>
+          </div>
+
+          <div className="glass-panel p-5 rounded-[2.5rem] border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.03] space-y-4 text-left">
+            <div className="space-y-1">
+              <h4 className="text-xs font-black text-white uppercase italic tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                ¿Vas a jugar hoy? Anticipa tus Bebidas
+              </h4>
+              <p className="text-[8.5px] font-bold text-[#bccbb9]/50 uppercase tracking-wider leading-relaxed">
+                Agrega consumos extras al reservar y retíralos helados al terminar de jugar o directamente en puerta.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              {cantinaItems.length === 0 ? (
+                <div className="col-span-full py-8 text-center text-[9px] font-black uppercase text-zinc-500 tracking-wider">
+                  Sin productos activos en catálogo
+                </div>
+              ) : (
+                cantinaItems.map(item => (
+                  <div key={item.id} className="p-3 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-2">
+                    <div className="flex justify-between items-start">
+                      <span className="text-[7.5px] font-black text-white/40 uppercase tracking-widest block leading-none">
+                        {item.type === 'drink' ? 'Bebida' : item.type === 'equipment' ? 'Equipamiento' : 'Adicional'}
+                      </span>
+                      {renderIconById(item.iconId)}
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-black text-white uppercase block leading-tight truncate" title={item.name}>
+                        {item.name}
+                      </span>
+                      <span className="text-[7px] font-bold text-[#bccbb9]/40 uppercase block leading-none">
+                        {item.stock > 0 ? `Stock: ${item.stock} u.` : 'Agotado'}
+                      </span>
+                    </div>
+                    <span className="text-xs font-black text-amber-400 font-mono block">
+                      $ {(item.price || 0).toFixed(2)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="p-3.5 bg-amber-500/5 rounded-2xl border border-amber-500/10 flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span className="text-[8.5px] font-bold text-[#bccbb9]/70 uppercase tracking-wider leading-relaxed">
+                Ahorra colas: puedes pedir estas bebidas al pre-reservar tu turno en la sección "Canchas" y el sistema las sumará al pago de forma integrada.
+              </span>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Modal Acceso Staff */}
       <AnimatePresence>

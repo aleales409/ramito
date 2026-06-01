@@ -14,6 +14,7 @@ export interface Slot {
   time: string;
   price: number;
   status: 'available' | 'booked' | 'reserved';
+  isFixed?: boolean;
 }
 
 export interface Booking {
