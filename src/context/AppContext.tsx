@@ -460,51 +460,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [cantinaItems]);
 
   const saveSettings = async (newSettings: Partial<any>) => {
+    // Update local state IMMEDIATELY
+    if (newSettings.is_complex_open !== undefined) setIsComplexOpen(newSettings.is_complex_open);
+    if (newSettings.admin_phone !== undefined) setAdminPhone(newSettings.admin_phone);
+    if (newSettings.elite_key !== undefined) setEliteKey(newSettings.elite_key);
+    if (newSettings.vip_key !== undefined) setVipKey(newSettings.vip_key);
+    if (newSettings.universal_user_key !== undefined) setUniversalUserKey(newSettings.universal_user_key);
+    if (newSettings.app_license_active !== undefined) {
+      setAppLicenseActive(newSettings.app_license_active);
+      if (!newSettings.app_license_active) {
+        setMaintenanceMode(true);
+      }
+    }
+    if (newSettings.web_license_active !== undefined) {
+      try {
+        await updateVercelLicense(newSettings.web_license_active);
+      } catch (vercelErr) {
+        console.error('Error sync Vercel', vercelErr);
+      }
+      setWebLicenseActive(newSettings.web_license_active);
+    }
+    if (newSettings.marquee_text !== undefined) setMarqueeText(newSettings.marquee_text);
+    if (newSettings.secondary_marquee_text !== undefined) setSecondaryMarqueeText(newSettings.secondary_marquee_text);
+    if (newSettings.schedule !== undefined) setSchedule(newSettings.schedule);
+    if (newSettings.courts !== undefined) setCourts(newSettings.courts);
+    if (newSettings.schedule_days !== undefined) setScheduleDays(newSettings.schedule_days);
+
+    // Then try to sync to Supabase
     try {
       const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
       if (isSupabaseConfigured) {
+        let updateData = { ...newSettings };
+        if (newSettings.schedule_days !== undefined) {
+          const generated = generarMarquee(newSettings.schedule_days);
+          setMarqueeText(generated);
+          updateData.marquee_text = generated;
+        }
+
         const { error } = await supabase
           .from('system_settings')
-          .update(newSettings)
+          .update(updateData)
           .eq('id', 1);
 
-        if (error) throw error;
-      }
-
-      // Update local state
-      if (newSettings.is_complex_open !== undefined) setIsComplexOpen(newSettings.is_complex_open);
-      if (newSettings.admin_phone !== undefined) setAdminPhone(newSettings.admin_phone);
-      if (newSettings.elite_key !== undefined) setEliteKey(newSettings.elite_key);
-      if (newSettings.vip_key !== undefined) setVipKey(newSettings.vip_key);
-      if (newSettings.universal_user_key !== undefined) setUniversalUserKey(newSettings.universal_user_key);
-      if (newSettings.app_license_active !== undefined) {
-        setAppLicenseActive(newSettings.app_license_active);
-        if (!newSettings.app_license_active) {
-          setMaintenanceMode(true);
+        if (error) {
+          console.warn('Supabase sync warning (algunas columnas podrían no existir):', error);
         }
       }
-      if (newSettings.web_license_active !== undefined) {
-        try {
-          await updateVercelLicense(newSettings.web_license_active);
-        } catch (vercelErr) {
-          console.error('Error sync Vercel', vercelErr);
-          showToast('Error al sincronizar con Vercel', 'error');
-        }
-        setWebLicenseActive(newSettings.web_license_active);
-      }
-      if (newSettings.marquee_text !== undefined) setMarqueeText(newSettings.marquee_text);
-      if (newSettings.secondary_marquee_text !== undefined) setSecondaryMarqueeText(newSettings.secondary_marquee_text);
-      if (newSettings.schedule !== undefined) setSchedule(newSettings.schedule);
-      if (newSettings.courts !== undefined) setCourts(newSettings.courts);
-      if (newSettings.schedule_days !== undefined) {
-        setScheduleDays(newSettings.schedule_days);
-        const generated = generarMarquee(newSettings.schedule_days);
-        setMarqueeText(generated);
-        if (isSupabaseConfigured) {
-          await supabase.from('system_settings').update({ marquee_text: generated }).eq('id', 1);
-        }
-      }
-
       showToast('Configuración Guardada', 'success');
     } catch (err) {
       console.error('Error saving settings', err);

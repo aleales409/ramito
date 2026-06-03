@@ -13,7 +13,18 @@ export default function TopAppBar() {
   const isLogged = !!userName || !!role || !!localStorage.getItem('ramito_user_id');
   const isAdmin = role === 'admin_vip' || role === 'admin_elite';
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const sessionId = localStorage.getItem('ramito_current_session_id');
+    const userId = localStorage.getItem('ramito_user_id');
+    // Clean active session from Supabase to allow future login
+    try {
+      const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+      if (isSupabaseConfigured && sessionId && userId) {
+        await supabase.from('active_sessions').delete().eq('profile_id', userId);
+      }
+    } catch (e) {
+      console.warn('Could not clear session from Supabase:', e);
+    }
     localStorage.removeItem('ramito_current_session_id');
     localStorage.removeItem('ramito_user_id');
     localStorage.removeItem('ramito_user_name');

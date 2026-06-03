@@ -102,12 +102,12 @@ export default function LoginView() {
     let sessionId = 'mock_session_' + Date.now();
 
     if (isSupabaseConfigured) {
-      // Limit active sessions for players
+      // If player already has active sessions, delete them first to allow fresh login
       if (user.role === 'player') {
         const { data: sessions } = await supabase.from('active_sessions').select('id').eq('profile_id', user.id);
         if (sessions && sessions.length > 0) {
-          showToast('Ya tienes una sesión activa.');
-          return;
+          // Delete old sessions to allow re-login
+          await supabase.from('active_sessions').delete().eq('profile_id', user.id);
         }
       }
 
@@ -117,10 +117,11 @@ export default function LoginView() {
         .single();
 
       if (sessionError) {
-         showToast(`Error: ${sessionError.message}`);
-         return;
+        // If active_sessions table doesn't exist or fails, continue without session tracking
+        console.warn('Session tracking error (continuing anyway):', sessionError.message);
+      } else {
+        sessionId = newSession.id;
       }
-      sessionId = newSession.id;
     }
 
     localStorage.setItem('ramito_current_session_id', sessionId);
@@ -274,12 +275,15 @@ export default function LoginView() {
             .eq('pin', trimmedQuickPin)
             .maybeSingle();
 
-          if (error) {
-            showToast(`Error de conexión: ${error.message}`);
-            return;
-          }
-          if (!user) {
-            showToast('PIN de ingreso rápido incorrecto o no encontrado.');
+          if (error || !user) {
+            // Fallback to local profiles
+            const profiles = getLocalProfiles();
+            const localUser = profiles.find((p: any) => p.pin && p.pin.trim().toLowerCase() === trimmedQuickPin.toLowerCase());
+            if (!localUser) {
+              showToast('PIN de ingreso rápido incorrecto o no encontrado.');
+              return;
+            }
+            await completeLogin(localUser);
             return;
           }
           await completeLogin(user);
@@ -367,32 +371,66 @@ export default function LoginView() {
           await completeLogin(newUser);
         }
       } else {
+        // Trim inputs to avoid whitespace issues
+        const trimmedEmail = email.trim().toLowerCase();
+        const trimmedPassword = password.trim();
+
         if (isSupabaseConfigured) {
-          const { data: user } = await supabase.from('profiles').select('*').eq('email', email.toLowerCase()).maybeSingle();
-          const isPasswordValid = user && user.password === password;
-          if (!user || !isPasswordValid) {
-            showToast('Correo o Llave incorrectos.');
-            return;
+          try {
+            const { data: user, error: fetchError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('email', trimmedEmail)
+              .maybeSingle();
+
+            if (fetchError) {
+              console.warn('Supabase login fetch error, falling back to local:', fetchError);
+              // Fallback to local profiles
+              const profiles = getLocalProfiles();
+              const localUser = profiles.find((p: any) => p.email.toLowerCase() === trimmedEmail);
+              if (!localUser || localUser.password?.trim() !== trimmedPassword) {
+                showToast('Correo o Llave incorrectos.');
+                return;
+              }
+              await completeLogin(localUser);
+              return;
+            }
+
+            if (!user) {
+              // User not found in Supabase, try local
+              const profiles = getLocalProfiles();
+              const localUser = profiles.find((p: any) => p.email.toLowerCase() === trimmedEmail);
+              if (!localUser || localUser.password?.trim() !== trimmedPassword) {
+                showToast('Correo o Llave incorrectos.');
+                return;
+              }
+              await completeLogin(localUser);
+              return;
+            }
+
+            const storedPassword = (user.password || '').trim();
+            if (storedPassword !== trimmedPassword) {
+              showToast('Correo o Llave incorrectos.');
+              return;
+            }
+            await completeLogin(user);
+          } catch (fetchErr: any) {
+            showToast(`Error de conexión: ${fetchErr.message}`);
           }
-          await completeLogin(user);
         } else {
           const profiles = getLocalProfiles();
-          const user = profiles.find((p: any) => p.email.toLowerCase() === email.toLowerCase());
-          
+          const user = profiles.find((p: any) => p.email.toLowerCase() === trimmedEmail);
+
           const currentEliteKey = localStorage.getItem('ramito_elite_key') || 'ELITE-9A7F-D3B8-K2C5';
           const currentVipKey = localStorage.getItem('ramito_vip_key') || 'VIP-3E8F-C1A5-J7B9';
-          
+
           let isPasswordValid = false;
           if (user) {
-            isPasswordValid = user.password === password;
-            if (user.role === 'admin_elite' && password === currentEliteKey) {
-              isPasswordValid = true;
-            }
-            if (user.role === 'admin_vip' && password === currentVipKey) {
-              isPasswordValid = true;
-            }
+            isPasswordValid = (user.password || '').trim() === trimmedPassword;
+            if (user.role === 'admin_elite' && trimmedPassword === currentEliteKey) isPasswordValid = true;
+            if (user.role === 'admin_vip' && trimmedPassword === currentVipKey) isPasswordValid = true;
           }
-          
+
           if (!user || !isPasswordValid) {
             showToast('Correo o Llave incorrectos.');
             return;

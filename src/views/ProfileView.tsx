@@ -952,7 +952,7 @@ export default function ProfileView() {
 
       setUserData((prev: any) => prev ? { ...prev, ...profileUpdates } : profileUpdates);
 
-      // REGLA DE ORO / GOLDEN RULE: Aislamiento total de llaves maestras de registro entre roles.
+      // REGLA DE ORO: Cada rol modifica únicamente su propia llave de registro
       if (userRole === 'admin_elite') {
         await saveSettings({
           elite_key: newEliteKey
@@ -965,6 +965,12 @@ export default function ProfileView() {
         });
         setVipKey(newVipKey);
         localStorage.setItem('ramito_vip_key', newVipKey);
+      } else if (userRole === 'player') {
+        await saveSettings({
+          universal_user_key: newUniversalUserKey
+        });
+        setUniversalUserKey(newUniversalUserKey);
+        localStorage.setItem('ramito_universal_user_key', newUniversalUserKey);
       }
 
       addAuditLog('CONFIGURACIÓN DE CUENTA', `El operador actualizó los datos de su cuenta y llaves de acceso.`, 'success');
@@ -1153,7 +1159,17 @@ export default function ProfileView() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const sessionId = localStorage.getItem('ramito_current_session_id');
+    const logoutUserId = localStorage.getItem('ramito_user_id');
+    // Clean active session from Supabase
+    try {
+      if (isSupabaseConfigured && sessionId && logoutUserId) {
+        await supabase.from('active_sessions').delete().eq('profile_id', logoutUserId);
+      }
+    } catch (e) {
+      console.warn('Could not clear session from Supabase:', e);
+    }
     localStorage.removeItem('ramito_current_session_id');
     localStorage.removeItem('ramito_user_id');
     localStorage.removeItem('ramito_user_name');
@@ -6399,64 +6415,88 @@ export default function ProfileView() {
                   </div>
                 </div>
 
-                {/* SECCIÓN 3: PARÁMETROS DE SEGURIDAD EXCLUSIVOS */}
-                {(userRole === 'admin_elite' || userRole === 'admin_vip') && (
-                  <div className="space-y-4 animate-fade-in">
-                    <span className="text-[8px] sm:text-[9px] font-black text-[#4be277] uppercase tracking-widest block font-bold">3. Parámetros de Seguridad del Complejo</span>
+                {/* SECCIÓN 3: PARÁMETROS DE SEGURIDAD DE REGISTRO (POR ROL) */}
+                <div className="space-y-4 animate-fade-in">
+                  <span className="text-[8px] sm:text-[9px] font-black text-[#4be277] uppercase tracking-widest block font-bold">3. Parámetros de Seguridad del Complejo</span>
 
-                    {userRole === 'admin_elite' && (
-                      <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-4 bg-zinc-950/40 relative overflow-hidden text-left">
-                        <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
-                          <ShieldCheck className="w-4.5 h-4.5 text-[#4be277]" />
-                          <h3 className="text-[10px] font-black text-white uppercase italic tracking-wider">Llave de Seguridad Élite</h3>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-[#4be277] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
-                            <Crown className="w-3.5 h-3.5" strokeWidth={2.5} />
-                            Llave Registro Élite Admin
-                          </label>
-                          <input 
-                            type="text" 
-                            value={newEliteKey} 
-                            onChange={(e) => setNewEliteKey(e.target.value)} 
-                            className="w-full h-11 bg-black/50 border border-[#4be277]/30 rounded-xl px-4 text-white text-xs font-mono font-black tracking-widest outline-none focus:border-[#4be277] transition-all cursor-text font-bold" 
-                            placeholder="CÓDIGO ÉLITE REGISTRO"
-                          />
-                        </div>
-                        <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed">
-                          Nota: Esta es la clave requerida por el sistema para autorizar el registro de un nuevo operador con rango Élite Admin. Al guardar la cuenta, se actualizará este código de forma global.
-                        </p>
+                  {userRole === 'admin_elite' && (
+                    <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-4 bg-zinc-950/40 relative overflow-hidden text-left">
+                      <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
+                        <ShieldCheck className="w-4.5 h-4.5 text-[#4be277]" />
+                        <h3 className="text-[10px] font-black text-white uppercase italic tracking-wider">Llave de Seguridad Élite</h3>
                       </div>
-                    )}
+                      
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-[#4be277] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
+                          <Crown className="w-3.5 h-3.5" strokeWidth={2.5} />
+                          Llave Registro Élite Admin
+                        </label>
+                        <input 
+                          type="text" 
+                          value={newEliteKey} 
+                          onChange={(e) => setNewEliteKey(e.target.value)} 
+                          className="w-full h-11 bg-black/50 border border-[#4be277]/30 rounded-xl px-4 text-white text-xs font-mono font-black tracking-widest outline-none focus:border-[#4be277] transition-all cursor-text font-bold" 
+                          placeholder="CÓDIGO ÉLITE REGISTRO"
+                        />
+                      </div>
+                      <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed">
+                        Nota: Clave para autorizar operadores rango Élite Admin.
+                      </p>
+                    </div>
+                  )}
 
-                    {userRole === 'admin_vip' && (
-                      <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-4 bg-zinc-950/40 relative overflow-hidden text-left">
-                        <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
-                          <ShieldCheck className="w-4.5 h-4.5 text-[#FFD600]" />
-                          <h3 className="text-[10px] font-black text-white uppercase italic tracking-wider">Llave Maestra de Registro VIP</h3>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <label className="text-[9px] font-black text-[#FFD600] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
-                            <Gem className="w-3.5 h-3.5" strokeWidth={2.5} />
-                            Llave Registro VIP Admin
-                          </label>
-                          <input 
-                            type="text" 
-                            value={newVipKey} 
-                            onChange={(e) => setNewVipKey(e.target.value)} 
-                            className="w-full h-11 bg-black/50 border border-[#FFD600]/30 rounded-xl px-4 text-[#FFD600] text-xs font-mono font-black tracking-widest outline-none focus:border-[#FFD600] transition-all cursor-text font-bold" 
-                            placeholder="CÓDIGO VIP REGISTRO"
-                          />
-                        </div>
-                        <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed">
-                          Nota: Esta es la clave requerida por el sistema para autorizar el registro de un nuevo operador con rango VIP Admin. Al guardar la cuenta, se actualizará este código de forma global.
-                        </p>
+                  {userRole === 'admin_vip' && (
+                    <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-4 bg-zinc-950/40 relative overflow-hidden text-left">
+                      <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
+                        <ShieldCheck className="w-4.5 h-4.5 text-[#FFD600]" />
+                        <h3 className="text-[10px] font-black text-white uppercase italic tracking-wider">Llave Maestra de Registro VIP</h3>
                       </div>
-                    )}
-                  </div>
-                )}
+                      
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-[#FFD600] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
+                          <Gem className="w-3.5 h-3.5" strokeWidth={2.5} />
+                          Llave Registro VIP Admin
+                        </label>
+                        <input 
+                          type="text" 
+                          value={newVipKey} 
+                          onChange={(e) => setNewVipKey(e.target.value)} 
+                          className="w-full h-11 bg-black/50 border border-[#FFD600]/30 rounded-xl px-4 text-[#FFD600] text-xs font-mono font-black tracking-widest outline-none focus:border-[#FFD600] transition-all cursor-text font-bold" 
+                          placeholder="CÓDIGO VIP REGISTRO"
+                        />
+                      </div>
+                      <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed">
+                        Nota: Clave para autorizar operadores rango VIP Admin.
+                      </p>
+                    </div>
+                  )}
+
+                  {userRole === 'player' && (
+                    <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-4 bg-zinc-950/40 relative overflow-hidden text-left">
+                      <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
+                        <ShieldCheck className="w-4.5 h-4.5 text-[#009EE3]" />
+                        <h3 className="text-[10px] font-black text-white uppercase italic tracking-wider">Llave Pública de Usuarios</h3>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-[#009EE3] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
+                          <Crown className="w-3.5 h-3.5" strokeWidth={2.5} />
+                          Llave Registro Usuarios
+                        </label>
+                        <input 
+                          type="text" 
+                          value={newUniversalUserKey} 
+                          onChange={(e) => setNewUniversalUserKey(e.target.value)} 
+                          className="w-full h-11 bg-black/50 border border-[#009EE3]/30 rounded-xl px-4 text-[#009EE3] text-xs font-mono font-black tracking-widest outline-none focus:border-[#009EE3] transition-all cursor-text font-bold" 
+                          placeholder="CÓDIGO USUARIO REGISTRO"
+                        />
+                      </div>
+                      <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed">
+                        Nota: Clave para autorizar el registro de clientes normales.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
 
 
