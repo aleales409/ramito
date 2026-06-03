@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn, Calendar, Clock, PlayCircle, DollarSign, Power, Globe, Smartphone, Newspaper, Database, HardDrive, Activity, Info, RefreshCw, Sparkles, GlassWater, Flame, Trophy, Shirt } from 'lucide-react';
+import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn, Calendar, Clock, PlayCircle, DollarSign, Power, Globe, Smartphone, Newspaper, Database, HardDrive, Activity, Info, RefreshCw, Sparkles, GlassWater, Flame, Trophy, Shirt, Search, Plus, Minus, ShoppingBag, Check, CloudSun, Footprints } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCantinaItems } from '../lib/cantina';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 
 const USER_AVATARS: Record<string, string> = {
@@ -13,6 +14,504 @@ const USER_AVATARS: Record<string, string> = {
   'CAMILA ESPINOZA': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23CA8A04" stroke-width="2" stroke-opacity="0.3"/><path d="M 42,20 L 34,44 L 50,54 L 66,44 L 58,20" fill="none" stroke="%23EF4444" stroke-width="2"/><circle cx="50" cy="58" r="18" fill="%23CA8A04" fill-opacity="0.1" stroke="%23CA8A04" stroke-width="2"/><path d="M 50,49 L 52,54 L 57,54 L 53,57 L 55,62 L 50,59 L 45,62 L 47,57 L 43,54 L 48,54 Z" fill="%23FBBF24" fill-opacity="0.4" stroke="%23CA8A04" stroke-width="1"/></svg>', // Medalla Oro
   'JAVIER ORTEGA': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%2310B981" stroke-width="2" stroke-opacity="0.3"/><rect x="24" y="24" width="52" height="48" fill="none" stroke="%2310B981" stroke-width="2" stroke-opacity="0.8"/><line x1="50" y1="24" x2="50" y2="72" stroke="%2310B981" stroke-width="1.5"/><circle cx="50" cy="48" r="10" fill="none" stroke="%2310B981" stroke-width="1.5"/><circle cx="50" cy="48" r="2.5" fill="%2310B981"/></svg>', // Estrategia
 };
+
+// Sub-component wrapper to avoid full-page re-renders on countdown tick
+function NextMatchWidget({ 
+  booking, 
+  onShare,
+  onShareSplit
+}: { 
+  booking: any; 
+  onShare: (b: any) => void; 
+  onShareSplit: (b: any, headcount: number, shareAmount: number, totalCost: number) => void;
+}) {
+  const [timeLeft, setTimeLeft] = useState('');
+  const [playerCount, setPlayerCount] = useState(10);
+
+  // Safe parsing of the amount for split division
+  const parseAmountValue = (amt: string) => {
+    if (!amt) return 12000;
+    let cleaned = amt;
+    if (cleaned.includes('.')) {
+      const parts = cleaned.split('.');
+      if (parts[parts.length - 1] === '00' || parts[parts.length - 1].length === 2) {
+        parts.pop();
+        cleaned = parts.join('');
+      }
+    }
+    const digitsOnly = cleaned.replace(/\D/g, '');
+    const val = parseInt(digitsOnly, 10);
+    return isNaN(val) ? 12000 : val;
+  };
+
+  const totalCost = parseAmountValue(booking.amount);
+  const shareAmount = Math.ceil(totalCost / playerCount);
+
+  React.useEffect(() => {
+    const calculateTimeLeft = () => {
+      if (!booking) return;
+      
+      const now = new Date();
+      let year = now.getFullYear();
+      let month = now.getMonth();
+      let day = now.getDate();
+
+      const d = (booking.date || '').toLowerCase();
+      if (d.includes('hoy')) {
+        // keep current date specs
+      } else if (d.includes('mañana') || d.includes('manana')) {
+        const tmr = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        year = tmr.getFullYear();
+        month = tmr.getMonth();
+        day = tmr.getDate();
+      } else {
+        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        let foundMonth = -1;
+        for (let i = 0; i < months.length; i++) {
+          if (d.includes(months[i])) {
+            foundMonth = i;
+            break;
+          }
+        }
+        const dayMatch = d.match(/\d+/);
+        if (dayMatch) {
+          day = parseInt(dayMatch[0], 10);
+        }
+        if (foundMonth !== -1) {
+          month = foundMonth;
+        }
+      }
+
+      let hour = 20;
+      let minute = 0;
+      const timeClean = (booking.time || '').split('-')[0].trim();
+      const timeMatch = timeClean.match(/(\d+):(\d+)/);
+      if (timeMatch) {
+        hour = parseInt(timeMatch[1], 10);
+        minute = parseInt(timeMatch[2], 10);
+      }
+
+      const target = new Date(year, month, day, hour, minute, 0);
+      const diffMs = target.getTime() - now.getTime();
+
+      if (diffMs <= 0) {
+        const matchDurationMs = 60 * 60 * 1000;
+        if (diffMs > -matchDurationMs) {
+          setTimeLeft('¡TU PARTIDO ESTÁ EN JUEGO AHORA! ⚽');
+        } else {
+          setTimeLeft('Partido finalizado');
+        }
+        return;
+      }
+
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffSecs / 60);
+      const diffHrs = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHrs / 24);
+
+      const rHours = diffHrs % 24;
+      const rMins = diffMins % 60;
+      const rSecs = diffSecs % 60;
+
+      if (diffDays > 0) {
+        setTimeLeft(`Faltan: ${diffDays}d ${rHours}h ${rMins}m`);
+      } else if (rHours > 0) {
+        setTimeLeft(`Faltan: ${rHours}h ${rMins}m ${rSecs}s`);
+      } else {
+        setTimeLeft(`¡Comienza en ${rMins}m ${rSecs}s! 🔥`);
+      }
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+    return () => clearInterval(interval);
+  }, [booking]);
+
+  if (!booking) return null;
+
+  const isCancha1 = booking.field?.toUpperCase().includes('CANCHA 1') || booking.field?.toUpperCase().includes('MARACANÁ') || !booking.field?.toUpperCase().includes('CANCHA 2');
+  const courtNameClean = isCancha1 ? 'Cancha 1 • El Maracaná' : 'Cancha 2 • La Bombonera';
+  const courtFeatures = isCancha1 ? 'Césped Sintético Pro' : 'Sin Césped • Salón';
+
+  let statusLabel = 'PAGO PENDIENTE';
+  let statusBadgeStyle = 'bg-red-500/10 border-red-500/20 text-red-400';
+  
+  if (booking.isSimulation) {
+    statusLabel = 'DEMO • CALCULADORA RÁPIDA 💰';
+    statusBadgeStyle = 'bg-emerald-500/10 border-emerald-500/20 text-[#4be277]';
+  } else if (booking.status === 'upcoming') {
+    statusLabel = 'APROBADO • SEÑADO 🛡️';
+    statusBadgeStyle = 'bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277]';
+  } else if (booking.status === 'pending_approval') {
+    statusLabel = 'EN REVISIÓN DE PAGO ⏳';
+    statusBadgeStyle = 'bg-amber-500/10 border-amber-500/20 text-amber-400';
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full relative overflow-hidden rounded-[2rem] border border-[#4be277]/20 bg-gradient-to-br from-emerald-950/20 to-zinc-950/90 p-5 space-y-3.5 text-left group shadow-lg"
+    >
+      <div className="absolute inset-0 bg-[#4be277]/[0.01] pointer-events-none group-hover:bg-[#4be277]/[0.03] transition-colors duration-300" />
+      <div className="flex items-center justify-between relative z-10">
+        <span className="text-[8px] font-black tracking-[0.2em] uppercase text-[#4be277] flex items-center gap-1.5 animate-pulse">
+          <Clock className="w-3.5 h-3.5 text-[#4be277]" /> {booking.isSimulation ? 'Simulador Fútbol Split 💰' : 'Próximo Partido Activo'}
+        </span>
+        <span className={`text-[7.5px] font-black tracking-widest px-2 py-0.5 border rounded uppercase ${statusBadgeStyle}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <div className="space-y-1 relative z-10">
+        <h4 className="text-xs font-black text-white uppercase italic tracking-tight flex items-center gap-1.5">
+          {courtNameClean}
+        </h4>
+        <p className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest leading-none">
+          {courtFeatures}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 py-2 border-y border-white/5 bg-black/20 -mx-5 px-5 my-1 text-left relative z-10">
+        <div className="space-y-0.5">
+          <span className="text-[7px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block leading-none">Fecha y Hora</span>
+          <span className="text-[10px] font-black text-white uppercase tracking-wider block font-mono leading-none">
+            {booking.date} • {booking.time} hs
+          </span>
+        </div>
+        <div className="space-y-0.5 text-right">
+          <span className="text-[7px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block leading-none">Monto / Seña</span>
+          <span className="text-[10px] font-mono font-black text-[#4be277] block leading-none">
+            {booking.amount || '$ 120.00'}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1 relative z-10">
+        <span className="text-[7px] font-bold text-[#bccbb9]/30 uppercase tracking-widest block leading-none">Cuenta Regresiva</span>
+        <span className="text-[13px] font-black font-mono text-[#4be277] tracking-tight uppercase leading-none">
+          {timeLeft}
+        </span>
+      </div>
+
+      <div className="flex gap-2 pt-1 relative z-10">
+        <button
+          type="button"
+          onClick={() => onShare(booking)}
+          className="flex-1 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-black text-[8.5px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-1.5 cursor-pointer"
+        >
+          <MessageCircle className="w-3.5 h-3.5 text-[#4be277]" /> Datos Partido
+        </button>
+      </div>
+
+      {/* Fútbol Split - Divisor Dinámico */}
+      <div className="pt-3 border-t border-white/5 space-y-2.5 relative z-10 text-left">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <DollarSign className="w-3.5 h-3.5 text-[#4be277]" />
+            <span className="text-[8.5px] font-black uppercase text-[#bccbb9] tracking-wider">Fútbol Split • Dividir Cuenta 💰</span>
+          </div>
+          <span className="text-[7px] font-bold font-mono text-[#4be277] bg-[#4be277]/10 border border-[#4be277]/20 px-1.5 py-0.5 rounded uppercase tracking-widest">
+            {booking.isSimulation ? 'Modo Demo' : 'En Vivo'}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 bg-black/40 p-3 rounded-2xl border border-white/5">
+          <div className="flex flex-col gap-0.5 text-left">
+            <span className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest leading-none">Total Jugadores</span>
+            <div className="flex items-center gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setPlayerCount(p => Math.max(2, p - 1))}
+                className="w-7 h-7 bg-white/5 hover:bg-white/10 active:scale-95 rounded-lg text-white font-black text-xs flex items-center justify-center transition-all cursor-pointer"
+              >
+                -
+              </button>
+              <span className="text-xs font-black font-mono text-white w-5 text-center">{playerCount}</span>
+              <button
+                type="button"
+                onClick={() => setPlayerCount(p => Math.min(22, p + 1))}
+                className="w-7 h-7 bg-white/5 hover:bg-white/10 active:scale-95 rounded-lg text-white font-black text-xs flex items-center justify-center transition-all cursor-pointer"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div className="text-right">
+            <span className="text-[7px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block leading-none mb-1">Cuota por Jugador</span>
+            <span className="text-[14px] font-black text-[#4be277] font-mono block leading-none">
+              $ {shareAmount.toLocaleString('es-AR')}
+            </span>
+            <span className="text-[6.5px] font-bold text-[#bccbb9]/30 uppercase tracking-tight block mt-1">
+              Neto Unitario Exacto
+            </span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onShareSplit(booking, playerCount, shareAmount, totalCost)}
+          className="w-full h-10 rounded-xl bg-[#4be277] text-black font-black text-[8.5px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_15px_rgba(75,226,119,0.25)] hover:opacity-95"
+        >
+          <DollarSign className="w-3.5 h-3.5" /> Copiar Cuota del Equipo (WhatsApp Split)
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
+function MicroBookingWidget({ booking }: { booking: any }) {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  React.useEffect(() => {
+    const calculateTimeLeft = () => {
+      if (!booking) return;
+      
+      const now = new Date();
+      let year = now.getFullYear();
+      let month = now.getMonth();
+      let day = now.getDate();
+
+      const d = (booking.date || '').toLowerCase();
+      if (d.includes('hoy')) {
+        // keep current date specs
+      } else if (d.includes('mañana') || d.includes('manana')) {
+        const tmr = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        year = tmr.getFullYear();
+        month = tmr.getMonth();
+        day = tmr.getDate();
+      } else {
+        const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        let foundMonth = -1;
+        for (let i = 0; i < months.length; i++) {
+          if (d.includes(months[i])) {
+            foundMonth = i;
+            break;
+          }
+        }
+        const dayMatch = d.match(/\d+/);
+        if (dayMatch) {
+          day = parseInt(dayMatch[0], 10);
+        }
+        if (foundMonth !== -1) {
+          month = foundMonth;
+        }
+      }
+
+      let hour = 20;
+      let minute = 0;
+      const timeClean = (booking.time || '').split('-')[0].trim();
+      const timeMatch = timeClean.match(/(\d+):(\d+)/);
+      if (timeMatch) {
+        hour = parseInt(timeMatch[1], 10);
+        minute = parseInt(timeMatch[2], 10);
+      }
+
+      const target = new Date(year, month, day, hour, minute, 0);
+      const diffMs = target.getTime() - now.getTime();
+
+      if (diffMs <= 0) {
+        const matchDurationMs = 60 * 60 * 1000;
+        if (diffMs > -matchDurationMs) {
+          setTimeLeft('EN JUEGO NOW ⚽');
+        } else {
+          setTimeLeft('PARTIDO FINALIZADO');
+        }
+        return;
+      }
+
+      const diffSecs = Math.floor(diffMs / 1000);
+      const diffMins = Math.floor(diffSecs / 60);
+      const diffHrs = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHrs / 24);
+
+      const rHours = diffHrs % 24;
+      const rMins = diffMins % 60;
+      const rSecs = diffSecs % 60;
+
+      if (diffDays > 0) {
+        setTimeLeft(`${diffDays}d ${rHours}h ${rMins}m`);
+      } else {
+        const hStr = rHours > 0 ? `${rHours}H ` : '';
+        const mStr = `${rMins.toString().padStart(2, '0')}M `;
+        const sStr = `${rSecs.toString().padStart(2, '0')}S`;
+        setTimeLeft(`${hStr}${mStr}${sStr}`);
+      }
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+    return () => clearInterval(interval);
+  }, [booking]);
+
+  const isCancha1 = booking.field?.toUpperCase().includes('CANCHA 1') || booking.field?.toUpperCase().includes('MARACANÁ') || !booking.field?.toUpperCase().includes('CANCHA 2');
+  const courtNameClean = isCancha1 ? 'CANCHA 1' : 'CANCHA 2';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      id="active-booking-metric"
+      className="w-full p-4.5 rounded-[2rem] border border-[#4be277]/25 bg-gradient-to-br from-emerald-950/20 via-[#121614]/45 to-black/50 backdrop-blur-md relative overflow-hidden"
+    >
+      <div className="absolute inset-x-0 bottom-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#4be277]/30 to-transparent" />
+      
+      <div className="flex items-center justify-between gap-4 w-full">
+        {/* Left Side: Booking Details in prominent fonts */}
+        <div className="flex flex-col text-left gap-1.5 min-w-0 flex-grow">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#4be277] animate-pulse shrink-0 shadow-[0_0_8px_#4be277]" />
+            <span className="text-[8px] font-black tracking-widest text-[#4be277] uppercase leading-none">
+              RESERVA ACTIVA
+            </span>
+          </div>
+          
+          <h3 className="text-[15px] font-black text-white uppercase tracking-tight leading-none">
+            {courtNameClean}
+          </h3>
+          
+          <p className="text-[11.5px] font-bold text-zinc-300 uppercase tracking-wide leading-none mt-0.5">
+            {booking.date} • {booking.time} HS
+          </p>
+        </div>
+
+        {/* Right Side: Proportional beautifully enclosed countdown */}
+        <div className="shrink-0 flex flex-col items-center justify-center text-center bg-black/60 border border-[#4be277]/20 p-3 rounded-2xl min-w-[125px] shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+          <span className="text-[5.5px] font-black text-[#bccbb9]/50 uppercase tracking-widest leading-none pb-1.5">
+            FALTAN PARA JUGAR
+          </span>
+          <span className="text-[13.5px] font-black font-mono text-[#4be277] tracking-tight leading-none">
+            {timeLeft}
+          </span>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function CantinaCatalogWidget({ cantinaItems, renderIconById }: { cantinaItems: any[], renderIconById: (id?: string) => React.ReactNode, adminPhone: string }) {
+  // Sort items slightly so drinks come first or order remains clear
+  const sortedItems = [...cantinaItems].sort((a, b) => {
+    if (a.type === 'drink' && b.type !== 'drink') return -1;
+    if (a.type !== 'drink' && b.type === 'drink') return 1;
+    return 0;
+  });
+
+  return (
+    <div id="cantina-grid-catalog" className="w-[100%] space-y-3.5 text-left">
+      {/* Grid structure of minimal cells */}
+      <div className="grid grid-cols-2 gap-2">
+        {sortedItems.length === 0 ? (
+          <div className="col-span-full py-6 text-center text-[9px] font-black uppercase text-zinc-600 tracking-wider">
+            Sin productos cargados
+          </div>
+        ) : (
+          sortedItems.map(item => {
+            const isDrink = item.type === 'drink';
+            const cleanName = item.name.split('(')[0].trim();
+            const isOutOfStock = item.stock <= 0;
+
+            return (
+              <div 
+                key={item.id} 
+                className="p-3 rounded-2xl border border-white/5 bg-gradient-to-br from-[#121614]/40 to-black/30 backdrop-blur-md flex flex-col justify-between min-h-[115px] transition-all hover:bg-white/[0.02]"
+              >
+                {/* Top Row: Icon / Type Badge */}
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border ${
+                    isDrink 
+                      ? 'bg-cyan-500/5 border-cyan-500/10 text-cyan-400' 
+                      : 'bg-amber-500/5 border-amber-500/10 text-amber-400'
+                  }`}>
+                    {renderIconById(item.iconId)}
+                  </div>
+                  <span className={`text-[5.5px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${
+                    isOutOfStock 
+                      ? 'text-red-400 bg-red-500/10' 
+                      : isDrink 
+                        ? 'text-cyan-400 bg-cyan-500/15' 
+                        : 'text-amber-400 bg-amber-500/15'
+                  }`}>
+                    {isOutOfStock ? 'AGOTADO' : isDrink ? 'BEBIDA' : 'EXTRA'}
+                  </span>
+                </div>
+
+                {/* Middle part: Wrapped name and Stock */}
+                <div className="flex flex-col text-left justify-center flex-grow pt-2.5 pb-2">
+                  <span className="text-[9.5px] font-black text-white uppercase tracking-tight block break-words leading-tight" title={item.name}>
+                    {cleanName}
+                  </span>
+                  <span className="text-[6.5px] font-bold text-zinc-500 tracking-wider uppercase block mt-0.5">
+                    U. Disp: {item.stock}
+                  </span>
+                </div>
+
+                {/* Bottom Row: Price metric cleanly separated */}
+                <div className="w-full pt-2 border-t border-white/[0.03] flex items-center justify-between">
+                  <span className="text-[6.5px] font-black text-zinc-500 uppercase tracking-widest leading-none">PRECIO</span>
+                  <span className="text-[10px] font-black text-amber-400 font-mono leading-none">
+                    $ {item.price.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Tiny clean footer indicator */}
+      <div className="p-2.5 bg-black/40 rounded-xl border border-white/5 flex items-center gap-2">
+        <Info className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+        <span className="text-[7.5px] font-bold text-[#bccbb9]/45 uppercase tracking-wider leading-relaxed">
+          Precios actualizados de cantina para retirar directo en la barra del complejo.
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ThreeQuickDetailsWidget() {
+  return (
+    <div id="three-quick-details" className="grid grid-cols-3 gap-2 w-full pt-1">
+      {/* 1. Clima */}
+      <div className="p-2.5 rounded-2xl border border-white/5 bg-[#121614]/40 flex flex-col justify-between text-left min-h-[75px] transition-all hover:bg-white/[0.01]">
+        <div className="flex items-center justify-between">
+          <CloudSun className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="text-[5.5px] font-black text-cyan-400/80 uppercase tracking-widest font-mono">Clima</span>
+        </div>
+        <div className="mt-2.5">
+          <span className="text-[8.5px] font-black text-white block uppercase leading-none pb-1">21°C Bueno</span>
+          <span className="text-[5.5px] font-black text-zinc-500 uppercase block tracking-wider leading-none">Cancha Seca ☀️</span>
+        </div>
+      </div>
+
+      {/* 2. Calzado */}
+      <div className="p-2.5 rounded-2xl border border-white/5 bg-[#121614]/40 flex flex-col justify-between text-left min-h-[75px] transition-all hover:bg-white/[0.01]">
+        <div className="flex items-center justify-between">
+          <Footprints className="w-3.5 h-3.5 text-amber-500" />
+          <span className="text-[5.5px] font-black text-amber-500/80 uppercase tracking-widest font-mono">Calzado</span>
+        </div>
+        <div className="mt-2.5">
+          <span className="text-[8.5px] font-black text-white block uppercase leading-none pb-1">Sintético F5</span>
+          <span className="text-[5.5px] font-black text-zinc-500 uppercase block tracking-wider leading-none">Sin tapón metal 👟</span>
+        </div>
+      </div>
+
+      {/* 3. Servicios Incluidos */}
+      <div className="p-2.5 rounded-2xl border border-white/5 bg-[#121614]/40 flex flex-col justify-between text-left min-h-[75px] transition-all hover:bg-white/[0.01]">
+        <div className="flex items-center justify-between">
+          <Shirt className="w-3.5 h-3.5 text-[#4be277]" />
+          <span className="text-[5.5px] font-black text-[#4be277]/80 uppercase tracking-widest font-mono font-black">Servicio</span>
+        </div>
+        <div className="mt-2.5">
+          <span className="text-[8.5px] font-black text-white block uppercase leading-none pb-1">Pelota + Vests</span>
+          <span className="text-[5.5px] font-black text-zinc-500 uppercase block tracking-wider leading-none">Cortesía de casa ⚽</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function HomeView() {
   const navigate = useNavigate();
@@ -31,13 +530,127 @@ export default function HomeView() {
       case 'vests':
         return <Shirt className="w-4 h-4 text-blue-400" />;
       case 'ball':
-        return <Trophy className="w-4 h-4 text-yellow-500" />;
+        return <Sparkles className="w-4 h-4 text-emerald-400" />;
       case 'bbq':
         return <Flame className="w-4 h-4 text-red-500" />;
       default:
         return <GlassWater className="w-4 h-4 text-cyan-400" />;
     }
   };
+
+  const getBookingTargetTime = (dateStr: string, timeStr: string) => {
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth();
+    let day = now.getDate();
+
+    const d = (dateStr || '').toLowerCase();
+    if (d.includes('hoy')) {
+      // keep
+    } else if (d.includes('mañana') || d.includes('manana')) {
+      const tmr = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      year = tmr.getFullYear();
+      month = tmr.getMonth();
+      day = tmr.getDate();
+    } else {
+      const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      let foundMonth = -1;
+      for (let i = 0; i < months.length; i++) {
+        if (d.includes(months[i])) {
+          foundMonth = i;
+          break;
+        }
+      }
+      const dayMatch = d.match(/\d+/);
+      if (dayMatch) {
+        day = parseInt(dayMatch[0], 10);
+      }
+      if (foundMonth !== -1) {
+        month = foundMonth;
+      }
+    }
+
+    let hour = 20;
+    let minute = 0;
+    const timeClean = (timeStr || '').split('-')[0].trim();
+    const timeMatch = timeClean.match(/(\d+):(\d+)/);
+    if (timeMatch) {
+      hour = parseInt(timeMatch[1], 10);
+      minute = parseInt(timeMatch[2], 10);
+    }
+
+    return new Date(year, month, day, hour, minute, 0);
+  };
+
+  const getNextActiveBooking = () => {
+    if (!allBookings || !userName) return null;
+    const userBookings = allBookings.filter((b: any) => {
+      const isMyBooking = (b.user || '').toLowerCase().trim() === userName.toLowerCase().trim();
+      return isMyBooking && ['upcoming', 'pending_approval', 'pending_payment'].includes(b.status);
+    });
+
+    if (userBookings.length === 0) {
+      if (userName.toLowerCase().trim() === 'agus castro') {
+        return {
+          id: 'b_temp_agus',
+          date: 'Hoy',
+          time: '21:00',
+          field: 'Cancha 1 • El Maracaná',
+          status: 'upcoming',
+          amount: 'S/. 120.00',
+          user: 'Agus Castro',
+          phone: '+51 987 654 321',
+          extras: ['Pack Hidratación (2 Gatorade + 2 Aguas)']
+        };
+      }
+      return null;
+    }
+
+    return userBookings.sort((a, b) => {
+      const timeA = getBookingTargetTime(a.date, a.time).getTime();
+      const timeB = getBookingTargetTime(b.date, b.time).getTime();
+      return timeA - timeB;
+    })[0];
+  };
+
+  const handleShareBooking = (b: any) => {
+    const isCancha1 = b.field?.toUpperCase().includes('CANCHA 1') || b.field?.toUpperCase().includes('MARACANÁ') || !b.field?.toUpperCase().includes('CANCHA 2');
+    const courtName = isCancha1 ? 'Cancha 1 • El Maracaná 🏟️' : 'Cancha 2 • La Bombonera 🏟️';
+    const textMsg = `¡Hay fulbito confirmado! ⚽🔥\n\n📌 *Complejo*: ${stadiumName || 'Complejo Ramito Fut Show'}\n🏟️ *Cancha*: ${courtName}\n🗓️ *Fecha*: ${b.date}\n⏰ *Horario*: ${b.time} hs\n💵 *Monto total/seña*: ${b.amount || '$ 120.00'}\n\n¡No falten! ¡A dejar la vida en la cancha! 💪🏃\n_Enviado desde Ramito Fut Show Mobile app_`;
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(textMsg);
+      if (showToast) {
+        showToast('¡Texto copiado listo para WhatsApp! Pastealo en tu grupo.', 'success');
+      }
+    } else {
+      if (showToast) showToast('No se pudo copiar automáticamente. Por favor compártelo manualmente.', 'error');
+    }
+  };
+
+  const handleShareSplit = (b: any, headcount: number, shareAmount: number, totalCost: number) => {
+    const isCancha1 = b.field?.toUpperCase().includes('CANCHA 1') || b.field?.toUpperCase().includes('MARACANÁ') || !b.field?.toUpperCase().includes('CANCHA 2');
+    const courtName = isCancha1 ? 'Cancha 1 • El Maracaná 🏟️' : 'Cancha 2 • La Bombonera 🏟️';
+    const totalCostStr = `$ ${totalCost.toLocaleString('es-AR')}`;
+    const shareAmountStr = `$ ${shareAmount.toLocaleString('es-AR')}`;
+    
+    const textMsg = `¡Muchachos! Ya tenemos reservada la cancha: *${courtName}* 🏟️\n🗓️ *Fecha*: ${b.date}\n⏰ *Horario*: ${b.time} hs\n\nSomos *${headcount}* jugadores en total, por lo que nos toca pagar *${shareAmountStr}* a cada uno para la cancha. 💰 ¡No falten! ⚽🏆\n\n_(Monto total: ${totalCostStr})_\n_Enviado desde Ramito Fut Show_`;
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(textMsg);
+      if (showToast) {
+        showToast(`¡Fútbol Split copiado para ${headcount} jugadores! Pastealo en tu grupo.`, 'success');
+      }
+    } else {
+      if (showToast) showToast('No se pudo copiar el texto del split.', 'error');
+    }
+  };
+
+  const nextBooking = getNextActiveBooking();
+
+  const myBookingsCount = allBookings?.filter((b: any) => 
+    (b.user || '').toLowerCase().trim() === (userName || '').toLowerCase().trim()
+  ).length || 0;
 
   const court1Obj = courts?.find((c: any) => c.id === '1') || { name: 'Cancha 1 • El Maracaná', features: ['Césped Sintético Pro'] };
   const court2Obj = courts?.find((c: any) => c.id === '2') || { name: 'Cancha 2 • La Bombonera', features: ['Sin Césped'] };
@@ -59,6 +672,9 @@ export default function HomeView() {
   const [maintenanceMode, setMaintenanceMode] = useState(() => localStorage.getItem('ramito_maintenance') === 'true');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminKey, setAdminKey] = useState('');
+  const [adminLoginMethod, setAdminLoginMethod] = useState<'credentials' | 'pin'>('credentials');
+  const [adminQuickPin, setAdminQuickPin] = useState('');
+  const [adminQuickPinVisible, setAdminQuickPinVisible] = useState(false);
   const [error, setError] = useState(false);
 
 
@@ -126,6 +742,7 @@ export default function HomeView() {
 
   const isLogged = !!userName;
   const isAdmin = role === 'admin_vip' || role === 'admin_elite';
+  const vercelPlan = localStorage.getItem('ramito_vercel_plan') || 'free';
 
   const totalCaja = cashTotal + transferTotal + mpTotal;
 
@@ -133,7 +750,7 @@ export default function HomeView() {
 
   // Auto-Login for Master Keys
   React.useEffect(() => {
-    if (adminKey && (adminKey === eliteKey || adminKey === vipKey)) {
+    if (adminLoginMethod === 'credentials' && adminKey && (adminKey === eliteKey || adminKey === vipKey)) {
       const r = adminKey === eliteKey ? 'admin_elite' : 'admin_vip';
       localStorage.setItem('ramito_user_role', r);
       localStorage.setItem('ramito_user_name', r === 'admin_elite' ? 'Elite Admin' : 'VIP Admin');
@@ -142,34 +759,163 @@ export default function HomeView() {
       setUserRole(r);
       navigate('/profile');
     }
-  }, [adminKey, eliteKey, vipKey, navigate, setUserName, setUserRole]);
+  }, [adminKey, eliteKey, vipKey, adminLoginMethod, navigate, setUserName, setUserRole]);
+
+  const getLocalProfilesForAdmin = () => {
+    const saved = localStorage.getItem('ramito_profiles');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // ignore
+      }
+    }
+    return [
+      { id: 'master_access_elite', email: 'admin@ramito.com', password: 'ELITE_PASSWORD', name: 'Elite Admin', role: 'admin_elite', pin: 'ELITE26', phone: '+51 987 654 321' },
+      { id: 'master_access_vip', email: 'vip@ramito.com', password: 'VIP_PASSWORD', name: 'VIP Admin', role: 'admin_vip', pin: 'VIP26', phone: '+51 912 345 678' },
+      { id: 'player_1', email: 'user@ramito.com', password: 'password', name: 'Agus Castro', role: 'player', pin: '481516', phone: '+51 900 123 456' }
+    ];
+  };
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminKey) return;
 
     try {
-      const { supabase } = await import('../lib/supabase');
+      if (adminLoginMethod === 'pin') {
+        const trimmedQuickPin = adminQuickPin.trim();
+        if (!trimmedQuickPin) {
+          setError(true);
+          setTimeout(() => setError(false), 3000);
+          return;
+        }
 
-      if (!adminEmail) {
-        setError(true);
+        let user: any = null;
+
+        if (isSupabaseConfigured) {
+          const { data, error: err } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('pin', trimmedQuickPin)
+            .maybeSingle();
+
+          if (data && (data.role === 'admin_elite' || data.role === 'admin_vip')) {
+            user = data;
+          }
+        } else {
+          // Check local profiles
+          const profiles = getLocalProfilesForAdmin();
+          const found = profiles.find((p: any) => p.pin && p.pin.trim().toLowerCase() === trimmedQuickPin.toLowerCase());
+          if (found && (found.role === 'admin_elite' || found.role === 'admin_vip')) {
+            user = found;
+          }
+        }
+
+        if (user) {
+          localStorage.setItem('ramito_user_role', user.role);
+          localStorage.setItem('ramito_user_name', user.name || 'Admin');
+          localStorage.setItem('ramito_user_id', user.id);
+          if (user.password) {
+            localStorage.setItem('ramito_user_pw', user.password);
+          }
+          if (user.pin) {
+            localStorage.setItem('ramito_user_pin', user.pin);
+          }
+          if (user.email) {
+            localStorage.setItem('ramito_user_email', user.email);
+          }
+          setUserName(user.name || 'Admin');
+          setUserRole(user.role);
+          
+          setAdminQuickPin('');
+          setShowAdminLogin(false);
+          if (user.role === 'admin_elite' || user.role === 'admin_vip') {
+            navigate('/profile?view=admin_selection');
+          } else {
+            navigate('/profile');
+          }
+        } else {
+          setError(true);
+          setTimeout(() => setError(false), 3000);
+        }
         return;
       }
 
-      const { data: user } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('email', adminEmail.toLowerCase())
-        .eq('password', adminKey)
-        .maybeSingle();
+      // Standard credentials login
+      if (!adminKey) return;
+      
+      let user: any = null;
 
-      if (user && (user.role === 'admin_elite' || user.role === 'admin_vip')) {
+      if (isSupabaseConfigured) {
+        const { data, error: err } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', adminEmail.toLowerCase())
+          .maybeSingle();
+
+        const currentEliteKey = localStorage.getItem('ramito_elite_key') || 'ELITE-9A7F-D3B8-K2C5';
+        const currentVipKey = localStorage.getItem('ramito_vip_key') || 'VIP-3E8F-C1A5-J7B9';
+
+        let isPasswordValid = false;
+        if (data) {
+          isPasswordValid = data.password === adminKey;
+          if (data.role === 'admin_elite' && adminKey === currentEliteKey) {
+            isPasswordValid = true;
+          }
+          if (data.role === 'admin_vip' && adminKey === currentVipKey) {
+            isPasswordValid = true;
+          }
+        }
+        
+        if (data && isPasswordValid && (data.role === 'admin_elite' || data.role === 'admin_vip')) {
+          user = data;
+        }
+      } else {
+        const profiles = getLocalProfilesForAdmin();
+        const found = profiles.find((p: any) => p.email.toLowerCase() === adminEmail.toLowerCase());
+        
+        const currentEliteKey = localStorage.getItem('ramito_elite_key') || 'ELITE-9A7F-D3B8-K2C5';
+        const currentVipKey = localStorage.getItem('ramito_vip_key') || 'VIP-3E8F-C1A5-J7B9';
+
+        let isPasswordValid = false;
+        if (found) {
+          isPasswordValid = found.password === adminKey;
+          if (found.role === 'admin_elite' && adminKey === currentEliteKey) {
+            isPasswordValid = true;
+          }
+          if (found.role === 'admin_vip' && adminKey === currentVipKey) {
+            isPasswordValid = true;
+          }
+        }
+
+        if (found && isPasswordValid && (found.role === 'admin_elite' || found.role === 'admin_vip')) {
+          user = found;
+        }
+      }
+
+      if (user) {
         localStorage.setItem('ramito_user_role', user.role);
-        localStorage.setItem('ramito_user_name', user.name);
+        localStorage.setItem('ramito_user_name', user.name || 'Admin');
         localStorage.setItem('ramito_user_id', user.id);
-        setUserName(user.name);
+        if (user.password) {
+          localStorage.setItem('ramito_user_pw', user.password);
+        }
+        if (user.pin) {
+          localStorage.setItem('ramito_user_pin', user.pin);
+        }
+        if (user.email) {
+          localStorage.setItem('ramito_user_email', user.email);
+        }
+        setUserName(user.name || 'Admin');
         setUserRole(user.role);
-        navigate('/profile');
+        
+        setAdminEmail('');
+        setAdminKey('');
+        setShowAdminLogin(false);
+        if (user.role === 'admin_elite' || user.role === 'admin_vip') {
+          navigate('/profile?view=admin_selection');
+        } else {
+          navigate('/profile');
+        }
       } else {
         setError(true);
         setTimeout(() => setError(false), 3000);
@@ -202,77 +948,81 @@ export default function HomeView() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm mb-4 z-10 grid grid-cols-2 gap-3"
+          className={`w-full max-w-sm mb-4 z-10 grid gap-3 ${
+            vercelPlan === 'pro' ? 'grid-cols-2' : 'grid-cols-1'
+          }`}
         >
           {/* Licencia Web */}
-          <motion.div 
-            whileHover={{ scale: 1.02, y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate('/profile?tab=licencias')}
-            className={`glass-panel p-4 rounded-2xl border bg-gradient-to-br from-white/[0.01] to-white/[0.03] flex flex-col justify-between cursor-pointer transition-all relative overflow-hidden group min-h-[155px] ${
-              webLicenseActive 
-                ? 'border-[#4be277]/25 hover:border-[#4be277]/40 shadow-[0_5px_20px_rgba(75,226,119,0.05)]' 
-                : 'border-red-500/20 hover:border-red-500/40 shadow-none'
-            }`}
-          >
-            {/* Glossy ambient glow */}
-            <div className={`absolute -right-2 -top-2 w-14 h-14 rounded-full blur-2xl opacity-30 pointer-events-none transition-colors ${
-              webLicenseActive ? 'bg-[#4be277]' : 'bg-red-500'
-            }`} />
-
-            <div className="flex justify-between items-start">
-              <span className="text-[9px] font-black text-white/50 uppercase tracking-[0.12em] shrink-0">
-                Web Hub
-              </span>
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all ${
+          {vercelPlan === 'pro' && (
+            <motion.div 
+              whileHover={{ scale: 1.02, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/profile?tab=licencias')}
+              className={`glass-panel p-4 rounded-2xl border bg-gradient-to-br from-white/[0.01] to-white/[0.03] flex flex-col justify-between cursor-pointer transition-all relative overflow-hidden group min-h-[155px] ${
                 webLicenseActive 
-                  ? 'bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277]' 
-                  : 'bg-red-500/10 border-red-500/20 text-red-500'
-              }`}>
-                <Globe className="w-3.5 h-3.5" />
-              </div>
-            </div>
+                  ? 'border-[#4be277]/25 hover:border-[#4be277]/40 shadow-[0_5px_20px_rgba(75,226,119,0.05)]' 
+                  : 'border-red-500/20 hover:border-red-500/40 shadow-none'
+              }`}
+            >
+              {/* Glossy ambient glow */}
+              <div className={`absolute -right-2 -top-2 w-14 h-14 rounded-full blur-2xl opacity-30 pointer-events-none transition-colors ${
+                webLicenseActive ? 'bg-[#4be277]' : 'bg-red-500'
+              }`} />
 
-            <div className="my-3 text-left">
-              <h4 className="text-[11px] font-black text-white uppercase tracking-wide leading-none pb-1.5 flex items-center gap-1">
-                Licencia Web
-                <span className={`w-1.5 h-1.5 rounded-full ${webLicenseActive ? 'bg-[#4be277] animate-pulse' : 'bg-red-500'}`} />
-              </h4>
-              
-              {webLicenseActive ? (
-                <div className="space-y-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-[22px] font-black font-display text-[#4be277] leading-none">15</span>
-                    <span className="text-[8px] font-black text-white/70 uppercase tracking-widest">Días</span>
+              <div className="flex justify-between items-start">
+                <span className="text-[9px] font-black text-white/50 uppercase tracking-[0.12em] shrink-0">
+                  Web Hub
+                </span>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all ${
+                  webLicenseActive 
+                    ? 'bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277]' 
+                    : 'bg-red-500/10 border-red-500/20 text-red-500'
+                }`}>
+                  <Globe className="w-3.5 h-3.5" />
+                </div>
+              </div>
+
+              <div className="my-3 text-left">
+                <h4 className="text-[11px] font-black text-white uppercase tracking-wide leading-none pb-1.5 flex items-center gap-1">
+                  Licencia Web
+                  <span className={`w-1.5 h-1.5 rounded-full ${webLicenseActive ? 'bg-[#4be277] animate-pulse' : 'bg-red-500'}`} />
+                </h4>
+                
+                {webLicenseActive ? (
+                  <div className="space-y-1">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-[22px] font-black font-display text-[#4be277] leading-none">15</span>
+                      <span className="text-[8px] font-black text-white/70 uppercase tracking-widest">Días</span>
+                    </div>
+                    <p className="text-[7px] font-medium font-mono text-[#bccbb9]/40 uppercase tracking-widest leading-none">Vence: 12 Jun 2026</p>
                   </div>
-                  <p className="text-[7px] font-medium font-mono text-[#bccbb9]/40 uppercase tracking-widest leading-none">Vence: 12 Jun 2026</p>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <span className="text-[11px] font-black text-red-500/80 uppercase tracking-wider block">BLOQUEADA</span>
-                  <p className="text-[7px] font-medium font-mono text-red-500/40 uppercase tracking-widest leading-none">Por Elite Switch</p>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-black text-red-500/80 uppercase tracking-wider block">BLOQUEADA</span>
+                    <p className="text-[7px] font-medium font-mono text-red-500/40 uppercase tracking-widest leading-none">Por Elite Switch</p>
+                  </div>
+                )}
+              </div>
 
-            {/* Premium progress bar */}
-            <div className="space-y-1.5 w-full">
-              <div className="w-full h-[3px] bg-white/5 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: webLicenseActive ? '50%' : '0%' }}
-                  transition={{ duration: 1 }}
-                  className={`h-full rounded-full ${
-                    webLicenseActive ? 'bg-gradient-to-r from-[#4be277] to-emerald-400' : 'bg-red-500'
-                  }`}
-                />
+              {/* Premium progress bar */}
+              <div className="space-y-1.5 w-full">
+                <div className="w-full h-[3px] bg-white/5 rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: webLicenseActive ? '50%' : '0%' }}
+                    transition={{ duration: 1 }}
+                    className={`h-full rounded-full ${
+                      webLicenseActive ? 'bg-gradient-to-r from-[#4be277] to-emerald-400' : 'bg-red-500'
+                    }`}
+                  />
+                </div>
+                <div className="flex justify-between items-center text-[7px] font-bold text-[#bccbb9]/30 uppercase tracking-widest leading-none">
+                  <span>Vercel PRO</span>
+                  <span>{webLicenseActive ? '50%' : '0%'}</span>
+                </div>
               </div>
-              <div className="flex justify-between items-center text-[7px] font-bold text-[#bccbb9]/30 uppercase tracking-widest leading-none">
-                <span>Vercel PRO</span>
-                <span>{webLicenseActive ? '50%' : '0%'}</span>
-              </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )}
 
           {/* Licencia APP (PWA) */}
           <motion.div 
@@ -1055,18 +1805,20 @@ export default function HomeView() {
       )}
 
       {/* Logo central */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full flex flex-col items-center justify-center mb-6"
-      >
-        <div className="absolute -inset-20 bg-[#4be277]/10 rounded-full blur-[120px] opacity-20 pointer-events-none" />
-        <img
-          src="/logo_ramito.png"
-          alt="Ramito Fut Show"
-          className="w-72 h-auto drop-shadow-[0_0_50px_rgba(75,226,119,0.3)]"
-        />
-      </motion.div>
+      {!isLogged && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 0.9 }}
+          className="relative w-full flex flex-col items-center justify-center mb-6"
+        >
+          <div className="absolute -inset-20 bg-[#4be277]/10 rounded-full blur-[120px] opacity-20 pointer-events-none" />
+          <img
+            src="/logo_ramito.png"
+            alt="Ramito Fut Show"
+            className="w-72 h-auto drop-shadow-[0_0_50px_rgba(75,226,119,0.3)]"
+          />
+        </motion.div>
+      )}
 
       {/* Botones de acción en la parte inferior */}
       <div className="w-full max-w-sm flex flex-col gap-3 z-10">
@@ -1094,75 +1846,180 @@ export default function HomeView() {
           </motion.div>
         ) : (
           <div className="space-y-3">
-            {/* Tarjeta de Perfil Activo con Avatar */}
-            <div className="p-4 bg-[#1a1c1c]/50 border border-white/5 rounded-3xl flex items-center gap-3.5 text-left">
-              <div className="w-12 h-12 rounded-2xl overflow-hidden border border-[#4be277]/20 shrink-0 flex items-center justify-center bg-black/40 text-[#4be277]">
-                {(() => {
-                  const savedName = userName || 'Jugador';
-                  const savedAvatar = userAvatar;
-                  const cleanName = savedName.toUpperCase().trim();
-                  const avatarUrl = savedAvatar || USER_AVATARS[cleanName];
-                  if (avatarUrl) {
-                    return <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover animate-fade-in" referrerPolicy="no-referrer" />;
-                  } else {
-                    return <User className="w-6 h-6 stroke-[1.5]" />;
-                  }
-                })()}
-              </div>
-              <div className="flex-grow min-w-0">
-                <span className="text-[8px] font-black text-[#4be277] uppercase tracking-[0.2em] leading-none block mb-1">
-                  Sesión Activa • {role?.includes('admin') ? 'Administrador' : 'Jugador'}
-                </span>
-                <span className="text-sm font-black text-white uppercase italic truncate block">
-                  {userName || 'Jugador'}
-                </span>
-              </div>
-              <button
-                onClick={() => navigate('/profile')}
-                className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[8px] font-black uppercase tracking-widest text-[#bccbb9] transition-all shrink-0"
+            {nextBooking ? (
+              <MicroBookingWidget booking={nextBooking} />
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full p-4.5 rounded-[2rem] border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.03] text-left space-y-3 relative overflow-hidden"
               >
-                Perfil
-              </button>
+                <div className="absolute inset-0 bg-[#FF9100]/[0.01] pointer-events-none" />
+                <div className="flex items-center gap-1.5 text-zinc-500 text-[8px] font-black uppercase tracking-widest">
+                  <Calendar className="w-3.5 h-3.5 text-zinc-600" />
+                  Sin reservas activas
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-[10px] font-black text-white uppercase italic tracking-tight">¿Listo para salir a la cancha hoy? ⚽</h4>
+                  <p className="text-[9px] font-bold text-[#bccbb9]/45 leading-normal">
+                    No tienes ningún partido agendado para las próximas horas. ¡Elegí uno de los turnos libres abajo para reservar tu lugar ahora mismo!
+                  </p>
+                </div>
+                <div className="pt-1">
+                  <button
+                    onClick={() => navigate('/booking')}
+                    className="h-8 px-4 rounded-xl bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/15 text-[#4be277] text-[8px] font-black uppercase tracking-widest transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    Reserva tu Turno ⚡
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            <ThreeQuickDetailsWidget />
+
+            {/* CANCHAS & RESERVAS ONLINE */}
+            <div className="space-y-4 w-full">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] italic flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FF9100] animate-pulse shrink-0" />
+                  <Clock className="w-3.5 h-3.5 text-[#FF9100] shrink-0" /> DISPONIBILIDAD EN VIVO • HOY
+                </span>
+                <span className="text-[8px] font-black font-mono text-[#FF9100] bg-[#FF9100]/10 border border-[#FF9100]/20 px-1.5 py-0.5 rounded uppercase tracking-widest">
+                  LIVE NOW ⚡
+                </span>
+              </div>
+
+              <div className="glass-panel p-5 rounded-[2.5rem] border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.03] hover:border-[#FF9100]/15 transition-all duration-300 space-y-4 text-left relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF9100]/[0.02] rounded-full blur-2xl pointer-events-none" />
+
+                <div className="space-y-4">
+                  {(() => {
+                    const getTodaySlotStatus = (timeSlot: string) => {
+                      if (!allBookings) return { c1Free: true, c2Free: true };
+                      
+                      const c1Booked = allBookings.some((b: any) => {
+                        const isToday = (b.date || '').toLowerCase().includes('hoy');
+                        const matchesTime = (b.time || '').includes(timeSlot);
+                        const isC1 = (b.field || b.courtName || '').toLowerCase().includes('cancha 1') || 
+                                     (b.field || b.courtName || '').toLowerCase().includes('maracaná') || 
+                                     (b.field || b.courtName || '').toLowerCase().includes('maracana') ||
+                                     !(b.field || b.courtName || '').toLowerCase().includes('cancha 2');
+                        return isToday && matchesTime && isC1 && (b.status === 'upcoming' || b.status === 'pending_approval' || b.status === 'pending_payment');
+                      });
+
+                      const c2Booked = allBookings.some((b: any) => {
+                        const isToday = (b.date || '').toLowerCase().includes('hoy');
+                        const matchesTime = (b.time || '').includes(timeSlot);
+                        const isC2 = (b.field || b.courtName || '').toLowerCase().includes('cancha 2') || 
+                                     (b.field || b.courtName || '').toLowerCase().includes('bombonera');
+                        return isToday && matchesTime && isC2 && (b.status === 'upcoming' || b.status === 'pending_approval' || b.status === 'pending_payment');
+                      });
+
+                      return {
+                        c1Free: !c1Booked,
+                        c2Free: !c2Booked
+                      };
+                    };
+
+                    const todaySlots = ['18:00', '19:00', '20:00', '21:00', '22:00'];
+                    let freeCount = 0;
+                    todaySlots.forEach(t => {
+                      const { c1Free, c2Free } = getTodaySlotStatus(t);
+                      if (c1Free) freeCount++;
+                      if (c2Free) freeCount++;
+                    });
+
+                    return (
+                      <>
+                        <div className="flex items-center justify-between pb-1">
+                          <span className="text-[10px] font-black text-white uppercase italic tracking-wider flex items-center gap-1.5">
+                            <Trophy className="w-3.5 h-3.5 text-[#FF9100]" />
+                            Turnos Libres de Hoy
+                          </span>
+                          <span className="text-[8px] font-black text-[#4be277] uppercase tracking-wider bg-[#4be277]/10 px-2 py-0.5 rounded-md border border-[#4be277]/20 font-mono">
+                            {freeCount} libres
+                          </span>
+                        </div>
+
+                        {/* Canchas y Celdas Horarias */}
+                        <div className="space-y-3.5 pt-1">
+                          {/* Cancha 1 */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-black uppercase text-[#bccbb9]/85 tracking-[0.1em] flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#4be277]" />
+                                Cancha 1 • El Maracaná 🏟️
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-5 gap-1.5">
+                              {todaySlots.map((time) => {
+                                const { c1Free } = getTodaySlotStatus(time);
+                                return (
+                                  <button
+                                    key={time + '_c1'}
+                                    onClick={() => navigate('/booking', { state: { initialCourt: '1' } })}
+                                    className={`h-11 rounded-xl flex flex-col items-center justify-center border font-mono transition-all text-[10px] focus:outline-none cursor-pointer ${
+                                      c1Free
+                                        ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-[#4be277]/30 text-[#4be277] font-black'
+                                        : 'bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/20 text-rose-400 font-bold'
+                                    }`}
+                                  >
+                                    <span className="leading-none text-xs font-black">{time}</span>
+                                    <span className="text-[5.5px] font-sans font-black uppercase mt-1 tracking-wider opacity-90">
+                                      {c1Free ? 'LIBRE' : 'OK'}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Cancha 2 */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-black uppercase text-[#bccbb9]/85 tracking-[0.1em] flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#FF9100]" />
+                                Cancha 2 • La Bombonera 🏟️
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-5 gap-1.5">
+                              {todaySlots.map((time) => {
+                                const { c2Free } = getTodaySlotStatus(time);
+                                return (
+                                  <button
+                                    key={time + '_c2'}
+                                    onClick={() => navigate('/booking', { state: { initialCourt: '2' } })}
+                                    className={`h-11 rounded-xl flex flex-col items-center justify-center border font-mono transition-all text-[10px] focus:outline-none cursor-pointer ${
+                                      c2Free
+                                        ? 'bg-emerald-500/10 hover:bg-emerald-500/20 border-[#4be277]/30 text-[#4be277] font-black'
+                                        : 'bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/20 text-rose-400 font-bold'
+                                    }`}
+                                  >
+                                    <span className="leading-none text-xs font-black">{time}</span>
+                                    <span className="text-[5.5px] font-sans font-black uppercase mt-1 tracking-wider opacity-90">
+                                      {c2Free ? 'LIBRE' : 'OK'}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => navigate('/booking')}
+                  className="w-full h-11 rounded-xl bg-[#FF9100] text-black font-black text-[9px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 cursor-pointer shadow-[0_4px_15px_rgba(255,145,0,0.25)] hover:bg-[#FF9100]/95"
+                >
+                  <Zap className="w-3.5 h-3.5 animate-pulse" /> RESERVAR AHORA
+                </motion.button>
+              </div>
             </div>
-
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/booking')}
-              className="w-full flex items-center gap-4 p-5 rounded-3xl bg-[#FF9100]/10 border border-[#FF9100]/30 hover:bg-[#FF9100]/20 transition-all group"
-            >
-              <div className="w-12 h-12 rounded-xl bg-[#FF9100]/20 flex items-center justify-center border border-[#FF9100]/40">
-                <Zap className="w-7 h-7 text-[#FF9100] animate-pulse" />
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-lg font-black uppercase italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white to-[#FF9100]">
-                  Reservar Cancha
-                </span>
-                <span className="text-[9px] font-black text-[#FF9100] uppercase tracking-widest">Jugar Ahora</span>
-              </div>
-              <ChevronRight className="w-6 h-6 text-[#FF9100]/40 ml-auto" />
-            </motion.button>
-
-            {/* Botón Acceso Staff (ahora en la parte inferior para dar prioridad al juego de los usuarios) */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="w-full pt-2"
-            >
-              <motion.button
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setShowAdminLogin(true)}
-                className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] transition-all opacity-60 hover:opacity-100"
-              >
-                <div className="w-8 h-8 rounded-lg bg-[#4be277]/10 flex items-center justify-center border border-[#4be277]/20">
-                  <ShieldCheck className="w-4 h-4 text-[#4be277]" />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-[10px] font-black uppercase text-white">Acceso Staff</span>
-                  <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">Administración</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#bccbb9]/20 ml-auto" />
-              </motion.button>
-            </motion.div>
           </div>
         )}
       </div>
@@ -1181,58 +2038,15 @@ export default function HomeView() {
               <GlassWater className="w-3.5 h-3.5 text-amber-500 shrink-0" /> CANTINA & MINI-SHOP RAMITO
             </span>
             <span className="text-[8px] font-black font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded uppercase tracking-widest">
-              MENU SPOT
+              CATÁLOGO ACTIVO ⚡
             </span>
           </div>
 
-          <div className="glass-panel p-5 rounded-[2.5rem] border border-white/5 bg-gradient-to-br from-white/[0.01] to-white/[0.03] space-y-4 text-left">
-            <div className="space-y-1">
-              <h4 className="text-xs font-black text-white uppercase italic tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                ¿Vas a jugar hoy? Anticipa tus Bebidas
-              </h4>
-              <p className="text-[8.5px] font-bold text-[#bccbb9]/50 uppercase tracking-wider leading-relaxed">
-                Agrega consumos extras al reservar y retíralos helados al terminar de jugar o directamente en puerta.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5 pt-1">
-              {cantinaItems.length === 0 ? (
-                <div className="col-span-full py-8 text-center text-[9px] font-black uppercase text-zinc-500 tracking-wider">
-                  Sin productos activos en catálogo
-                </div>
-              ) : (
-                cantinaItems.map(item => (
-                  <div key={item.id} className="p-3 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-2">
-                    <div className="flex justify-between items-start">
-                      <span className="text-[7.5px] font-black text-white/40 uppercase tracking-widest block leading-none">
-                        {item.type === 'drink' ? 'Bebida' : item.type === 'equipment' ? 'Equipamiento' : 'Adicional'}
-                      </span>
-                      {renderIconById(item.iconId)}
-                    </div>
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] font-black text-white uppercase block leading-tight truncate" title={item.name}>
-                        {item.name}
-                      </span>
-                      <span className="text-[7px] font-bold text-[#bccbb9]/40 uppercase block leading-none">
-                        {item.stock > 0 ? `Stock: ${item.stock} u.` : 'Agotado'}
-                      </span>
-                    </div>
-                    <span className="text-xs font-black text-amber-400 font-mono block">
-                      $ {(item.price || 0).toFixed(2)}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="p-3.5 bg-amber-500/5 rounded-2xl border border-amber-500/10 flex items-start gap-2.5">
-              <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <span className="text-[8.5px] font-bold text-[#bccbb9]/70 uppercase tracking-wider leading-relaxed">
-                Ahorra colas: puedes pedir estas bebidas al pre-reservar tu turno en la sección "Canchas" y el sistema las sumará al pago de forma integrada.
-              </span>
-            </div>
-          </div>
+          <CantinaCatalogWidget 
+            cantinaItems={cantinaItems} 
+            renderIconById={renderIconById} 
+            adminPhone={adminPhone} 
+          />
         </motion.div>
       )}
 
@@ -1262,36 +2076,97 @@ export default function HomeView() {
                 </div>
                 <div className="text-center">
                   <h3 className="font-display text-2xl font-black text-white uppercase italic tracking-tighter">Acceso Staff</h3>
-                  <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest italic">Ingrese su correo y llave</p>
+                  <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest italic">
+                    {adminLoginMethod === 'pin' ? 'Use su código especial de ingreso rápido' : 'Ingrese su correo y llave'}
+                  </p>
+                </div>
+
+                {/* Alternador de método de ingreso para administrador */}
+                <div className="flex bg-black/60 p-1 rounded-2xl border border-white/5 w-full max-w-[270px] -mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setAdminLoginMethod('credentials')}
+                    className={`flex-1 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${
+                      adminLoginMethod === 'credentials'
+                        ? 'bg-[#4be277] text-black shadow-md'
+                        : 'text-[#bccbb9]/50 hover:text-white'
+                    }`}
+                  >
+                    Con Correo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdminLoginMethod('pin')}
+                    className={`flex-1 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all gap-1 flex items-center justify-center ${
+                      adminLoginMethod === 'pin'
+                        ? 'bg-[#4be277] text-black shadow-md'
+                        : 'text-[#bccbb9]/50 hover:text-white'
+                    }`}
+                  >
+                    <Sparkles className="w-2.5 h-2.5" /> PIN Rápido
+                  </button>
                 </div>
 
                 <form onSubmit={handleAdminLogin} className="w-full space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Correo Administrador</label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#bccbb9]" />
-                      <input
-                        type="email"
-                        value={adminEmail}
-                        onChange={(e) => setAdminEmail(e.target.value)}
-                        placeholder="CORREO"
-                        className="w-full h-14 bg-white/[0.03] border border-white/10 rounded-2xl pl-12 text-white font-black uppercase text-[11px] focus:border-[#4be277]/50 outline-none"
-                      />
+                  {adminLoginMethod === 'pin' ? (
+                    <div className="space-y-2 animate-fade-in">
+                      <label className="text-[10px] font-black text-[#4be277] uppercase tracking-widest ml-1">
+                        PIN Rápido Administrador
+                      </label>
+                      <div className="relative">
+                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4be277]" />
+                        <input
+                          type={adminQuickPinVisible ? 'text' : 'password'}
+                          required
+                          value={adminQuickPin}
+                          onChange={(e) => setAdminQuickPin(e.target.value)}
+                          placeholder="INGRESE SU PIN"
+                          className="block w-full pl-12 pr-16 h-14 bg-white/[0.03] border border-white/10 rounded-2xl text-white font-mono font-black tracking-widest uppercase text-xs focus:border-[#4be277]/60 outline-none transition-all cursor-text text-center animate-pulse"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setAdminQuickPinVisible(!adminQuickPinVisible)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-mono font-black text-[#bccbb9]/50 hover:text-white tracking-widest px-2 py-1.5 rounded hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
+                        >
+                          {adminQuickPinVisible ? 'OCULTAR' : 'VER'}
+                        </button>
+                      </div>
+                      <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest leading-normal text-center mt-1 px-1">
+                        * Ingresa tu PIN de 4 a 12 caracteres alfanuméricos guardado en tu panel de administrador.
+                      </p>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Llave Maestro o Personal</label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#bccbb9]" />
-                      <input
-                        type="password"
-                        value={adminKey}
-                        onChange={(e) => setAdminKey(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full h-14 bg-white/[0.03] border border-white/10 rounded-2xl pl-12 text-white font-black tracking-[0.3em] focus:border-[#4be277]/50 outline-none"
-                      />
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Correo Administrador</label>
+                        <div className="relative">
+                          <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#bccbb9]" />
+                          <input
+                            type="email"
+                            required
+                            value={adminEmail}
+                            onChange={(e) => setAdminEmail(e.target.value)}
+                            placeholder="CORREO"
+                            className="w-full h-14 bg-white/[0.03] border border-white/10 rounded-2xl pl-12 text-white font-black uppercase text-[11px] focus:border-[#4be277]/50 outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Llave Maestro o Personal</label>
+                        <div className="relative">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[#bccbb9]" />
+                          <input
+                            type="password"
+                            required
+                            value={adminKey}
+                            onChange={(e) => setAdminKey(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full h-14 bg-white/[0.03] border border-white/10 rounded-2xl pl-12 text-white font-black tracking-[0.3em] focus:border-[#4be277]/50 outline-none"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {error && (
                     <motion.div
@@ -1306,30 +2181,31 @@ export default function HomeView() {
 
                   <button
                     type="submit"
-                    className="w-full bg-[#4be277] text-black font-black h-16 rounded-2xl uppercase text-xs tracking-widest shadow-lg shadow-[#4be277]/20 flex items-center justify-center gap-3 italic"
+                    className="w-full bg-[#4be277] text-black font-black h-16 rounded-2xl uppercase text-xs tracking-widest shadow-lg shadow-[#4be277]/20 flex items-center justify-center gap-3 italic cursor-pointer"
                   >
-                    INGRESAR AL PANEL <Key className="w-4 h-4" />
+                    {adminLoginMethod === 'pin' ? 'VALIDAR PIN E INGRESAR' : 'INGRESAR AL PANEL'} <Key className="w-4 h-4" />
                   </button>
                 </form>
+
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAdminLogin(false);
+                      navigate('/login', { state: { view: 'recover' } });
+                    }}
+                    className="text-[8px] font-black text-[#bccbb9]/50 hover:text-[#4be277] uppercase tracking-widest transition-all cursor-pointer hover:underline font-mono"
+                  >
+                    ¿Olvidó su Llave o PIN? Recupérela aquí &rarr;
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* WhatsApp flotante */}
-      {isLogged && !role?.includes('admin') && adminPhone && (
-        <motion.a
-          href={`https://wa.me/${adminPhone.replace(/\D/g, '')}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="fixed bottom-24 right-6 w-16 h-16 bg-[#25D366] rounded-full flex items-center justify-center shadow-lg z-50 border-4 border-[#121414]"
-        >
-          <MessageCircle className="w-8 h-8 text-white" />
-        </motion.a>
-      )}
+
     </main>
   );
 }

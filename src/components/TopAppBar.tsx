@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Bell, LogOut } from 'lucide-react';
+import { Trophy, Bell, LogOut, AlertTriangle, RefreshCw, Sparkles } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -37,19 +37,29 @@ export default function TopAppBar() {
       const timeRange = isWeekend ? schedule.weekend : schedule.weekday;
       
       const currentHours = now.getHours();
-      const [openH, openM] = timeRange.open.split(':').map(Number);
-      const [closeH, closeM] = timeRange.close.split(':').map(Number);
-      
       const currentMinutes = now.getMinutes();
       const currentTime = currentHours + currentMinutes / 60;
-      const openTime = openH + openM / 60;
-      const closeTime = closeH + closeM / 60;
       
-      let currentlyOpen = false;
-      if (closeTime < openTime) {
-        if (currentTime >= openTime || currentTime <= closeTime) currentlyOpen = true;
-      } else {
-        if (currentTime >= openTime && currentTime <= closeTime) currentlyOpen = true;
+      const checkInShift = (op: string, cl: string) => {
+        if (!op || !cl) return false;
+        try {
+          const [openH, openM] = op.split(':').map(Number);
+          const [closeH, closeM] = cl.split(':').map(Number);
+          const openTime = openH + openM / 60;
+          const closeTime = closeH + closeM / 60;
+          if (closeTime < openTime) {
+            return currentTime >= openTime || currentTime <= closeTime;
+          } else {
+            return currentTime >= openTime && currentTime <= closeTime;
+          }
+        } catch (e) {
+          return false;
+        }
+      };
+
+      let currentlyOpen = checkInShift(timeRange.open, timeRange.close);
+      if (timeRange.useTwoShifts && timeRange.open2 && timeRange.close2) {
+        currentlyOpen = currentlyOpen || checkInShift(timeRange.open2, timeRange.close2);
       }
       
       setIsOpen(currentlyOpen);
@@ -67,18 +77,49 @@ export default function TopAppBar() {
 
   const displayIsOpen = emergencyMode ? false : isOpen;
 
+  const renderActiveHoursText = () => {
+    if (timeRange.useTwoShifts && timeRange.open2 && timeRange.close2) {
+      return (
+        <>
+          <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.open}</span> A <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.close}</span>
+          <span> Y </span>
+          <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.open2}</span> A <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.close2}</span>
+        </>
+      );
+    }
+    return (
+      <>
+        <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.open}</span> A <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.close}</span>
+      </>
+    );
+  };
+
   return (
     <header className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-5xl md:max-w-6xl z-[300]">
       <div className="w-full bg-black/60 backdrop-blur-md flex items-center justify-between px-5 py-2 border-b border-white/5 overflow-hidden">
         <div className="flex-grow overflow-hidden relative">
           {emergencyMode ? (
-            <div className="whitespace-nowrap animate-marquee inline-block text-[10px] font-black tracking-[0.1em] uppercase italic">
-              <span className="text-red-500 font-extrabold">🚨 {emergencyMessage ? emergencyMessage.toUpperCase() : 'CIERRE DE EMERGENCIA'} 🚨</span>
-              <span className="text-[#FF9100] ml-6">🔄 REPROGRAME SU TURNO LIBREMENTE DESDE "MIS RESERVAS" SIN COSTO</span>
-              <span className="text-zinc-500 mx-6">•</span>
-              <span className="text-red-500 font-extrabold">🚨 {emergencyMessage ? emergencyMessage.toUpperCase() : 'CIERRE DE EMERGENCIA'} 🚨</span>
-              <span className="text-[#FF9100] ml-6">🔄 REPROGRAME SU TURNO LIBREMENTE DESDE "MIS RESERVAS" SIN COSTO</span>
-              <span className="text-zinc-500 mx-6">•</span>
+            <div className="whitespace-nowrap animate-marquee inline-block text-[10px] font-black tracking-[0.1em] uppercase italic flex items-center gap-6">
+              <span className="text-red-500 font-extrabold flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 inline" />
+                {emergencyMessage ? emergencyMessage.toUpperCase() : 'CIERRE DE EMERGENCIA'}
+                <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 inline" />
+              </span>
+              <span className="text-[#FF9100] flex items-center gap-1">
+                <RefreshCw className="w-3.5 h-3.5 text-[#FF9100] shrink-0 inline animate-spin" />
+                REPROGRAME SU TURNO LIBREMENTE DESDE "MIS RESERVAS" SIN COSTO
+              </span>
+              <span className="text-zinc-500 mx-2">•</span>
+              <span className="text-red-500 font-extrabold flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 inline" />
+                {emergencyMessage ? emergencyMessage.toUpperCase() : 'CIERRE DE EMERGENCIA'}
+                <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0 inline" />
+              </span>
+              <span className="text-[#FF9100] flex items-center gap-1">
+                <RefreshCw className="w-3.5 h-3.5 text-[#FF9100] shrink-0 inline animate-spin" />
+                REPROGRAME SU TURNO LIBREMENTE DESDE "MIS RESERVAS" SIN COSTO
+              </span>
+              <span className="text-zinc-500 mx-2">•</span>
             </div>
           ) : (
             <div className="whitespace-nowrap animate-marquee inline-block text-[10px] font-black tracking-[0.1em] uppercase italic">
@@ -86,15 +127,13 @@ export default function TopAppBar() {
               {secondaryMarqueeText && (
                 <span className="text-[#009EE3] ml-3 bg-[#009EE3]/15 px-2 py-0.5 rounded-lg border border-[#009EE3]/30 inline-flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#009EE3] animate-ping shrink-0" />
-                  ⚡ {secondaryMarqueeText}
+                  <Sparkles className="w-3.5 h-3.5 text-[#009EE3] shrink-0 inline" />
+                  {secondaryMarqueeText}
                 </span>
               )}
               {isOpen ? (
                 <span className="text-white">
-                  {' • '}HOY <span className="text-[#4be277] font-black">ABIERTO</span> DE{' '}
-                  <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.open}</span>
-                  {' '}A{' '}
-                  <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/20 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.close}</span>
+                  {' • '}HOY <span className="text-[#4be277] font-black">ABIERTO</span> DE {renderActiveHoursText()}
                 </span>
               ) : (
                 <span className="text-zinc-400">
@@ -108,15 +147,13 @@ export default function TopAppBar() {
               {secondaryMarqueeText && (
                 <span className="text-[#009EE3] ml-3 bg-[#009EE3]/15 px-2 py-0.5 rounded-lg border border-[#009EE3]/30 inline-flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#009EE3] animate-ping shrink-0" />
-                  ⚡ {secondaryMarqueeText}
+                  <Sparkles className="w-3.5 h-3.5 text-[#009EE3] shrink-0 inline" />
+                  {secondaryMarqueeText}
                 </span>
               )}
               {isOpen ? (
                 <span className="text-white">
-                  {' • '}HOY <span className="text-[#4be277] font-black">ABIERTO</span> DE{' '}
-                  <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/30 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.open}</span>
-                  {' '}A{' '}
-                  <span className="bg-[#4be277]/10 text-[#4be277] border border-[#4be277]/30 px-1.5 py-0.5 rounded font-mono font-black">{timeRange.close}</span>
+                  {' • '}HOY <span className="text-[#4be277] font-black">ABIERTO</span> DE {renderActiveHoursText()}
                 </span>
               ) : (
                 <span className="text-zinc-400">

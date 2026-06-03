@@ -20,8 +20,9 @@ export default function ProfileView() {
   const paramView = searchParams.get('view');
 
   const { 
-    showToast, eliteKey, setEliteKey, vipKey, setVipKey, saveSettings, adminPhone, schedule, 
+    showToast, eliteKey, setEliteKey, vipKey, setVipKey, universalUserKey, setUniversalUserKey, saveSettings, adminPhone, schedule, 
     appLicenseActive, webLicenseActive, maintenanceMode, setMaintenanceMode, emergencyMode, setEmergencyMode, 
+    emergencyType, setEmergencyType,
     emergencyMessage, setEmergencyMessage, notifications, setNotifications, stadiumName, setStadiumName, 
     marqueeText, setMarqueeText, secondaryMarqueeText, setSecondaryMarqueeText, setUserAvatar, 
     setUserName, setUserRole, allBookings, 
@@ -59,17 +60,29 @@ export default function ProfileView() {
   const [loading, setLoading] = useState(true);
 
   // Separate Windows (Ventanas) for each Admin and License
-  const [showWebWindow, setShowWebWindow] = useState(false);
+  const [showWebWindow, setShowWebWindow] = useState(() => {
+    const searchParamsTemp = new URLSearchParams(window.location.search);
+    const tab = searchParamsTemp.get('tab');
+    const license = searchParamsTemp.get('license');
+    const modal = searchParamsTemp.get('modal');
+    return (tab === 'licencias' && license === 'web') || modal === 'web_console' || modal === 'vercel';
+  });
+  const [webConsoleActiveTab, setWebConsoleActiveTab] = useState<'config' | 'metrics'>(() => {
+    const searchParamsTemp = new URLSearchParams(window.location.search);
+    const modal = searchParamsTemp.get('modal');
+    return modal === 'vercel' ? 'metrics' : 'config';
+  });
   const [showAppWindow, setShowAppWindow] = useState(false);
   const [showEmergencyWindow, setShowEmergencyWindow] = useState(false);
   const [showTransferWindow, setShowTransferWindow] = useState(false);
   const [showCantinaWindow, setShowCantinaWindow] = useState(false);
   const [showMaintenanceWindow, setShowMaintenanceWindow] = useState(false);
-
-  const [showVercelMetricsWindow, setShowVercelMetricsWindow] = useState(() => {
+  const [showCodesWindow, setShowCodesWindow] = useState(false);
+  const [showAnalyticsWindow, setShowAnalyticsWindow] = useState(() => {
     const searchParamsTemp = new URLSearchParams(window.location.search);
-    return searchParamsTemp.get('tab') === 'ajustes' && searchParamsTemp.get('modal') === 'vercel';
+    return searchParamsTemp.get('tab') === 'ajustes' && searchParamsTemp.get('modal') === 'analytics';
   });
+
   const [showStorageBackupWindow, setShowStorageBackupWindow] = useState(() => {
     const searchParamsTemp = new URLSearchParams(window.location.search);
     return searchParamsTemp.get('tab') === 'ajustes' && searchParamsTemp.get('modal') === 'backup';
@@ -100,6 +113,8 @@ export default function ProfileView() {
   const [webSyncFrequency, setWebSyncFrequency] = useState(() => localStorage.getItem('ramito_web_sync_frequency') || 'Tiempo Real (Live)');
   const [isVercelDeploying, setIsVercelDeploying] = useState(false);
   const [vercelDeployLogs, setVercelDeployLogs] = useState<string[]>([]);
+  const [vercelPlan, setVercelPlan] = useState(() => localStorage.getItem('ramito_vercel_plan') || 'free');
+  const [vercelAutoUpgrade, setVercelAutoUpgrade] = useState(() => localStorage.getItem('ramito_vercel_autoupgrade') === 'true');
 
   // States for APP License Options (Separated and Complete)
   const [appDaysRemaining, setAppDaysRemaining] = useState(() => parseInt(localStorage.getItem('ramito_app_days_remaining') || '28', 10));
@@ -109,27 +124,40 @@ export default function ProfileView() {
   const [appPushId, setAppPushId] = useState(() => localStorage.getItem('ramito_app_push_id') || 'fcm-token-id-9485295-a');
   const [appOfflineCache, setAppOfflineCache] = useState(() => localStorage.getItem('ramito_app_offline_cache') || 'Pre-cargar reservas y perfiles');
   const [testPushMessage, setTestPushMessage] = useState('');
+  const [elitePhone, setElitePhone] = useState(() => localStorage.getItem('ramito_elite_phone') || '+51 987 654 321');
 
   // States for Security tab
   const [newEliteKey, setNewEliteKey] = useState(eliteKey);
   const [newVipKey, setNewVipKey] = useState(vipKey);
+  const [newUniversalUserKey, setNewUniversalUserKey] = useState(universalUserKey);
   const [newAdminPhone, setNewAdminPhone] = useState(adminPhone);
   const [newPersonalKey, setNewPersonalKey] = useState('');
+  const [newPersonalPin, setNewPersonalPin] = useState('');
+  const [newPersonalPhone, setNewPersonalPhone] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [personalKeyVisible, setPersonalKeyVisible] = useState(false);
+  const [personalPinVisible, setPersonalPinVisible] = useState(false);
   const [purgingSessions, setPurgingSessions] = useState(false);
   const [newStadiumName, setNewStadiumName] = useState(stadiumName);
 
   const [newWeekdayOpen, setNewWeekdayOpen] = useState(schedule?.weekday?.open || '18:00');
   const [newWeekdayClose, setNewWeekdayClose] = useState(schedule?.weekday?.close || '23:00');
+  const [newWeekdayOpen2, setNewWeekdayOpen2] = useState(schedule?.weekday?.open2 || '08:00');
+  const [newWeekdayClose2, setNewWeekdayClose2] = useState(schedule?.weekday?.close2 || '13:00');
+  const [newWeekdayUseTwoShifts, setNewWeekdayUseTwoShifts] = useState(schedule?.weekday?.useTwoShifts || false);
+
   const [newWeekendOpen, setNewWeekendOpen] = useState(schedule?.weekend?.open || '15:00');
   const [newWeekendClose, setNewWeekendClose] = useState(schedule?.weekend?.close || '23:00');
+  const [newWeekendOpen2, setNewWeekendOpen2] = useState(schedule?.weekend?.open2 || '08:00');
+  const [newWeekendClose2, setNewWeekendClose2] = useState(schedule?.weekend?.close2 || '13:00');
+  const [newWeekendUseTwoShifts, setNewWeekendUseTwoShifts] = useState(schedule?.weekend?.useTwoShifts || false);
 
   const [supportEmail, setSupportEmail] = useState(() => localStorage.getItem('ramito_support_email') || 'soporte@ramitofut.com');
   const [supportIg, setSupportIg] = useState(() => localStorage.getItem('ramito_support_ig') || '@ramitofut');
   const [activationCode, setActivationCode] = useState('');
   const [maintenanceBg, setMaintenanceBg] = useState(() => localStorage.getItem('ramito_maintenance_bg') || '');
   const [maintenanceCustomMsg, setMaintenanceCustomMsg] = useState(() => localStorage.getItem('ramito_maintenance_msg') || 'Estamos realizando mejoras en nuestra aplicación móvil para ofrecerles un servicio más rápido y seguro. Las funciones de reserva estarán disponibles nuevamente a la brevedad.');
+  const [verifyEliteKey, setVerifyEliteKey] = useState('');
 
   const [court1Policy, setCourt1Policy] = useState(() => localStorage.getItem('ramito_court1_policy') || 'CANCELACIÓN GRATUITA HASTA 24 HORAS ANTES DEL INICIO. EL USO DE CHIMPUNES CON COCOS GRANDES ESTÁ PROHIBIDO POR CUIDADO DEL CÉSPED.');
   const [showCourt1PolicyWindow, setShowCourt1PolicyWindow] = useState(false);
@@ -179,8 +207,15 @@ export default function ProfileView() {
   useEffect(() => {
     if (schedule?.weekday?.open) setNewWeekdayOpen(schedule.weekday.open);
     if (schedule?.weekday?.close) setNewWeekdayClose(schedule.weekday.close);
+    if (schedule?.weekday?.open2) setNewWeekdayOpen2(schedule.weekday.open2);
+    if (schedule?.weekday?.close2) setNewWeekdayClose2(schedule.weekday.close2);
+    if (schedule?.weekday?.useTwoShifts !== undefined) setNewWeekdayUseTwoShifts(schedule.weekday.useTwoShifts);
+
     if (schedule?.weekend?.open) setNewWeekendOpen(schedule.weekend.open);
     if (schedule?.weekend?.close) setNewWeekendClose(schedule.weekend.close);
+    if (schedule?.weekend?.open2) setNewWeekendOpen2(schedule.weekend.open2);
+    if (schedule?.weekend?.close2) setNewWeekendClose2(schedule.weekend.close2);
+    if (schedule?.weekend?.useTwoShifts !== undefined) setNewWeekendUseTwoShifts(schedule.weekend.useTwoShifts);
   }, [schedule]);
 
   useEffect(() => {
@@ -190,6 +225,34 @@ export default function ProfileView() {
       const storedEmail = localStorage.getItem('ramito_user_email');
       if (storedEmail) {
         setNewEmail(storedEmail);
+      }
+    }
+    if (userData?.password) {
+      setNewPersonalKey(userData.password);
+    } else {
+      const storedPw = localStorage.getItem('ramito_user_pw');
+      if (storedPw) {
+        setNewPersonalKey(storedPw);
+      }
+    }
+    if (userData?.pin) {
+      setNewPersonalPin(userData.pin);
+    } else {
+      const storedPin = localStorage.getItem('ramito_user_pin');
+      if (storedPin) {
+        setNewPersonalPin(storedPin);
+      } else {
+        setNewPersonalPin('');
+      }
+    }
+    if (userData?.phone) {
+      setNewPersonalPhone(userData.phone);
+    } else {
+      const storedPhone = localStorage.getItem('ramito_user_phone');
+      if (storedPhone) {
+        setNewPersonalPhone(storedPhone);
+      } else {
+        setNewPersonalPhone('+51 987 654 321');
       }
     }
   }, [userData]);
@@ -808,6 +871,11 @@ export default function ProfileView() {
       showToast('Por favor ingrese un correo de acceso válido', 'error');
       return;
     }
+    const trimmedPhone = newPersonalPhone ? newPersonalPhone.trim() : '';
+    if (!trimmedPhone) {
+      showToast('Por favor ingrese un teléfono / WhatsApp de contacto', 'error');
+      return;
+    }
     
     try {
       const uppercaseName = newProfileName.toUpperCase();
@@ -815,7 +883,8 @@ export default function ProfileView() {
       
       const profileUpdates: any = {
         name: uppercaseName,
-        email: emailLower
+        email: emailLower,
+        phone: trimmedPhone
       };
 
       if (newPersonalKey) {
@@ -827,9 +896,46 @@ export default function ProfileView() {
         localStorage.setItem('ramito_user_pw', newPersonalKey);
       }
       
+      const trimmedPin = newPersonalPin ? newPersonalPin.trim() : '';
+      if (trimmedPin) {
+        if (trimmedPin.length < 4 || trimmedPin.length > 12) {
+          showToast('El PIN o Llave Secundaria debe tener entre 4 y 12 caracteres', 'error');
+          return;
+        }
+        profileUpdates.pin = trimmedPin;
+        localStorage.setItem('ramito_user_pin', trimmedPin);
+      } else {
+        profileUpdates.pin = '';
+        localStorage.removeItem('ramito_user_pin');
+      }
+      
       localStorage.setItem('ramito_user_name', uppercaseName);
       localStorage.setItem('ramito_user_email', emailLower);
+      localStorage.setItem('ramito_user_phone', trimmedPhone);
       setUserName(uppercaseName);
+
+      // Sync with local simulated profiles database if offline
+      try {
+        const savedProfilesStr = localStorage.getItem('ramito_profiles');
+        const profiles = savedProfilesStr ? JSON.parse(savedProfilesStr) : [
+          { id: 'master_access_elite', email: 'admin@ramito.com', password: 'ELITE_PASSWORD', name: 'Elite Admin', role: 'admin_elite', pin: 'ELITE26', phone: '+51 987 654 321' },
+          { id: 'master_access_vip', email: 'vip@ramito.com', password: 'VIP_PASSWORD', name: 'VIP Admin', role: 'admin_vip', pin: 'VIP26', phone: '+51 912 345 678' },
+          { id: 'player_1', email: 'agus@ramito.com', password: 'agus2026', name: 'Agus Castro', role: 'player', pin: 'agus26', phone: '+51 987 654 321' }
+        ];
+        const updatedProfiles = profiles.map((p: any) => {
+          const isSameUser = 
+            (userId && p.id === userId) ||
+            p.email.toLowerCase() === emailLower ||
+            (userRole && userRole.includes('admin') && p.role === userRole);
+          if (isSameUser) {
+            return { ...p, ...profileUpdates };
+          }
+          return p;
+        });
+        localStorage.setItem('ramito_profiles', JSON.stringify(updatedProfiles));
+      } catch (e) {
+        console.error("Local profile update error:", e);
+      }
 
       if (userId && userId !== 'master_access' && isSupabaseConfigured) {
         const { error } = await supabase
@@ -837,7 +943,7 @@ export default function ProfileView() {
           .update(profileUpdates)
           .eq('id', userId);
         
-        if (error) {
+         if (error) {
           console.warn("Supabase profiles update warning:", error);
         } else {
           await fetchUserData();
@@ -846,24 +952,23 @@ export default function ProfileView() {
 
       setUserData((prev: any) => prev ? { ...prev, ...profileUpdates } : profileUpdates);
 
-      // Save master registration keys depending on role
+      // REGLA DE ORO / GOLDEN RULE: Aislamiento total de llaves maestras de registro entre roles.
       if (userRole === 'admin_elite') {
         await saveSettings({
-          elite_key: newEliteKey,
-          vip_key: newVipKey
+          elite_key: newEliteKey
         });
         setEliteKey(newEliteKey);
-        setVipKey(newVipKey);
+        localStorage.setItem('ramito_elite_key', newEliteKey);
       } else if (userRole === 'admin_vip') {
         await saveSettings({
           vip_key: newVipKey
         });
         setVipKey(newVipKey);
+        localStorage.setItem('ramito_vip_key', newVipKey);
       }
 
       addAuditLog('CONFIGURACIÓN DE CUENTA', `El operador actualizó los datos de su cuenta y llaves de acceso.`, 'success');
       showToast('¡Configuración de cuenta guardada con éxito!', 'success');
-      setNewPersonalKey('');
       setShowProfileModal(false);
     } catch (err) {
       console.error(err);
@@ -876,6 +981,7 @@ export default function ProfileView() {
   const userName = userData?.name || localStorage.getItem('ramito_user_name') || 'Cargando...';
   const isReadOnly = userRole !== 'admin_elite' && userRole !== 'admin_vip';
   const isLicensingReadOnly = userRole !== 'admin_elite';
+  const isMaintenanceReadOnly = userRole !== 'admin_elite';
 
   const [newProfileName, setNewProfileName] = useState('');
   
@@ -892,20 +998,29 @@ export default function ProfileView() {
   }, [userId]);
 
   useEffect(() => {
+    setNewUniversalUserKey(universalUserKey);
+  }, [universalUserKey]);
+
+  useEffect(() => {
     const tabParam = searchParams.get('tab');
     const licenseParam = searchParams.get('license');
     const modalParam = searchParams.get('modal');
     if (tabParam === 'licencias') {
       setActiveTab('licencias');
-      if (licenseParam === 'web') {
+      if (licenseParam === 'web' || modalParam === 'web_console') {
         setShowWebWindow(true);
+        setWebConsoleActiveTab('config');
+      } else if (licenseParam === 'web_metrics' || modalParam === 'vercel') {
+        setShowWebWindow(true);
+        setWebConsoleActiveTab('metrics');
       } else if (licenseParam === 'app') {
         setShowAppWindow(true);
       }
     } else if (tabParam === 'ajustes') {
       setActiveTab('ajustes');
       if (modalParam === 'vercel') {
-        setShowVercelMetricsWindow(true);
+        setShowWebWindow(true);
+        setWebConsoleActiveTab('metrics');
       } else if (modalParam === 'backup') {
         setShowStorageBackupWindow(true);
       }
@@ -918,13 +1033,49 @@ export default function ProfileView() {
 
   const fetchUserData = async () => {
     try {
+      const currentRole = localStorage.getItem('ramito_user_role') || 'player';
+      let defaultPw = '';
+      if (currentRole === 'admin_elite') {
+        defaultPw = 'ELITE_PASSWORD';
+      } else if (currentRole === 'admin_vip') {
+        defaultPw = 'VIP_PASSWORD';
+      } else {
+        defaultPw = 'agus2026';
+      }
+
+      let localPw = localStorage.getItem('ramito_user_pw') || '';
+      if (localPw && (localPw.includes('•') || localPw.includes('●'))) {
+        localPw = '';
+      }
+
+      const getOfflineMatchedUser = () => {
+        let matchedProfile: any = null;
+        try {
+          const storedProfiles = localStorage.getItem('ramito_profiles');
+          if (storedProfiles) {
+            const list = JSON.parse(storedProfiles);
+            matchedProfile = list.find((p: any) => 
+              (userId && p.id === userId) || 
+              p.email?.toLowerCase() === localStorage.getItem('ramito_user_email')?.toLowerCase() ||
+              (currentRole && currentRole.includes('admin') && p.role === currentRole)
+            );
+          }
+        } catch (e) {
+          console.error("Local profile match fetch error:", e);
+        }
+        return matchedProfile;
+      };
+
       if (!isSupabaseConfigured || userId === 'master_access') {
+        const localProf = getOfflineMatchedUser();
         const simulatedUser = {
-          id: userId || 'master_access',
-          name: localStorage.getItem('ramito_user_name') || 'Élite Admin',
-          role: localStorage.getItem('ramito_user_role') || 'admin_elite',
-          email: localStorage.getItem('ramito_user_email') || 'admin@ramito.com',
-          password: localStorage.getItem('ramito_user_pw') || '••••'
+          id: userId || localProf?.id || 'master_access',
+          name: localStorage.getItem('ramito_user_name') || localProf?.name || 'Élite Admin',
+          role: localProf?.role || currentRole,
+          email: localStorage.getItem('ramito_user_email') || localProf?.email || 'admin@ramito.com',
+          password: localStorage.getItem('ramito_user_pw') || localProf?.password || localPw || defaultPw,
+          pin: localStorage.getItem('ramito_user_pin') || localProf?.pin || '',
+          phone: localStorage.getItem('ramito_user_phone') || localProf?.phone || '+51 987 654 321'
         };
         setUserData(simulatedUser);
         return;
@@ -938,19 +1089,65 @@ export default function ProfileView() {
 
       const response = await Promise.race([queryPromise, timeoutPromise]) as any;
       if (response && response.data) {
-        setUserData(response.data);
+        if (response.data.password && (response.data.password.includes('•') || response.data.password.includes('●'))) {
+          response.data.password = localPw || defaultPw;
+        }
+        // Force merge the locally saved values to preserve edited email/pin/name/password
+        const mergedUser = {
+          ...response.data,
+          email: localStorage.getItem('ramito_user_email') || response.data.email || 'admin@ramito.com',
+          name: localStorage.getItem('ramito_user_name') || response.data.name || 'Élite Admin',
+          password: localStorage.getItem('ramito_user_pw') || response.data.password || defaultPw,
+          pin: localStorage.getItem('ramito_user_pin') || response.data.pin || '',
+          phone: localStorage.getItem('ramito_user_phone') || response.data.phone || response.data.phone || '+51 987 654 321'
+        };
+        setUserData(mergedUser);
       } else {
         throw new Error('No data found');
       }
     } catch (err) {
       console.warn('Error fetching user data from Supabase, loading fallback state immediately:', err);
-      setUserData({
-        id: userId,
-        name: localStorage.getItem('ramito_user_name') || 'Élite Admin',
-        role: localStorage.getItem('ramito_user_role') || 'admin_elite',
-        email: localStorage.getItem('ramito_user_email') || 'admin@ramito.com',
-        password: localStorage.getItem('ramito_user_pw') || '••••'
-      });
+      const currentRole = localStorage.getItem('ramito_user_role') || 'player';
+      let defaultPw = '';
+      if (currentRole === 'admin_elite') {
+        defaultPw = 'ELITE_PASSWORD';
+      } else if (currentRole === 'admin_vip') {
+        defaultPw = 'VIP_PASSWORD';
+      } else {
+        defaultPw = 'agus2026';
+      }
+
+      let localPw = localStorage.getItem('ramito_user_pw') || '';
+      if (localPw && (localPw.includes('•') || localPw.includes('●'))) {
+        localPw = '';
+      }
+
+      const localProf = (() => {
+        try {
+          const storedProfiles = localStorage.getItem('ramito_profiles');
+          if (storedProfiles) {
+            const list = JSON.parse(storedProfiles);
+            return list.find((p: any) => 
+              (userId && p.id === userId) || 
+              p.email?.toLowerCase() === localStorage.getItem('ramito_user_email')?.toLowerCase() ||
+              (currentRole && currentRole.includes('admin') && p.role === currentRole)
+            );
+          }
+        } catch (e) {}
+        return null;
+      })();
+
+      // Ensure local state always takes priority in the fallback simulated block
+      const fallbackUser = {
+        id: userId || localProf?.id || 'master_access',
+        name: localStorage.getItem('ramito_user_name') || localProf?.name || 'Élite Admin',
+        role: localProf?.role || currentRole,
+        email: localStorage.getItem('ramito_user_email') || localProf?.email || 'admin@ramito.com',
+        password: localStorage.getItem('ramito_user_pw') || localProf?.password || localPw || defaultPw,
+        pin: localStorage.getItem('ramito_user_pin') || localProf?.pin || '',
+        phone: localStorage.getItem('ramito_user_phone') || localProf?.phone || '+51 987 654 321'
+      };
+      setUserData(fallbackUser);
     } finally {
       setLoading(false);
     }
@@ -1006,25 +1203,43 @@ export default function ProfileView() {
 
       showToast('¡LLAVE DE ACCESO ACTUALIZADA!', 'success');
       addAuditLog('SEGURIDAD', 'El operador actualizó su llave de acceso personal con éxito.', 'success');
-      setNewPersonalKey('');
     } catch (err) {
       showToast('Error al actualizar tu llave');
     }
   };
 
-  const generateStrongKey = (type: 'elite' | 'vip') => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let key = '';
-    for (let i = 0; i < 8; i++) {
-      key += chars.charAt(Math.floor(Math.random() * chars.length));
+  const generateStrongKey = (type: 'elite' | 'vip' | 'universal' | 'personal' | 'pin') => {
+    if (type === 'pin') {
+      const pinChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let pinCode = '';
+      for (let i = 0; i < 8; i++) {
+        pinCode += pinChars.charAt(Math.floor(Math.random() * pinChars.length));
+      }
+      setNewPersonalPin(pinCode);
+      showToast('¡PIN Alfanumérico Sugerido con éxito!', 'success');
+      return;
     }
-    const finalKey = `${type.toUpperCase()}-${key}`;
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let segments = [];
+    for (let s = 0; s < 3; s++) {
+      let segment = '';
+      for (let i = 0; i < 4; i++) {
+        segment += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      segments.push(segment);
+    }
+    const finalKey = `${type === 'universal' ? 'USER' : (type === 'personal' ? 'PLAY' : type.toUpperCase())}-${segments.join('-')}`;
     if (type === 'elite') {
       setNewEliteKey(finalKey);
-    } else {
+    } else if (type === 'vip') {
       setNewVipKey(finalKey);
+    } else if (type === 'universal') {
+      setNewUniversalUserKey(finalKey);
+    } else {
+      setNewPersonalKey(finalKey);
     }
-    showToast(`¡Llave sugerida para ${type.toUpperCase()} generada con éxito!`, 'success');
+    const labelType = type === 'universal' ? 'UNIVERSAL' : (type === 'personal' ? 'MAESTRA JUGADOR' : type.toUpperCase());
+    showToast(`¡Llave de ingreso ${labelType} sugerida con éxito!`, 'success');
   };
 
   const handlePurgeSessions = async () => {
@@ -1042,13 +1257,25 @@ export default function ProfileView() {
     try {
       await saveSettings({
         schedule: {
-          weekday: { open: newWeekdayOpen, close: newWeekdayClose },
-          weekend: { open: newWeekendOpen, close: newWeekendClose }
+          weekday: { 
+            open: newWeekdayOpen, 
+            close: newWeekdayClose, 
+            open2: newWeekdayOpen2, 
+            close2: newWeekdayClose2, 
+            useTwoShifts: newWeekdayUseTwoShifts 
+          },
+          weekend: { 
+            open: newWeekendOpen, 
+            close: newWeekendClose, 
+            open2: newWeekendOpen2, 
+            close2: newWeekendClose2, 
+            useTwoShifts: newWeekendUseTwoShifts 
+          }
         }
       });
       addAuditLog(
         'HORARIOS DEL COMPLEJO', 
-        `Actualización ordinaria de horarios de atención efectuada: LUNES-VIERNES (${newWeekdayOpen} a ${newWeekdayClose}) - SÁBADO-DOMINGO (${newWeekendOpen} a ${newWeekendClose}). Estado sincronizado en tiempo real.`, 
+        `Actualización ordinaria de horarios de atención efectuada: LUNES-VIERNES (${newWeekdayOpen} a ${newWeekdayClose}${newWeekdayUseTwoShifts ? ` y ${newWeekdayOpen2} a ${newWeekdayClose2}` : ''}) - SÁBADO-DOMINGO (${newWeekendOpen} a ${newWeekendClose}${newWeekendUseTwoShifts ? ` y ${newWeekendOpen2} a ${newWeekendClose2}` : ''}). Estado sincronizado en tiempo real.`, 
         'success'
       );
       showToast('Horarios del complejo actualizados', 'success');
@@ -1065,6 +1292,8 @@ export default function ProfileView() {
     localStorage.setItem('ramito_web_payment_key', webPaymentKey);
     localStorage.setItem('ramito_web_allow_registrations', String(webAllowRegistrations));
     localStorage.setItem('ramito_web_sync_frequency', webSyncFrequency);
+    localStorage.setItem('ramito_vercel_plan', vercelPlan);
+    localStorage.setItem('ramito_vercel_autoupgrade', String(vercelAutoUpgrade));
 
     try {
       await saveSettings({
@@ -1091,6 +1320,7 @@ export default function ProfileView() {
     localStorage.setItem('ramito_app_push_provider', appPushProvider);
     localStorage.setItem('ramito_app_push_id', appPushId);
     localStorage.setItem('ramito_app_offline_cache', appOfflineCache);
+    localStorage.setItem('ramito_elite_phone', elitePhone);
 
     try {
       await saveSettings({
@@ -1195,55 +1425,103 @@ export default function ProfileView() {
                 )}
               </span>
               
-              <button
-                type="button"
-                onClick={() => {
-                  setShowProfileModal(true);
-                  setShowAdvancedConfig(true);
-                }}
-                className="self-start flex items-center gap-1.5 px-2.5 py-1.5 bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/25 text-[#4be277] hover:border-[#4be277]/40 rounded-xl text-[8.5px] font-black uppercase tracking-widest italic font-sans transition-all active:scale-[0.97]"
-              >
-                <Settings className="w-3 h-3 animate-spin duration-3000" />
-                Configurar Cuenta
-              </button>
+              <div className="flex flex-wrap gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProfileModal(true);
+                    setShowAdvancedConfig(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/25 text-[#4be277] hover:border-[#4be277]/40 rounded-xl text-[8.5px] font-black uppercase tracking-widest italic font-sans transition-all active:scale-[0.97]"
+                >
+                  <Settings className="w-3 h-3 animate-spin duration-3000" />
+                  Configurar Cuenta
+                </button>
+                
+                {!(userRole === 'admin_elite' || userRole === 'admin_vip') && (
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 hover:border-red-500/40 rounded-xl text-[8.5px] font-black uppercase tracking-widest italic font-sans transition-all active:scale-[0.97]"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    Cerrar Sesión
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-       {/* TABS NAVEGACIÓN */}
-      <div className="flex gap-1.5 p-1.5 glass-panel rounded-2xl border border-white/5 mb-8 overflow-x-auto scrollbar-none">
-        {(userRole?.includes('admin')
-          ? ['licencias', 'ajustes', 'seguridad', 'noticia', 'analytics'] as const
-          : ['seguridad', 'noticia'] as const
-        ).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as any)}
-            className={`flex-1 py-3 px-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0 ${
-              activeTab === tab 
-                ? tab === 'analytics'
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-white/10 text-white shadow-xl border border-white/10' 
-                : 'text-[#bccbb9]/40 hover:text-[#bccbb9]/60'
-            }`}
-          >
-            {tab === 'seguridad' 
-              ? 'AUDITORÍA' 
-              : tab === 'licencias' 
-              ? 'LICENCIAS' 
-              : tab === 'ajustes' 
-              ? 'AJUSTES' 
-              : tab === 'noticia'
-              ? 'MARQUESINA'
-              : '📊 ANALÍTICA'}
-          </button>
-        ))}
-      </div>
+      {/* TABS NAVEGACIÓN - SOLAMENTE VISIBLE PARA ADMINISTRADORES */}
+      {userRole?.includes('admin') && (
+        <div className="flex gap-1.5 p-1.5 glass-panel rounded-2xl border border-white/5 mb-8 overflow-x-auto scrollbar-none animate-fade-in">
+          {(['licencias', 'ajustes', 'seguridad', 'noticia'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              className={`flex-1 py-3 px-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0 ${
+                activeTab === tab 
+                  ? 'bg-white/10 text-white shadow-xl border border-white/10' 
+                  : 'text-[#bccbb9]/40 hover:text-[#bccbb9]/60'
+              }`}
+            >
+              {tab === 'seguridad' 
+                ? 'AUDITORÍA' 
+                : tab === 'licencias' 
+                ? 'LICENCIAS' 
+                : tab === 'ajustes' 
+                ? 'AJUSTES' 
+                : 'MARQUESINA'}
+            </button>
+          ))}
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
+        {!userRole?.includes('admin') && (
+          <motion.div
+            key="player-dashboard"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="space-y-6"
+          >
+            {/* BOTÓN ASISTENCIA WHATSAPP PARA JUGADORES */}
+            <div className="glass-panel rounded-[2rem] border border-white/5 p-5 space-y-4 bg-zinc-950/60 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#25D366]/5 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#25D366]/10 flex items-center justify-center border border-[#25D366]/20 shrink-0">
+                  <MessageCircle className="w-5 h-5 text-[#25D366]" />
+                </div>
+                <div className="text-left">
+                  <span className="text-[11px] font-black text-white uppercase tracking-wider block italic font-sans font-extrabold">Asistencia WhatsApp Soporte</span>
+                  <span className="text-[8px] font-mono text-[#bccbb9]/40 tracking-wider">RESOLUCIÓN DE DUDAS Y EXPEDICIONES</span>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-left font-sans">
+                <p className="text-[9.5px] font-bold text-[#bccbb9]/60 uppercase tracking-wide leading-relaxed">
+                  ¿Tienes problemas con tu llave o tu reserva? Comunícate con asistencia directa por WhatsApp del complejo.
+                </p>
+                {adminPhone && <p className="text-sm font-mono font-black text-[#25D366] tracking-widest pt-1">{adminPhone}</p>}
+                <a 
+                  href={`https://wa.me/${adminPhone.replace(/\D/g, '')}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center justify-center gap-2 w-full h-12 bg-[#25D366] text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-[#25D366]/15 active:scale-[0.98] transition-all italic"
+                >
+                  Abrir Chat de Soporte <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* VISTA LICENCIAS COMPLETA */}
-        {activeTab === 'licencias' && (
+        {userRole?.includes('admin') && activeTab === 'licencias' && (
           <motion.div
             key="licencias"
             initial={{ opacity: 0, y: 10 }}
@@ -1262,257 +1540,213 @@ export default function ProfileView() {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              {/* Card Licencia Web */}
-              <div 
-                className="glass-panel rounded-3xl border p-5 space-y-4 bg-zinc-950/60 relative overflow-hidden"
-                style={{ borderColor: webLicenseActive ? 'rgba(75, 226, 119, 0.2)' : 'rgba(239, 68, 68, 0.2)' }}
+              {/* COMPONENTE INTERACTIVO: LICENCIA WEB DE PRODUCCIÓN */}
+              <button
+                onClick={() => setShowWebWindow(true)}
+                className={`w-full text-left glass-panel rounded-3xl border p-5 relative overflow-hidden group hover:border-[#4be277]/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r ${
+                  webLicenseActive
+                    ? 'from-emerald-950/20 to-emerald-900/10 border-[#4be277]/30 shadow-[0_4px_20px_rgba(75,226,119,0.06)]'
+                    : 'from-zinc-950/80 to-zinc-950/40 border-white/5 shadow-lg'
+                }`}
               >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[#4be277]/5 rounded-full blur-3xl pointer-events-none" />
-                
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-                      <Globe className="w-5 h-5 text-emerald-400" />
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#4be277]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#4be277]/10 transition-all duration-500" />
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
+                      webLicenseActive
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.25)] animate-pulse'
+                        : 'bg-emerald-500/10 border-emerald-500/20 text-[#bccbb9] group-hover:bg-[#4be277]/20 group-hover:border-[#4be277]/40'
+                    }`}>
+                      <Globe className="w-6 h-6" />
                     </div>
                     <div>
-                      <span className="text-[11px] font-black text-white uppercase tracking-wider block italic">Licencia Web</span>
-                      <span className="text-[8px] font-mono text-[#bccbb9]/50 tracking-wider">ID: LIC-WEB-2026-FUT</span>
-                    </div>
-                  </div>
-                  <span className={`text-[8px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded border ${
-                    webLicenseActive ? 'bg-[#4be277]/10 border-[#4be277]/30 text-[#4be277]' : 'bg-red-500/10 border-red-500/30 text-red-500'
-                  }`}>
-                    {webLicenseActive ? 'Activo' : 'Inactivo'}
-                  </span>
-                </div>
-
-                <div className="space-y-2 pt-1 border-t border-white/5">
-                  <div className="flex justify-between items-center text-[9px]">
-                    <span className="text-[#bccbb9]/40 uppercase font-black tracking-widest">Dominio Web:</span>
-                    <span className="text-white font-mono font-black">{webDomain}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[9px]">
-                    <span className="text-[#bccbb9]/40 uppercase font-black tracking-widest">Sincronización:</span>
-                    <span className="text-emerald-400 font-black uppercase">{webSyncFrequency}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[9px]">
-                    <span className="text-[#bccbb9]/40 uppercase font-black tracking-widest">Validez Restante:</span>
-                    <span className="text-[#FF9100] font-black uppercase">{webDaysRemaining} Días</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setShowWebWindow(true)}
-                  className="w-full h-12 bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/30 text-[#4be277] transition-all rounded-xl flex items-center justify-center gap-2 font-black text-[9px] uppercase tracking-widest italic"
-                >
-                  <Settings className="w-4 h-4 text-[#4be277]" /> Configurar Licencia Web
-                </button>
-              </div>
-
-              {/* Card Licencia App (PWA) */}
-              <div 
-                className="glass-panel rounded-3xl border p-5 space-y-4 bg-zinc-950/60 relative overflow-hidden"
-                style={{ borderColor: appLicenseActive ? 'rgba(255, 145, 0, 0.2)' : 'rgba(239, 68, 68, 0.2)' }}
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF9100]/5 rounded-full blur-3xl pointer-events-none" />
-
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                      <Smartphone className="w-5 h-5 text-amber-500" />
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-black text-white uppercase tracking-wider block italic">Licencia Móvil APP</span>
-                      <span className="text-[8px] font-mono text-[#bccbb9]/50 tracking-wider">ID: LIC-PWA-2026-FUT</span>
-                    </div>
-                  </div>
-                  <span className={`text-[8px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded border ${
-                    appLicenseActive ? 'bg-[#FF9100]/10 border-[#FF9100]/30 text-amber-500' : 'bg-red-500/10 border-red-500/30 text-red-500'
-                  }`}>
-                    {appLicenseActive ? 'Activo' : 'Inactivo'}
-                  </span>
-                </div>
-
-                <div className="space-y-2 pt-1 border-t border-white/5">
-                  <div className="flex justify-between items-center text-[9px]">
-                    <span className="text-[#bccbb9]/40 uppercase font-black tracking-widest">Nombre de App:</span>
-                    <span className="text-white font-black uppercase">{appPwaShortName}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[9px]">
-                    <span className="text-[#bccbb9]/40 uppercase font-black tracking-widest">Alertas Push:</span>
-                    <span className={`font-black uppercase ${appPushEnabled ? 'text-[#4be277]' : 'text-red-400'}`}>
-                      {appPushEnabled ? 'Habilitadas' : 'Desactivadas'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-[9px]">
-                    <span className="text-[#bccbb9]/40 uppercase font-black tracking-widest">Validez Restante:</span>
-                    <span className="text-[#FF9100] font-black uppercase">{appDaysRemaining} Días</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setShowAppWindow(true)}
-                  className="w-full h-12 bg-[#FF9100]/10 hover:bg-[#FF9100]/20 border border-[#FF9100]/30 text-amber-500 transition-all rounded-xl flex items-center justify-center gap-2 font-black text-[9px] uppercase tracking-widest italic"
-                >
-                  <Settings className="w-4 h-4 text-amber-500" /> Configurar Licencia App
-                </button>
-              </div>
-            </div>
-
-            {/* GESTOR DE CÓDIGOS DE ACTIVACIÓN (SOLO ELITE ADMIN) */}
-            {!isLicensingReadOnly && (
-              <div className="glass-panel rounded-3xl border border-white/5 p-5 space-y-4 bg-zinc-950/60 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
-                
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                    <Key className="w-5 h-5 text-purple-400" />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-black text-white uppercase tracking-wider block italic">Servidor de Códigos (App Móvil PWA)</span>
-                    <span className="text-[8px] font-mono text-[#bccbb9]/50 tracking-wider">CREAR CUPONES DE RECARGA • EXCLUSIVO ELITE</span>
-                  </div>
-                </div>
-
-                {/* Formulario de Creación */}
-                <div className="p-4 bg-black/40 border border-white/5 rounded-2xl space-y-3">
-                  <span className="text-[9px] font-black text-purple-400 uppercase tracking-wider block italic">Generador de Cupones</span>
-                  
-                  <div className="space-y-2">
-                    <label className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Código del Cupón</label>
-                    <div className="flex gap-2">
-                      <input 
-                        type="text"
-                        value={newCodeName}
-                        onChange={(e) => setNewCodeName(e.target.value.toUpperCase())}
-                        placeholder="EJ: RENOVAR-VIP-60D"
-                        className="flex-1 h-10 bg-zinc-950 border border-white/10 rounded-xl px-3 text-[9px] font-black font-mono text-white placeholder-[#bccbb9]/30 outline-none uppercase focus:border-purple-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={generateRandomCode}
-                        className="h-10 px-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[9px] font-black text-white uppercase tracking-wider flex items-center gap-1.5 transition-all outline-none"
-                        title="Generar código aleatorio"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
-                        Generar
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block mb-1">Días de Validez</label>
-                      <select
-                        value={newCodeDays}
-                        onChange={(e) => setNewCodeDays(e.target.value)}
-                        className="w-full h-10 bg-zinc-950 border border-white/10 rounded-xl px-3 text-[9px] font-black text-white outline-none focus:border-purple-500"
-                      >
-                        <option value="30">30 Días</option>
-                        <option value="60">60 Días</option>
-                        <option value="90">90 Días</option>
-                        <option value="180">180 Días</option>
-                        <option value="365">365 Días (1 Año)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block mb-1">Aplica Para</label>
-                      <div className="flex items-center h-10 w-full rounded-xl border border-purple-500/15 bg-purple-500/5 px-3 text-[8.5px] font-bold uppercase tracking-wider text-purple-300">
-                        Sólo APP Móvil PWA
+                      <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-[#4be277] transition-colors">
+                        Licencia Web de Producción
+                      </span>
+                      <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                        DOMINIO: {webDomain} • SINCRONIZACIÓN: {webSyncFrequency}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`w-2 h-2 rounded-full ${webLicenseActive ? 'bg-[#4be277]' : 'bg-red-500 animate-ping'}`} />
+                        <span className={`text-[8px] font-black uppercase tracking-wider font-mono ${webLicenseActive ? 'text-[#4be277]' : 'text-red-400 font-bold'}`}>
+                          {webLicenseActive ? (
+                            vercelPlan === 'free' 
+                              ? 'PLAN GRATUITO VERCEL • ACTIVO SIN EXPIRACIÓN' 
+                              : `LICENCIA ACTIVA • Quedan ${webDomain ? webDaysRemaining : 0} Días`
+                          ) : 'LICENCIA DESACTIVADA'}
+                        </span>
                       </div>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddCustomCode}
-                    className="w-full h-10 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/50 text-purple-300 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all outline-none"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Registrar Cupón Activo
-                  </button>
+                  <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                    <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
                 </div>
+              </button>
 
-                {/* Listado de Códigos Activos */}
-                <div className="space-y-2">
-                  <span className="text-[9px] font-black text-[#bccbb9]/40 uppercase tracking-wider block">Listado de Códigos en Circulación</span>
+              {/* COMPONENTE INTERACTIVO: LICENCIA MÓVIL APP */}
+              <button
+                onClick={() => setShowAppWindow(true)}
+                className={`w-full text-left glass-panel rounded-3xl border p-5 relative overflow-hidden group hover:border-[#FF9100]/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r ${
+                  appLicenseActive
+                    ? 'from-amber-950/20 to-amber-900/10 border-[#FF9100]/35 shadow-[0_4px_20px_rgba(255,145,0,0.06)]'
+                    : 'from-zinc-950/80 to-zinc-950/40 border-white/5 shadow-lg'
+                }`}
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-all duration-500" />
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
+                      appLicenseActive
+                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-pulse'
+                        : 'bg-[#FF9100]/10 border-[#FF9100]/20 text-[#bccbb9] group-hover:bg-[#FF9100]/20 group-hover:border-[#FF9100]/40'
+                    }`}>
+                      <Smartphone className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-amber-400 transition-colors">
+                        Licencia Móvil APP (PWA)
+                      </span>
+                      <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                        APLICACIÓN: {appPwaShortName} • NOTIFICACIONES: {appPushEnabled ? 'HABILITADAS' : 'DESACTIVADAS'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`w-2 h-2 rounded-full ${appLicenseActive ? 'bg-[#FF9100]' : 'bg-red-500 animate-ping'}`} />
+                        <span className={`text-[8px] font-black uppercase tracking-wider font-mono ${appLicenseActive ? 'text-amber-400' : 'text-red-400 font-bold'}`}>
+                          {appLicenseActive ? `LICENCIA ACTIVA • Quedan ${appDaysRemaining} Días` : 'LICENCIA EXPIRADA'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                    <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </div>
+              </button>
+
+              {/* GESTOR DE ASISTENCIA WHATSAPP DE SOPORTE (MOSTRADO ÚNICAMENTE EDITABLE PARA EL ADMIN VIP) */}
+              {userRole === 'admin_vip' && (
+                <div className="glass-panel rounded-3xl border border-white/5 p-5 space-y-4 bg-zinc-950/60 relative overflow-hidden text-left animate-fade-in font-sans">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#25D366]/5 rounded-full blur-3xl pointer-events-none" />
                   
-                  {customCodes.length === 0 ? (
-                    <div className="p-4 rounded-2xl bg-white/[0.01] border border-dashed border-white/5 text-center">
-                      <p className="text-[8.5px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">No hay códigos custom creados</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#25D366]/10 flex items-center justify-center border border-[#25D366]/20 shrink-0">
+                      <MessageCircle className="w-5 h-5 text-[#25D366]" />
                     </div>
-                  ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {customCodes.map((item, index) => {
-                        const itemNumber = customCodes.length - index;
-                        return (
-                          <div 
-                            key={item.id}
-                            className="p-3 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between gap-3"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              {/* Cuadrado de Número con Indicador de Validación */}
-                              <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-[9px] font-black font-mono transition-all border shrink-0 relative ${
-                                item.used 
-                                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)] animate-pulse' 
-                                  : 'bg-white/5 border-white/10 text-[#bccbb9]/50'
-                              }`} title={item.used ? `Cupón #${itemNumber} - VALIDADO` : `Cupón #${itemNumber}`}>
-                                {item.used ? (
-                                  <div className="relative flex items-center justify-center">
-                                    <span className="text-[9px]">{itemNumber}</span>
-                                    <div className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-black w-3.5 h-3.5 rounded-full flex items-center justify-center border border-black shadow">
-                                      <Check className="w-2.5 h-2.5" strokeWidth={4} />
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <span>{itemNumber}</span>
-                                )}
-                              </div>
-
-                              <div className="flex flex-col min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono text-[9.5px] font-black text-white truncate">{item.code}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(item.code);
-                                      showToast('Código copiado al portapapeles', 'success');
-                                    }}
-                                    className="text-[#bccbb9]/45 hover:text-white transition-colors shrink-0"
-                                    title="Copiar código"
-                                  >
-                                    <Copy className="w-3 h-3" />
-                                  </button>
-                                </div>
-                                <span className="text-[7.5px] font-bold text-[#bccbb9]/50 uppercase tracking-wide mt-1 leading-none block">
-                                  +{item.days} DÍAS • MÓVIL PWA
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className={`text-[7.5px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded border ${
-                                item.used 
-                                  ? 'bg-red-500/10 border-red-500/20 text-red-400' 
-                                  : 'bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277]'
-                              }`}>
-                                {item.used ? 'USADO' : 'ACTIVO'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteCustomCode(item.id)}
-                                className="w-7 h-7 bg-red-500/15 hover:bg-red-500/25 text-red-400 rounded-lg flex items-center justify-center transition-all border border-red-500/10 outline-none"
-                                title="Eliminar código"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="text-left font-sans">
+                      <span className="text-[11px] font-black text-white uppercase tracking-wider block italic font-sans font-bold">Asistencia WhatsApp Soporte</span>
+                      <span className="text-[8px] font-mono text-[#bccbb9]/40 tracking-wider">NÚMERO DE TELÉFONO SOPORTE GLOBAL RAMITO FUT SHOW</span>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="space-y-3 text-left font-sans">
+                    <div className="space-y-1.5 font-sans">
+                      <label className="text-[8.5px] font-black text-[#bccbb9]/60 uppercase tracking-widest block font-bold">Número de Soporte WhatsApp</label>
+                      <input 
+                        type="text" 
+                        value={newAdminPhone} 
+                        onChange={(e) => setNewAdminPhone(e.target.value)} 
+                        className="w-full h-11 bg-black/40 border border-white/10 rounded-xl px-4 text-xs font-mono font-bold text-white focus:border-[#25D366]/55 transition-all outline-none" 
+                      />
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1 font-sans">
+                      <button 
+                        type="button"
+                        onClick={async () => {
+                          await saveSettings({ admin_phone: newAdminPhone });
+                          addAuditLog('CAMBIO DE NÚMERO DE ASISTENCIA', `Número de WhatsApp de asistencia configurado a: ${newAdminPhone}`, 'success');
+                          showToast('Número de WhatsApp de asistencia guardado', 'success');
+                        }} 
+                        className="flex-1 h-11 bg-[#25D366] text-white font-black rounded-xl uppercase text-[9px] tracking-widest italic flex items-center justify-center gap-1.5 shadow-lg shadow-[#25D366]/15 hover:opacity-95 transition-all outline-none active:scale-[0.98]"
+                      >
+                        <Save className="w-4 h-4" /> Guardar WhatsApp
+                      </button>
+                      <a 
+                        href={`https://wa.me/${newAdminPhone.replace(/\D/g, '')}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="h-11 px-4 bg-white/5 hover:bg-white/10 text-[#25D366] font-black rounded-xl border border-white/10 flex items-center justify-center transition-all shrink-0 gap-1.5 text-[9px] uppercase tracking-widest italic font-sans"
+                      >
+                        Probar <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* BOTÓN MANTENIMIENTO DEL SISTEMA (ABRE VENTANA FLOTANTE FULL-SCREEN, MOVIDO DIRECTAMENTE AQUÍ) */}
+              <button
+                onClick={() => setShowMaintenanceWindow(true)}
+                className={`w-full text-left glass-panel rounded-3xl border p-5 relative overflow-hidden group hover:border-amber-500/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r ${
+                  maintenanceMode
+                    ? 'from-amber-950/45 to-amber-900/10 border-amber-500/40 shadow-[0_10px_35px_rgba(245,158,11,0.15)]'
+                    : 'from-zinc-950/80 to-zinc-950/40 border-white/5 shadow-lg'
+                }`}
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-all duration-500" />
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
+                      maintenanceMode
+                        ? 'bg-amber-500/20 border-amber-500/45 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-pulse'
+                        : 'bg-amber-500/10 border-amber-500/20 text-amber-500 group-hover:bg-amber-500/20 group-hover:border-amber-500/40'
+                    }`}>
+                      <Wrench className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-amber-400 transition-colors">
+                        Mantenimiento del Sistema
+                      </span>
+                      <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                        SOPORTE TÉCNICO • WALLPAPER DE ESPERA • MENSAJE PERSONALIZADO
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`w-2 h-2 rounded-full ${maintenanceMode ? 'bg-red-500 animate-ping' : 'bg-[#4be277]'}`} />
+                        <span className={`text-[8px] font-black uppercase tracking-wider font-mono ${maintenanceMode ? 'text-red-400 font-bold' : 'text-[#4be277]'}`}>
+                          {maintenanceMode ? 'BLOQUEO ACTIVO / APP EN MANTENIMIENTO' : 'PANTALLA DE ESPERA LIBERADA / OPERANDO'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                    <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* COMPONENTE INTERACTIVO: SERVIDOR DE CÓDIGOS DE ACTIVACIÓN (EXCLUSIVO ELITE) */}
+            {!isLicensingReadOnly && (
+              <button
+                onClick={() => setShowCodesWindow(true)}
+                className="w-full text-left glass-panel rounded-3xl border p-5 relative overflow-hidden group hover:border-purple-500/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-purple-950/20 to-purple-900/10 border-purple-500/30 shadow-[0_4px_20px_rgba(168,85,247,0.06)]"
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-purple-500/10 transition-all duration-500" />
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border border-purple-500/40 text-purple-400 bg-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.25)] group-hover:bg-purple-500/30 transition-all duration-300">
+                      <Key className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-purple-400 transition-colors">
+                        Servidor de Códigos (App Móvil PWA)
+                      </span>
+                      <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                        LLAVES DE ACCESO • CREAR CUPONES DE RECARGA DE DÍAS DE LICENCIA
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                        <span className="text-[8px] font-black uppercase tracking-wider font-mono text-purple-400">
+                          CONSOLA DE CONTROL ELITE ACTIVA • {customCodes.length} CÓDIGOS EN CIRCULACIÓN
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                    <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </div>
+              </button>
             )}
             
             <div className="p-4 bg-zinc-950/40 border border-white/5 rounded-2xl flex gap-3 text-left">
@@ -1528,7 +1762,7 @@ export default function ProfileView() {
         )}
 
         {/* VISTA AJUSTES: CIERRE DE EMERGENCIA Y AUDITORÍA */}
-        {activeTab === 'ajustes' && (
+        {userRole?.includes('admin') && activeTab === 'ajustes' && (
           <motion.div
             key="ajustes"
             initial={{ opacity: 0, y: 10 }}
@@ -1545,46 +1779,6 @@ export default function ProfileView() {
                 Gestione de forma avanzada la auditoría del personal, cierres de emergencia y bloqueo preventivo de reservas.
               </p>
             </div>
-
-            {/* BOTÓN MANTENIMIENTO DEL SISTEMA (ABRE VENTANA FLOTANTE FULL-SCREEN) */}
-            <button
-              onClick={() => setShowMaintenanceWindow(true)}
-              className={`w-full text-left glass-panel rounded-3xl border p-5 relative overflow-hidden group hover:border-amber-500/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r ${
-                maintenanceMode
-                  ? 'from-amber-950/45 to-amber-900/10 border-amber-500/40 shadow-[0_10px_35px_rgba(245,158,11,0.15)]'
-                  : 'from-zinc-950/80 to-zinc-950/40 border-white/5 shadow-lg'
-              }`}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-all duration-500" />
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all duration-300 ${
-                    maintenanceMode
-                      ? 'bg-amber-500/20 border-amber-500/45 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-pulse'
-                      : 'bg-amber-500/10 border-amber-500/20 text-amber-500 group-hover:bg-amber-500/20 group-hover:border-amber-500/40'
-                  }`}>
-                    <Wrench className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-amber-400 transition-colors">
-                      Mantenimiento del Sistema
-                    </span>
-                    <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
-                      SOPORTE TÉCNICO • WALLPAPER DE ESPERA • MENSAJE PERSONALIZADO
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`w-2 h-2 rounded-full ${maintenanceMode ? 'bg-red-500 animate-ping' : 'bg-[#4be277]'}`} />
-                      <span className={`text-[8px] font-black uppercase tracking-wider font-mono ${maintenanceMode ? 'text-red-400 font-bold' : 'text-[#4be277]'}`}>
-                        {maintenanceMode ? 'BLOQUEO ACTIVO / APP EN MANTENIMIENTO' : 'PANTALLA DE ESPERA LIBERADA / OPERANDO'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
-                  <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </div>
-            </button>
 
             {/* CIERRE DE EMERGENCIA AUTOMÁTICO (BOTÓN PREFERENCIAL EN PANTALLA COMPLETA) */}
             <button
@@ -1658,37 +1852,7 @@ export default function ProfileView() {
               </div>
             </button>
 
-            {/* BOTÓN MÉTRICAS DE CONEXIÓN VERCEL Y ANCHO DE BANDA */}
-            <button
-              onClick={() => setShowVercelMetricsWindow(true)}
-              className="w-full text-left glass-panel rounded-3xl border border-white/5 p-5 relative overflow-hidden group hover:border-[#4be277]/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-zinc-950/80 to-zinc-950/40 shadow-lg"
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-blue-500/10 transition-all duration-500" />
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-blue-500/10 border-blue-500/20 text-blue-400 group-hover:bg-blue-500/20 group-hover:border-blue-500/40 transition-all duration-300">
-                    <Activity className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-blue-400 transition-colors">
-                      Métricas de Conexión Vercel y Canales
-                    </span>
-                    <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
-                      ESTADÍSTICAS DEL ANCHO DE BANDA • CONSUMO DE TOKENS • RENDIMIENTO EN LA WEB
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                      <span className="text-[8px] font-black uppercase tracking-wider font-mono text-blue-400">
-                        ANCHO DE BANDA CONSUMIDO: 4.8 GB ESTE MES • MÉTRICAS PROVISIONALES
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
-                  <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </div>
-            </button>
+
 
             {/* BOTÓN RESGUARDO DE BASE DE DATOS Y MULTIMEDIA */}
             <button
@@ -1817,13 +1981,45 @@ export default function ProfileView() {
                 </div>
               </div>
             </button>
+
+            {/* BOTÓN PANEL DE ANALÍTICAS E INTELIGENCIA DE DEMANDA */}
+            <button
+              onClick={() => setShowAnalyticsWindow(true)}
+              className="w-full text-left glass-panel rounded-3xl border border-white/5 p-5 relative overflow-hidden group hover:border-[#10B981]/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-zinc-950/80 to-zinc-950/40 shadow-lg"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-500/10 transition-all duration-500" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-emerald-500/10 border-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/20 group-hover:border-emerald-500/40 transition-all duration-300">
+                    <Activity className="w-6 h-6 animate-pulse" strokeWidth={2.5} />
+                  </div>
+                  <div>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-emerald-400 transition-colors">
+                      Panel de Analíticas de Ocupación e Inteligencia
+                    </span>
+                    <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                      OCUPACIÓN HISTÓRICA • FILTROS POR CANCHA • PATRONES DE DEMANDA DIRECTO
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-[8px] font-black uppercase tracking-wider font-mono text-emerald-400">
+                        MONITOREO DE SATURACIÓN ACTIVO • VER PATRONES DE DEMANDA DE RESERVAS
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                  <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </div>
+            </button>
           </motion.div>
         )}
 
 
 
         {/* VISTA SEGURIDAD (SOLO ADMINS) */}
-        {activeTab === 'seguridad' && (
+        {userRole?.includes('admin') && activeTab === 'seguridad' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
             {!userRole?.includes('admin') ? (
               <div className="space-y-6 animate-fade-in">
@@ -1900,18 +2096,16 @@ export default function ProfileView() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => {
-                          setCashTotal(15000);
-                          setTransferTotal(18000);
-                          setMpTotal(12000);
-                          setLedgerTransactions([
-                            { id: 'tx1', time: '15:30', detail: 'Juan Pérez • Cancha Sintética (18:00)', method: 'Mercado Pago (Aprobado)', amount: 12000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' },
-                            { id: 'tx2', time: '14:15', detail: 'María Gómez • Cancha de Tenis (19:00)', method: 'Efectivo en Puerta', amount: 8000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
-                            { id: 'tx3', time: '12:00', detail: 'Carlos Soto • Cancha Sintética (15:00)', method: 'Transferencia Bancaria', amount: 12000, type: 'transfer', labelColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
-                            { id: 'tx4', time: '10:45', detail: 'Lucas Díaz • Cancha de Pádel (16:30)', method: 'Efectivo en Puerta', amount: 7000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
-                            { id: 'tx5', time: '09:15', detail: 'Andrés Ruiz • Cancha de Pádel (17:30)', method: 'Mercado Pago (API Link)', amount: 6000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' }
-                          ]);
-                          showToast('Valores de caja restablecidos a valores por defecto', 'success');
+                        onClick={async () => {
+                          setCashTotal(0);
+                          setTransferTotal(0);
+                          setMpTotal(0);
+                          setLedgerTransactions([]);
+                          showToast('Valores de caja restablecidos', 'success');
+                          const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+                          if (isSupabaseConfigured) {
+                            await supabase.from('ledger_transactions').delete().neq('id', '0');
+                          }
                         }}
                         className="text-[7px] text-zinc-400 hover:text-white uppercase tracking-widest font-bold bg-white/5 px-2 py-0.5 rounded border border-white/5 transition-all"
                       >
@@ -1936,9 +2130,13 @@ export default function ProfileView() {
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               setCashTotal(prev => prev + 1000);
                               showToast('+1.000 ARS Efectivo registrado', 'success');
+                              const newTx = { id: `tx_${Date.now()}`, time: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}), detail: 'Ajuste Efectivo (+)', method: 'Efectivo', amount: 1000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' };
+                              setLedgerTransactions(prev => [newTx, ...prev]);
+                              const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+                              if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
                             }}
                             className="text-[7px] font-black text-white bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
                           >
@@ -1946,9 +2144,13 @@ export default function ProfileView() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               setCashTotal(prev => Math.max(0, prev - 1000));
                               showToast('-1.000 ARS Efectivo ajustado', 'success');
+                              const newTx = { id: `tx_${Date.now()}`, time: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}), detail: 'Ajuste Efectivo (-)', method: 'Efectivo', amount: -1000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' };
+                              setLedgerTransactions(prev => [newTx, ...prev]);
+                              const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+                              if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
                             }}
                             className="text-[7px] font-black text-zinc-400 bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
                           >
@@ -1972,9 +2174,13 @@ export default function ProfileView() {
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               setTransferTotal(prev => prev + 2000);
                               showToast('+2.000 ARS Transferencia cargada', 'success');
+                              const newTx = { id: `tx_${Date.now()}`, time: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}), detail: 'Ajuste Transferencia (+)', method: 'Transferencia Bancaria', amount: 2000, type: 'transfer', labelColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' };
+                              setLedgerTransactions(prev => [newTx, ...prev]);
+                              const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+                              if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
                             }}
                             className="text-[7px] font-black text-white bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
                           >
@@ -1982,9 +2188,13 @@ export default function ProfileView() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               setTransferTotal(prev => Math.max(0, prev - 2000));
                               showToast('-2.000 ARS Transferencia corregida', 'success');
+                              const newTx = { id: `tx_${Date.now()}`, time: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}), detail: 'Ajuste Transferencia (-)', method: 'Transferencia Bancaria', amount: -2000, type: 'transfer', labelColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' };
+                              setLedgerTransactions(prev => [newTx, ...prev]);
+                              const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+                              if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
                             }}
                             className="text-[7px] font-black text-zinc-400 bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
                           >
@@ -2009,9 +2219,13 @@ export default function ProfileView() {
                         <div className="flex gap-1">
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               setMpTotal(prev => prev + 5000);
                               showToast('+5.000 ARS Mercado Pago añadido', 'success');
+                              const newTx = { id: `tx_${Date.now()}`, time: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}), detail: 'Ajuste Mercado Pago (+)', method: 'Mercado Pago', amount: 5000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' };
+                              setLedgerTransactions(prev => [newTx, ...prev]);
+                              const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+                              if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
                             }}
                             className="text-[7px] font-black text-white bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-[#009EE3]/25 transition-all"
                           >
@@ -2019,9 +2233,13 @@ export default function ProfileView() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                               setMpTotal(prev => Math.max(0, prev - 5000));
                               showToast('-5.000 ARS Mercado Pago ajustado', 'success');
+                              const newTx = { id: `tx_${Date.now()}`, time: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}), detail: 'Ajuste Mercado Pago (-)', method: 'Mercado Pago', amount: -5000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' };
+                              setLedgerTransactions(prev => [newTx, ...prev]);
+                              const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+                              if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
                             }}
                             className="text-[7px] font-black text-zinc-400 bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
                           >
@@ -2100,7 +2318,7 @@ export default function ProfileView() {
                     <div className="flex items-end">
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           const pInput = document.getElementById('sim_player_name') as HTMLInputElement;
                           const aInput = document.getElementById('sim_charge_amount') as HTMLSelectElement;
                           const player = (pInput?.value || 'Juan Gómez').trim().toUpperCase();
@@ -2121,8 +2339,9 @@ export default function ProfileView() {
                             type: 'mercadopago',
                             labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20 animate-pulse'
                           };
-                          setLedgerTransactions(prev => [newTx, ...prev.slice(0, 4)]);
-
+                          setLedgerTransactions(prev => [newTx, ...prev]);
+                          const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+                          if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
                           // Trigger High Impact system notification representing live webhook
                           const systemWebNotification = {
                             id: `mp_notkey_${Date.now()}`,
@@ -2155,9 +2374,11 @@ export default function ProfileView() {
                     <h5 className="text-[9px] font-black text-white uppercase italic tracking-widest font-bold">Ledger de Facturación Diaria</h5>
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setLedgerTransactions([]);
                         showToast('Ledger de transacciones limpiado', 'success');
+                        const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
+                        if (isSupabaseConfigured) await supabase.from('ledger_transactions').delete().neq('id', '0');
                       }}
                       className="text-[7.5px] font-bold text-red-400 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 px-2 py-0.5 rounded transition-all uppercase tracking-widest"
                     >
@@ -2244,53 +2465,50 @@ export default function ProfileView() {
                     </button>
                   </div>
 
-                {/* 5. BOTÓN ASISTENCIA WHATSAPP (Ajustes de Soporte de Asistencia) */}
-                <div className="glass-panel rounded-3xl border border-white/5 p-6 space-y-4 bg-zinc-950/60 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#25D366]/5 rounded-full blur-3xl pointer-events-none" />
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#25D366]/10 flex items-center justify-center border border-[#25D366]/20 shrink-0">
-                      <MessageCircle className="w-5 h-5 text-[#25D366]" />
+                  {/* SECCIÓN PERSONAL DE ACCESO RÁPIDO Y PIN DE ADMINISTRADOR */}
+                  <div className="p-5 bg-zinc-950/40 border border-white/5 rounded-2.5xl space-y-4 text-left animate-fade-in mb-6">
+                    <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
+                      <User className="w-4.5 h-4.5 text-[#4be277]" />
+                      <h5 className="text-[10px] font-black text-white uppercase italic tracking-widest font-bold">Tu PIN & Credenciales Personales de Respaldo</h5>
                     </div>
-                    <div className="text-left">
-                      <span className="text-[11px] font-black text-white uppercase tracking-wider block italic font-sans font-bold">Asistencia WhatsApp Soporte</span>
-                      <span className="text-[8px] font-mono text-[#bccbb9]/40 tracking-wider">RESOLUCIÓN DE DUDAS Y ASISTENCIA AL CLIENTE</span>
+                    <p className="text-[9.5px] font-bold text-[#bccbb9]/60 uppercase tracking-wide leading-relaxed">
+                      Como administrador, tus credenciales personales, llave de acceso y teléfono de recuperación están activos. Puedes cambiarlos o actualizarlos al instante en el centro de configuración:
+                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-3.5 pt-1">
+                      <div className="p-3 bg-white/[0.02] border border-white/5 rounded-2xl space-y-1">
+                        <span className="text-[7.5px] font-black text-zinc-500 uppercase tracking-widest block">Mi Correo de Login</span>
+                        <span className="font-mono text-[9px] font-black text-white block truncate">{newEmail || 'admin@ramito.com'}</span>
+                      </div>
+                      <div className="p-3 bg-white/[0.02] border border-white/5 rounded-2xl space-y-1 font-mono">
+                        <span className="text-[7.5px] font-black text-zinc-500 uppercase tracking-widest block">Teléfono / WhatsApp</span>
+                        <span className="font-mono text-[9px] font-black text-white block truncate">{newPersonalPhone || '+51 987 654 321'}</span>
+                      </div>
+                      <div className="p-3 bg-white/[0.02] border border-white/5 rounded-2xl space-y-1">
+                        <span className="text-[7.5px] font-black text-zinc-500 uppercase tracking-widest block">Llave Maestra Acceso</span>
+                        <span className="font-mono text-[9px] font-black text-[#4be277] uppercase block truncate">
+                          {newPersonalKey ? '✓ ' + newPersonalKey : '✘ NO CONFIGURADO'}
+                        </span>
+                      </div>
+                      <div className="p-3 bg-white/[0.02] border border-[#4be277]/10 rounded-2xl space-y-1">
+                        <span className="text-[7.5px] font-black text-[#4be277] uppercase tracking-widest block">PIN Rápido Activo</span>
+                        <span className="font-mono text-[9px] font-black text-[#4be277] uppercase block truncate">
+                          {newPersonalPin ? '✓ ' + newPersonalPin : '✘ NO CONFIGURADO'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-3 text-left">
-                    <div className="space-y-1.5 font-sans">
-                      <label className="text-[8.5px] font-black text-[#bccbb9]/60 uppercase tracking-widest block font-bold">Número de Soporte WhatsApp</label>
-                      <input 
-                        type="text" 
-                        value={newAdminPhone} 
-                        onChange={(e) => setNewAdminPhone(e.target.value)} 
-                        className="w-full h-11 bg-black/40 border border-white/10 rounded-xl px-4 text-xs font-mono font-bold text-white focus:border-[#25D366]/55 transition-all outline-none" 
-                      />
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2 pt-1 font-sans">
-                      <button 
-                        type="button"
-                        onClick={async () => {
-                          await saveSettings({ admin_phone: newAdminPhone });
-                          addAuditLog('CAMBIO DE NÚMERO DE ASISTENCIA', `Número de WhatsApp configurado a: ${newAdminPhone}`, 'success');
-                          showToast('Número de WhatsApp de asistencia guardado', 'success');
-                        }} 
-                        className="flex-1 h-11 bg-[#25D366] text-white font-black rounded-xl uppercase text-[9px] tracking-widest italic flex items-center justify-center gap-1.5 shadow-lg shadow-[#25D366]/15 hover:opacity-95 transition-all outline-none active:scale-[0.98]"
-                      >
-                        <Save className="w-4 h-4" /> Guardar WhatsApp
-                      </button>
-                      <a 
-                        href={`https://wa.me/${newAdminPhone.replace(/\D/g, '')}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="h-11 px-4 bg-white/5 hover:bg-white/10 text-[#25D366] font-black rounded-xl border border-white/10 flex items-center justify-center transition-all shrink-0 gap-1.5 text-[9px] uppercase tracking-widest italic font-sans"
-                      >
-                        Probar <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileModal(true);
+                        setShowAdvancedConfig(true);
+                      }}
+                      className="w-full h-11 bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/20 hover:border-[#4be277]/40 text-[#4be277] font-black rounded-xl text-[9px] uppercase tracking-widest italic flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                    >
+                      <Settings className="w-3.5 h-3.5 animate-spin duration-3000" /> Configurar Mi Cuenta & PIN Rápido
+                    </button>
                   </div>
-                </div>
 
               </div>
             )}
@@ -2298,7 +2516,7 @@ export default function ProfileView() {
         )}
 
         {/* VISTA NOTICIA / MARQUEE (REEMPLAZA A SOPORTE) */}
-        {activeTab === 'noticia' && (
+        {userRole?.includes('admin') && activeTab === 'noticia' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6 text-left">
             {!userRole?.includes('admin') ? (
               /* Vista jugadores / No admin */
@@ -2397,7 +2615,8 @@ export default function ProfileView() {
                         {secondaryMarqueeText && (
                           <span className="text-[#009EE3] ml-3 bg-[#009EE3]/15 px-2 py-0.5 rounded-lg border border-[#009EE3]/30 inline-flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#009EE3] animate-ping shrink-0" />
-                            ⚡ {secondaryMarqueeText}
+                            <Sparkles className="w-3.5 h-3.5 text-[#009EE3] shrink-0 inline" />
+                            {secondaryMarqueeText}
                           </span>
                         )}
                         {(() => {
@@ -2437,7 +2656,8 @@ export default function ProfileView() {
                         {secondaryMarqueeText && (
                           <span className="text-[#009EE3] ml-3 bg-[#009EE3]/15 px-2 py-0.5 rounded-lg border border-[#009EE3]/30 inline-flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#009EE3] animate-ping shrink-0" />
-                            ⚡ {secondaryMarqueeText}
+                            <Sparkles className="w-3.5 h-3.5 text-[#009EE3] shrink-0 inline" />
+                            {secondaryMarqueeText}
                           </span>
                         )}
                         <span className="text-zinc-500 mx-5">•</span>
@@ -2557,52 +2777,142 @@ export default function ProfileView() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Lunes a Viernes */}
-                    <div className="p-4 bg-white/[0.01] border border-white/5 rounded-2xl space-y-3">
-                      <span className="text-[9.5px] font-black text-[#bccbb9] uppercase tracking-widest block font-sans">LUNES A VIERNES</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[7.5px] font-black text-zinc-500 uppercase block tracking-wider mb-1">HORA APERTURA</label>
+                    <div className="p-4 bg-white/[0.01] border border-white/5 rounded-2xl space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-white/5 pb-2">
+                        <span className="text-[9.5px] font-black text-[#bccbb9] uppercase tracking-widest block font-sans">LUNES A VIERNES</span>
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
                           <input 
-                            type="time" 
-                            value={newWeekdayOpen}
-                            onChange={(e) => setNewWeekdayOpen(e.target.value)}
-                            className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                            type="checkbox" 
+                            checked={newWeekdayUseTwoShifts} 
+                            onChange={(e) => setNewWeekdayUseTwoShifts(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-white/15 bg-black/40 text-blue-500 focus:ring-0 focus:ring-offset-0 checkmark-custom"
                           />
-                        </div>
+                          <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest font-sans">Rango Partido</span>
+                        </label>
+                      </div>
+
+                      <div className="space-y-3">
                         <div>
-                          <label className="text-[7.5px] font-black text-zinc-500 uppercase block tracking-wider mb-1">HORA CIERRE</label>
-                          <input 
-                            type="time" 
-                            value={newWeekdayClose}
-                            onChange={(e) => setNewWeekdayClose(e.target.value)}
-                            className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
-                          />
+                          <div className="text-[8px] font-black text-amber-500/80 uppercase tracking-wider mb-2 font-mono">
+                            {newWeekdayUseTwoShifts ? '⏰ TURNO 1 (MAÑANA)' : '⏰ HORARIO CORRIDO'}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="text-[7px] font-mono text-zinc-500 uppercase block mb-1">HORA APERTURA</span>
+                              <input 
+                                type="time" 
+                                value={newWeekdayOpen}
+                                onChange={(e) => setNewWeekdayOpen(e.target.value)}
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-[7px] font-mono text-zinc-500 uppercase block mb-1">HORA CIERRE</span>
+                              <input 
+                                type="time" 
+                                value={newWeekdayClose}
+                                onChange={(e) => setNewWeekdayClose(e.target.value)}
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                              />
+                            </div>
+                          </div>
                         </div>
+
+                        {newWeekdayUseTwoShifts && (
+                          <div className="pt-3 border-t border-white/5 space-y-2">
+                            <div className="text-[8px] font-black text-emerald-400/80 uppercase tracking-wider font-mono">⏰ TURNO 2 (TARDE/NOCHE)</div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <span className="text-[7px] font-mono text-zinc-500 uppercase block mb-1">HORA APERTURA</span>
+                                <input 
+                                  type="time" 
+                                  value={newWeekdayOpen2}
+                                  onChange={(e) => setNewWeekdayOpen2(e.target.value)}
+                                  className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-[7px] font-mono text-zinc-500 uppercase block mb-1">HORA CIERRE</span>
+                                <input 
+                                  type="time" 
+                                  value={newWeekdayClose2}
+                                  onChange={(e) => setNewWeekdayClose2(e.target.value)}
+                                  className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Sábados y Domingos */}
-                    <div className="p-4 bg-white/[0.01] border border-white/5 rounded-2xl space-y-3">
-                      <span className="text-[9.5px] font-black text-[#bccbb9] uppercase tracking-widest block font-sans">SÁBADO Y DOMINGO</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[7.5px] font-black text-zinc-500 uppercase block tracking-wider mb-1">HORA APERTURA</label>
+                    <div className="p-4 bg-white/[0.01] border border-white/5 rounded-2xl space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-white/5 pb-2">
+                        <span className="text-[9.5px] font-black text-[#bccbb9] uppercase tracking-widest block font-sans">SÁBADO Y DOMINGO</span>
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
                           <input 
-                            type="time" 
-                            value={newWeekendOpen}
-                            onChange={(e) => setNewWeekendOpen(e.target.value)}
-                            className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                            type="checkbox" 
+                            checked={newWeekendUseTwoShifts} 
+                            onChange={(e) => setNewWeekendUseTwoShifts(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-white/15 bg-black/40 text-blue-500 focus:ring-0 focus:ring-offset-0 checkmark-custom"
                           />
-                        </div>
+                          <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest font-sans">Rango Partido</span>
+                        </label>
+                      </div>
+
+                      <div className="space-y-3">
                         <div>
-                          <label className="text-[7.5px] font-black text-zinc-500 uppercase block tracking-wider mb-1">HORA CIERRE</label>
-                          <input 
-                            type="time" 
-                            value={newWeekendClose}
-                            onChange={(e) => setNewWeekendClose(e.target.value)}
-                            className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
-                          />
+                          <div className="text-[8px] font-black text-amber-500/80 uppercase tracking-wider mb-2 font-mono">
+                            {newWeekendUseTwoShifts ? '⏰ TURNO 1 (MAÑANA)' : '⏰ HORARIO CORRIDO'}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <span className="text-[7px] font-mono text-zinc-500 uppercase block mb-1">HORA APERTURA</span>
+                              <input 
+                                type="time" 
+                                value={newWeekendOpen}
+                                onChange={(e) => setNewWeekendOpen(e.target.value)}
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-[7px] font-mono text-zinc-500 uppercase block mb-1">HORA CIERRE</span>
+                              <input 
+                                type="time" 
+                                value={newWeekendClose}
+                                onChange={(e) => setNewWeekendClose(e.target.value)}
+                                className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                              />
+                            </div>
+                          </div>
                         </div>
+
+                        {newWeekendUseTwoShifts && (
+                          <div className="pt-3 border-t border-white/5 space-y-2">
+                            <div className="text-[8px] font-black text-emerald-400/80 uppercase tracking-wider font-mono">⏰ TURNO 2 (TARDE/NOCHE)</div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <span className="text-[7px] font-mono text-zinc-500 uppercase block mb-1">HORA APERTURA</span>
+                                <input 
+                                  type="time" 
+                                  value={newWeekendOpen2}
+                                  onChange={(e) => setNewWeekendOpen2(e.target.value)}
+                                  className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-[7px] font-mono text-zinc-500 uppercase block mb-1">HORA CIERRE</span>
+                                <input 
+                                  type="time" 
+                                  value={newWeekendClose2}
+                                  onChange={(e) => setNewWeekendClose2(e.target.value)}
+                                  className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white font-mono font-bold uppercase transition-all focus:border-blue-400 outline-none"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2620,18 +2930,26 @@ export default function ProfileView() {
                     
                     const openStr = isWeekend ? newWeekendOpen : newWeekdayOpen;
                     const closeStr = isWeekend ? newWeekendClose : newWeekdayClose;
-                    
-                    const [openH, openM] = openStr.split(':').map(Number);
-                    const openTime = openH + openM / 60;
-                    
-                    const [closeH, closeM] = closeStr.split(':').map(Number);
-                    const closeTime = closeH + closeM / 60;
-                    
-                    let currentlyOpen = false;
-                    if (closeTime < openTime) {
-                      if (currentTime >= openTime || currentTime <= closeTime) currentlyOpen = true;
-                    } else {
-                      if (currentTime >= openTime && currentTime <= closeTime) currentlyOpen = true;
+                    const openStr2 = isWeekend ? newWeekendOpen2 : newWeekdayOpen2;
+                    const closeStr2 = isWeekend ? newWeekendClose2 : newWeekdayClose2;
+                    const use2 = isWeekend ? newWeekendUseTwoShifts : newWeekdayUseTwoShifts;
+
+                    const checkInShift = (op: string, cl: string) => {
+                      if (!op || !cl) return false;
+                      const [openH, openM] = op.split(':').map(Number);
+                      const [closeH, closeM] = cl.split(':').map(Number);
+                      const openTime = openH + openM / 60;
+                      const closeTime = closeH + closeM / 60;
+                      if (closeTime < openTime) {
+                        return currentTime >= openTime || currentTime <= closeTime;
+                      } else {
+                        return currentTime >= openTime && currentTime <= closeTime;
+                      }
+                    };
+
+                    let currentlyOpen = checkInShift(openStr, closeStr);
+                    if (use2) {
+                      currentlyOpen = currentlyOpen || checkInShift(openStr2, closeStr2);
                     }
 
                     return (
@@ -2640,7 +2958,7 @@ export default function ProfileView() {
                         <div>
                           <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest block">COMPROBACIÓN DE TELEMETRÍA EN VIVO</span>
                           <p className="text-[9.5px] font-bold text-[#bccbb9]/70 uppercase tracking-wide leading-relaxed mt-0.5">
-                            Hoy es <span className="text-white font-extrabold">{dayName}</span>. Basado en las horas elegidas, el complejo registraría en su marquesina el estado de <span className={`font-black ${currentlyOpen ? 'text-[#4be277]' : 'text-red-500'}`}>{currentlyOpen ? '● BIENVENIDO / ABIERTO' : '● CERRADO / OPERACIONES SUSPENDIDAS'}</span> ({openStr} a {closeStr}).
+                            Hoy es <span className="text-white font-extrabold">{dayName}</span>. Basado en las horas elegidas, el complejo registraría en su marquesina el estado de <span className={`font-black ${currentlyOpen ? 'text-[#4be277]' : 'text-red-500'}`}>{currentlyOpen ? '● BIENVENIDO / ABIERTO' : '● CERRADO / OPERACIONES SUSPENDIDAS'}</span> ({openStr} a {closeStr}{use2 ? ` y ${openStr2} a ${closeStr2}` : ''}).
                           </p>
                         </div>
                       </div>
@@ -2660,14 +2978,39 @@ export default function ProfileView() {
         )}
 
         {/* VISTA ANALÍTICAS Y HEATMAPS (INTERACTIVO, BENTO-STYLE, RECHARTS DE ALTO POLISH) */}
-        {activeTab === 'analytics' && (
-          <motion.div
-            key="analytics"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-6 text-left"
-          >
+        {showAnalyticsWindow && (
+          <div className="fixed inset-0 z-[100] flex flex-col bg-[#121414] overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
+            {/* Background Gradient Decorative elements */}
+            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-600/5 rounded-full blur-[120px] pointer-events-none" />
+
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8 mt-2">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                    <Activity className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">CONSOLA ANALÍTICA ACTIVA</h4>
+                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">Panel de Ocupación e Inteligencia de Demanda</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowAnalyticsWindow(false)}
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <motion.div
+                key="analytics-inside"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6 text-left flex-1"
+              >
             {/* Cabecera del Panel */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
@@ -2675,14 +3018,14 @@ export default function ProfileView() {
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest font-mono">Consola Analítica Activa</span>
                 </div>
-                <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Panel de Ocupación e Inteligencia de Demanda</h3>
-                <p className="text-[10px] font-bold text-[#bccbb9]/50 uppercase tracking-widest max-w-xl">
+                <h3 className="text-base sm:text-lg md:text-xl font-black text-white uppercase italic tracking-tight leading-tight">Panel de Ocupación e Inteligencia de Demanda</h3>
+                <p className="text-[9.5px] sm:text-[10px] font-bold text-[#bccbb9]/50 uppercase tracking-widest max-w-xl leading-relaxed">
                   Visualice patrones de reserva histórica para planificar tarifas diferenciadas dinámicas (Horarios Pico vs. Horarios Valle).
                 </p>
               </div>
 
               {/* Selector Filtro de Cancha Bento */}
-              <div className="flex gap-1 p-1 bg-zinc-950 border border-white/5 rounded-xl shrink-0">
+              <div className="flex gap-1 p-1 bg-zinc-950 border border-white/5 rounded-xl shrink-0 w-full md:w-auto overflow-x-auto scrollbar-none justify-between md:justify-start">
                 {['todos', 'cancha1', 'cancha2'].map((courtOpt) => (
                   <button
                     key={courtOpt}
@@ -2694,23 +3037,38 @@ export default function ProfileView() {
                       // Force local refresh without full page reload
                       showToast(`Filtrando analíticas por: ${courtOpt === 'todos' ? 'Todas las Canchas' : courtOpt === 'cancha1' ? 'Cancha 1' : 'Cancha 2'}`, 'success');
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all ${
+                    className={`flex-1 md:flex-initial text-center px-2 py-1.5 sm:px-3 rounded-lg text-[8.5px] font-black uppercase tracking-wider transition-all ${
                       (localStorage.getItem('ramito_court_analytics_filter') || 'todos') === courtOpt
                         ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'text-[#bccbb9]/40 hover:text-white/80'
+                        : 'text-[#bccbb9]/40 hover:text-white/80 border border-transparent'
                     }`}
                   >
-                    {courtOpt === 'todos' ? 'Ambas Canchas' : courtOpt === 'cancha1' ? 'Cancha 1 • Césped' : 'Cancha 2 • Losa'}
+                    {courtOpt === 'todos' ? (
+                      <>
+                        <span className="inline sm:hidden">Ambas</span>
+                        <span className="hidden sm:inline">Ambas Canchas</span>
+                      </>
+                    ) : courtOpt === 'cancha1' ? (
+                      <>
+                        <span className="inline sm:hidden">Cancha 1</span>
+                        <span className="hidden sm:inline">Cancha 1 • Césped</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="inline sm:hidden">Cancha 2</span>
+                        <span className="hidden sm:inline">Cancha 2 • Losa</span>
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* BENTO GRID LAYOUT */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* BENTO GRID LAYOUT - HEATMAP SEMANAL DE OCUPACIÓN */}
+            <div className="w-full mb-6 text-left">
 
               {/* CARD BENTO 1: HEATMAP MENSUAL DE OCUPACIÓN (7 Días x 8 Bloques Horarios) */}
-              <div className="lg:col-span-2 glass-panel rounded-[2rem] border border-white/5 p-6 bg-zinc-950/40 relative overflow-hidden flex flex-col justify-between space-y-4">
+              <div className="w-full glass-panel rounded-[2rem] border border-white/5 p-6 bg-zinc-950/40 relative overflow-hidden flex flex-col justify-between space-y-4">
                 <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/[0.02] rounded-full blur-[100px] pointer-events-none" />
                 
                 <div className="space-y-1">
@@ -2721,65 +3079,67 @@ export default function ProfileView() {
                   </p>
                 </div>
 
-                {/* Grid Heatmap */}
-                <div className="space-y-4 mt-2">
-                  <div className="grid grid-cols-8 gap-1 text-center font-mono text-[7px] text-[#bccbb9]/30 font-black uppercase">
-                    <div>HORAS</div>
-                    <div>LUN</div>
-                    <div>MAR</div>
-                    <div>MIÉ</div>
-                    <div>JUE</div>
-                    <div>VIE</div>
-                    <div>SÁB</div>
-                    <div>DOM</div>
-                  </div>
+                {/* Grid Heatmap (Completamente Fluido y Autoadaptativo sin Desborde) */}
+                <div className="mt-2 w-full overflow-hidden">
+                  <div className="space-y-3 w-full">
+                    <div className="grid grid-cols-8 gap-1 text-center font-mono text-[6px] xs:text-[7px] sm:text-[8px] text-[#bccbb9]/30 font-black uppercase">
+                      <div>HORAS</div>
+                      <div>LUN</div>
+                      <div>MAR</div>
+                      <div>MIÉ</div>
+                      <div>JUE</div>
+                      <div>VIE</div>
+                      <div>SÁB</div>
+                      <div>DOM</div>
+                    </div>
 
-                  <div className="space-y-1.5">
-                    {[
-                      { hour: '15:00 hs', load: [15, 20, 25, 20, 30, 65, 55], slotsStatus: ['v', 'v', 'v', 'v', 'v', 'p', 'p'] },
-                      { hour: '16:00 hs', load: [25, 30, 20, 35, 45, 80, 75], slotsStatus: ['v', 'v', 'v', 'v', 'v', 'p', 'p'] },
-                      { hour: '17:00 hs', load: [35, 40, 45, 45, 60, 95, 85], slotsStatus: ['v', 'v', 'v', 'v', 'p', 'p', 'p'] },
-                      { hour: '18:00 hs', load: [60, 65, 55, 70, 75, 100, 95], slotsStatus: ['p', 'p', 'v', 'p', 'p', 'p', 'p'] },
-                      { hour: '20:00 hs', load: [85, 95, 90, 95, 100, 95, 80], slotsStatus: ['p', 'p', 'p', 'p', 'p', 'p', 'p'] },
-                      { hour: '21:00 hs', load: [95, 100, 95, 100, 100, 100, 90], slotsStatus: ['p', 'p', 'p', 'p', 'p', 'p', 'p'] },
-                      { hour: '22:00 hs', load: [75, 80, 70, 85, 95, 90, 70], slotsStatus: ['p', 'p', 'p', 'p', 'p', 'p', 'p'] }
-                    ].map((row, idx) => (
-                      <div key={idx} className="grid grid-cols-8 gap-1.5 items-center">
-                        {/* Hour marker */}
-                        <div className="text-[8px] font-mono font-black text-[#bccbb9]/70 text-right pr-2">
-                          {row.hour}
+                    <div className="space-y-1.5 w-full">
+                      {[
+                        { hour: '15:00 hs', load: [15, 20, 25, 20, 30, 65, 55], slotsStatus: ['v', 'v', 'v', 'v', 'v', 'p', 'p'] },
+                        { hour: '16:00 hs', load: [25, 30, 20, 35, 45, 80, 75], slotsStatus: ['v', 'v', 'v', 'v', 'v', 'p', 'p'] },
+                        { hour: '17:00 hs', load: [35, 40, 45, 45, 60, 95, 85], slotsStatus: ['v', 'v', 'v', 'v', 'p', 'p', 'p'] },
+                        { hour: '18:00 hs', load: [60, 65, 55, 70, 75, 100, 95], slotsStatus: ['p', 'p', 'v', 'p', 'p', 'p', 'p'] },
+                        { hour: '20:00 hs', load: [85, 95, 90, 95, 100, 95, 80], slotsStatus: ['p', 'p', 'p', 'p', 'p', 'p', 'p'] },
+                        { hour: '21:00 hs', load: [95, 100, 95, 100, 100, 100, 90], slotsStatus: ['p', 'p', 'p', 'p', 'p', 'p', 'p'] },
+                        { hour: '22:00 hs', load: [75, 80, 70, 85, 95, 90, 70], slotsStatus: ['p', 'p', 'p', 'p', 'p', 'p', 'p'] }
+                      ].map((row, idx) => (
+                        <div key={idx} className="grid grid-cols-8 gap-1 items-center w-full">
+                          {/* Hour marker */}
+                          <div className="text-[6.5px] xs:text-[7.5px] sm:text-[8px] font-mono font-black text-[#bccbb9]/70 text-right pr-0.5 sm:pr-2 leading-none">
+                            {row.hour}
+                          </div>
+
+                          {/* 7 Days heatmap blocks */}
+                          {row.load.map((pct, dayIdx) => {
+                            const filterType = localStorage.getItem('ramito_court_analytics_filter') || 'todos';
+                            let finalPct = pct;
+                            // Simulate dynamic filtering values
+                            if (filterType === 'cancha1') finalPct = Math.max(10, Math.round(pct * 0.9));
+                            if (filterType === 'cancha2') finalPct = Math.max(5, Math.round(pct * 0.75));
+
+                            let colorClass = 'bg-zinc-900 border-zinc-950 text-[#bccbb9]/20';
+                            if (finalPct > 0 && finalPct <= 30) colorClass = 'bg-[#10B981]/15 text-[#10B981] border-[#10B981]/25 hover:bg-[#10B981]/25';
+                            else if (finalPct > 30 && finalPct <= 60) colorClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/35 hover:bg-emerald-500/30';
+                            else if (finalPct > 60 && finalPct <= 85) colorClass = 'bg-[#FF9100]/20 text-[#FF9100] border-[#FF9100]/35 hover:bg-[#FF9100]/30';
+                            else if (finalPct > 85) colorClass = 'bg-red-500/25 text-red-400 border-red-500/35 hover:bg-red-500/30 animate-pulse';
+
+                            return (
+                              <button
+                                key={dayIdx}
+                                type="button"
+                                onClick={() => {
+                                  showToast(`Franja: ${row.hour} • Carga estimada: ${finalPct}% de Ocupación`, 'success');
+                                }}
+                                className={`aspect-square sm:aspect-video rounded sm:rounded-lg border flex flex-col justify-center items-center text-[7px] md:text-[9px] font-mono font-bold transition-all transition-colors cursor-pointer w-full ${colorClass}`}
+                                title={`Demanda: ${finalPct}%`}
+                              >
+                                <span className="text-[6.5px] xs:text-[7.5px] sm:text-[8px] md:text-[8.5px] font-mono font-black">{finalPct}%</span>
+                              </button>
+                            );
+                          })}
                         </div>
-
-                        {/* 7 Days heatmap blocks */}
-                        {row.load.map((pct, dayIdx) => {
-                          const filterType = localStorage.getItem('ramito_court_analytics_filter') || 'todos';
-                          let finalPct = pct;
-                          // Simulate dynamic filtering values
-                          if (filterType === 'cancha1') finalPct = Math.max(10, Math.round(pct * 0.9));
-                          if (filterType === 'cancha2') finalPct = Math.max(5, Math.round(pct * 0.75));
-
-                          let colorClass = 'bg-zinc-900 border-zinc-950 text-[#bccbb9]/20';
-                          if (finalPct > 0 && finalPct <= 30) colorClass = 'bg-[#10B981]/10 text-[#10B981] border-[#10B981]/25 hover:bg-[#10B981]/20';
-                          else if (finalPct > 30 && finalPct <= 60) colorClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/35 hover:bg-emerald-500/30';
-                          else if (finalPct > 60 && finalPct <= 85) colorClass = 'bg-[#FF9100]/20 text-[#FF9100] border-[#FF9100]/30 hover:bg-[#FF9100]/30';
-                          else if (finalPct > 85) colorClass = 'bg-red-500/20 text-red-400 border-red-500/35 hover:bg-red-500/30 animate-pulse';
-
-                          return (
-                            <button
-                              key={dayIdx}
-                              type="button"
-                              onClick={() => {
-                                showToast(`Franja: ${row.hour} • Carga estimada: ${finalPct}% de Ocupación`, 'success');
-                              }}
-                              className={`aspect-square sm:aspect-video rounded-lg border flex flex-col justify-center items-center text-[7px] md:text-[9px] font-mono font-bold transition-all transition-colors cursor-pointer ${colorClass}`}
-                              title={`Demanda: ${finalPct}%`}
-                            >
-                              <span className="text-[7.5px] font-mono font-black">{finalPct}%</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -2803,58 +3163,6 @@ export default function ProfileView() {
                   </div>
                 </div>
               </div>
-
-              {/* CARD BENTO 2: RECONOCIMIENTO INTELIGENTE DE TARIFAS (Intel Engine) */}
-              <div className="glass-panel rounded-[2rem] border border-white/5 p-6 bg-[#181a1a] relative overflow-hidden flex flex-col justify-between space-y-6">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.03] rounded-full blur-3xl pointer-events-none" />
-                
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest font-mono">Motor de Recomendación Inteligente</span>
-                    <p className="text-[11px] font-black text-white uppercase italic tracking-wider">Planificación de Tarifas Dinámicas</p>
-                  </div>
-
-                  <div className="p-3.5 bg-black/50 border border-white/5 rounded-2xl text-left space-y-2">
-                    <div className="flex items-center gap-1.5 text-red-400">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      <span className="text-[8.5px] font-black uppercase tracking-widest">Alerta de Bloques Críticos (Pico)</span>
-                    </div>
-                    <p className="text-[9.5px] font-bold text-white/90 leading-relaxed uppercase">
-                      Los turnos de 20:00 y 21:00 hs de Martes a Sábados exhiben ocupación saturada (&gt;95%).
-                    </p>
-                    <div className="pt-2 border-t border-white/5 mt-2">
-                      <span className="text-[8px] font-black text-[#4be277] uppercase tracking-wider block font-sans">Sugerencia Comercial:</span>
-                      <p className="text-[8.5px] font-medium text-[#bccbb9]/60 uppercase tracking-wide leading-relaxed mt-1">
-                        Establecer Tarifa Diferencial del +15% ($2,500 ARS extra) en este rango. Los jugadores están dispuestos a pagar premium debido a la escasez de turnos.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 bg-black/50 border border-white/5 rounded-2xl text-left space-y-2">
-                    <div className="flex items-center gap-1.5 text-[#10B981]">
-                      <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                      <span className="text-[8.5px] font-black uppercase tracking-widest">Optimización del Bloque Valle</span>
-                    </div>
-                    <p className="text-[9.5px] font-bold text-white/90 leading-relaxed uppercase">
-                      Lunes y Miércoles de 15:00 a 17:00 registran ocupación inferior al 25%.
-                    </p>
-                    <div className="pt-2 border-t border-white/5 mt-2">
-                      <span className="text-[8px] font-black text-amber-400 uppercase tracking-wider block font-sans">Sugerencia Comercial:</span>
-                      <p className="text-[8.5px] font-medium text-[#bccbb9]/60 uppercase tracking-wide leading-relaxed mt-1">
-                        Lanzar un descuento automático del -25% ("Happy Hour de Fútbol") para capturar estudiantes universitarios o deportistas vespertinos y balancear caja.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <span className="text-[8px] font-black text-[#bccbb9]/30 uppercase font-mono block">Auditoría Regulatoria de Tarifas</span>
-                  <p className="text-[8.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-none">
-                    Complejo Ramito Fut Show • Algoritmo de Carga de Red V1.6
-                  </p>
-                </div>
-              </div>
-
             </div>
 
             {/* SEGUNDA FILA: BENTO INFERIOR (Gráfico de Barras de Distribución Horaria & Distribución de Canchas) */}
@@ -2867,40 +3175,42 @@ export default function ProfileView() {
                   <p className="text-[11px] font-black text-white uppercase italic tracking-wider">Carga de Tráfico Horario Consolidado</p>
                 </div>
 
-                {/* SVG Chart */}
-                <div className="h-44 flex items-end gap-3 px-2 pt-6 pb-2 border-b border-white/5">
-                  {[
-                    { slot: '15:00', val: 30, text: 'Valle' },
-                    { slot: '16:00', val: 40, text: 'Valle' },
-                    { slot: '17:00', val: 55, text: 'Moderado' },
-                    { slot: '18:00', val: 78, text: 'Intermedio' },
-                    { slot: '20:00', val: 95, text: 'Saturado' },
-                    { slot: '21:00', val: 100, text: 'Máximo' },
-                    { slot: '22:00', val: 82, text: 'Pico' }
-                  ].map((bar, bidx) => (
-                    <div key={bidx} className="flex-1 flex flex-col items-center gap-2 group cursor-pointer">
-                      <div className="w-full relative rounded-t-lg bg-zinc-900 overflow-hidden h-32 flex items-end">
-                        <motion.div
-                          initial={{ height: 0 }}
-                          animate={{ height: `${bar.val}%` }}
-                          transition={{ duration: 0.8, delay: bidx * 0.05 }}
-                          className={`w-full rounded-t-lg relative transition-all group-hover:brightness-110 ${
-                            bar.val > 85 
-                              ? 'bg-gradient-to-t from-red-600 to-[#FF9100]' 
-                              : bar.val > 50 
-                              ? 'bg-gradient-to-t from-emerald-500 to-amber-400' 
-                              : 'bg-gradient-to-t from-emerald-600 to-[#10B981]'
-                          }`}
-                        />
-                        {/* Hover Popup Overlay */}
-                        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black text-[#4be277] text-[7.5px] font-black font-mono py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">
-                          {bar.val}%
+                {/* SVG Chart (Completamente Fluido y Autoadaptativo sin Desborde) */}
+                <div className="w-full overflow-hidden">
+                  <div className="h-44 flex items-end gap-1.5 sm:gap-3 px-1 sm:px-2 pt-6 pb-2 border-b border-white/5 w-full">
+                    {[
+                      { slot: '15:00', val: 30, text: 'Valle' },
+                      { slot: '16:00', val: 40, text: 'Valle' },
+                      { slot: '17:00', val: 55, text: 'Moderado' },
+                      { slot: '18:00', val: 78, text: 'Intermedio' },
+                      { slot: '20:00', val: 95, text: 'Saturado' },
+                      { slot: '21:00', val: 100, text: 'Máximo' },
+                      { slot: '22:00', val: 82, text: 'Pico' }
+                    ].map((bar, bidx) => (
+                      <div key={bidx} className="flex-1 flex flex-col items-center gap-1 sm:gap-2 group cursor-pointer min-w-0">
+                        <div className="w-full relative rounded-t-lg bg-zinc-900 overflow-hidden h-32 flex items-end">
+                          <motion.div
+                            initial={{ height: 0 }}
+                            animate={{ height: `${bar.val}%` }}
+                            transition={{ duration: 0.8, delay: bidx * 0.05 }}
+                            className={`w-full rounded-t-lg relative transition-all group-hover:brightness-110 ${
+                              bar.val > 85 
+                                ? 'bg-gradient-to-t from-red-600 to-[#FF9100]' 
+                                : bar.val > 50 
+                                ? 'bg-gradient-to-t from-emerald-500 to-amber-400' 
+                                : 'bg-gradient-to-t from-emerald-600 to-[#10B981]'
+                            }`}
+                          />
+                          {/* Hover Popup Overlay */}
+                          <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black text-[#4be277] text-[7px] sm:text-[7.5px] font-black font-mono py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap">
+                            {bar.val}%
+                          </div>
                         </div>
+                        <span className="text-[7.5px] sm:text-[8px] font-mono font-black text-white leading-none mt-1">{bar.slot}</span>
+                        <span className="text-[6px] xs:text-[6.5px] sm:text-[7.5px] font-mono font-black text-[#bccbb9]/40 group-hover:text-emerald-400 transition-colors uppercase select-none leading-none truncate w-full text-center mt-0.5">{bar.text}</span>
                       </div>
-                      <span className="text-[8px] font-mono font-black text-white">{bar.slot}</span>
-                      <span className="text-[7.5px] font-mono font-black text-[#bccbb9]/40 group-hover:text-emerald-400 transition-colors uppercase select-none">{bar.text}</span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
                 
                 <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-widest block italic leading-none">
@@ -2915,7 +3225,7 @@ export default function ProfileView() {
                   <p className="text-[11px] font-black text-white uppercase italic tracking-wider">Corte de Ingresos y Reservas por Cancha</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2">
                   <div className="p-4 bg-zinc-900/30 rounded-2xl border border-white/5 space-y-2">
                     <span className="text-[8px] font-mono text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Cancha 1 • El Maracaná</span>
                     <p className="text-xl font-black text-white uppercase">62.5% <span className="text-xs text-emerald-400 font-bold">CARGA</span></p>
@@ -2939,7 +3249,7 @@ export default function ProfileView() {
                     <div className="absolute inset-0 rounded-full border-4 border-emerald-500 border-r-transparent border-b-transparent animate-spin duration-3000" />
                     <span className="text-[8px] font-mono font-black text-white">62%</span>
                   </div>
-                  <div className="text-left space-y-0.5">
+                  <div className="text-left space-y-0.5 font-sans">
                     <span className="text-[9px] font-black text-white uppercase tracking-wider block italic">Preferencia de Césped Sintético</span>
                     <p className="text-[8px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
                       El Maracaná lidera la recaudación debido a que los equipos prefieren césped sintético sobre losa para el juego con botines de fútbol 5.
@@ -2949,28 +3259,112 @@ export default function ProfileView() {
               </div>
 
             </div>
-          </motion.div>
+
+            {/* CARD BENTO 2: RECONOCIMIENTO INTELIGENTE DE TARIFAS (Intel Engine) - MOVIDO AL FINAL DEBAJO DE LAS MÉTRICAS */}
+            <div className="glass-panel rounded-[2rem] border border-white/5 p-6 bg-[#181a1a] relative overflow-hidden flex flex-col justify-between space-y-6 mt-6">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.03] rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="space-y-4">
+                <div className="space-y-1 text-left">
+                  <span className="text-[8px] font-black text-amber-500 uppercase tracking-widest font-mono">Motor de Recomendación Inteligente</span>
+                  <p className="text-[11px] font-black text-white uppercase italic tracking-wider">Planificación de Tarifas Dinámicas</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* ALERTA DE BLOQUES CRÍTICOS (PICO) */}
+                  <div className="p-3.5 bg-black/50 border border-white/5 rounded-2xl text-left space-y-2 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5 text-red-400">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span className="text-[8.5px] font-black uppercase tracking-widest">Alerta de Bloques Críticos (Pico)</span>
+                      </div>
+                      <p className="text-[9.5px] font-bold text-white/90 leading-relaxed uppercase mt-2">
+                        Los turnos de 20:00 y 21:00 hs de Martes a Sábados exhiben ocupación saturada (&gt;95%).
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-white/5 mt-3">
+                      <span className="text-[8px] font-black text-[#4be277] uppercase tracking-wider block font-sans">Sugerencia Comercial:</span>
+                      <p className="text-[8.5px] font-medium text-[#bccbb9]/60 uppercase tracking-wide leading-relaxed mt-1">
+                        Establecer Tarifa Diferencial del +15% ($2,500 ARS extra) en este rango. Los jugadores están dispuestos a pagar premium debido a la escasez de turnos.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* OPTIMIZACIÓN DEL BLOQUE VALLE */}
+                  <div className="p-3.5 bg-black/50 border border-white/5 rounded-2xl text-left space-y-2 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[#10B981]">
+                        <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                        <span className="text-[8.5px] font-black uppercase tracking-widest">Optimización del Bloque Valle</span>
+                      </div>
+                      <p className="text-[9.5px] font-bold text-white/90 leading-relaxed uppercase mt-2">
+                        Lunes y Miércoles de 15:00 a 17:00 registran ocupación inferior al 25%.
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-white/5 mt-3">
+                      <span className="text-[8px] font-black text-amber-400 uppercase tracking-wider block font-sans">Sugerencia Comercial:</span>
+                      <p className="text-[8.5px] font-medium text-[#bccbb9]/60 uppercase tracking-wide leading-relaxed mt-1">
+                        Lanzar un descuento automático del -25% ("Happy Hour de Fútbol") para capturar estudiantes universitarios o deportistas vespertinos y balancear caja.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-left">
+                <span className="text-[8px] font-black text-[#bccbb9]/30 uppercase font-mono block">Auditoría Regulatoria de Tarifas</span>
+                <p className="text-[8.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-none">
+                  Complejo Ramito Fut Show • Algoritmo de Carga de Red V1.6
+                </p>
+              </div>
+            </div>
+
+              </motion.div>
+
+              {/* Informative footer */}
+              <div className="p-4 bg-zinc-950/40 border border-white/5 rounded-2xl flex gap-3 text-left mb-8 font-sans mt-8">
+                <Info className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[10px] font-black text-white uppercase tracking-wider block italic">ANÁLISIS DE NEGOCIO SEGURO</span>
+                  <p className="text-[8.5px] font-bold text-[#bccbb9]/50 uppercase tracking-widest leading-relaxed mt-1">
+                    Las métricas mostradas reflejan la ocupación unificación de datos unificados de reservas presenciales, transferencias registradas y abonos Mercado Pago.
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={() => setShowAnalyticsWindow(false)}
+                  className="w-full h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Ajustes
+                </button>
+              </div>
+
+            </div>
+          </div>
         )}
       </AnimatePresence>
 
-      {/* Ventana de Configuración Licencia Web (Detallada y Completa) */}
+      {/* Ventana de Configuración Licencia Web (Unificada con Métricas y Canales) */}
       <AnimatePresence>
         {showWebWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             {/* Background Gradient Decorative elements */}
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-600/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
 
             <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-blue-500/10 border border-emerald-500/20 flex items-center justify-center">
                     <Globe className="w-6 h-6 text-emerald-400" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Licencia Web - Consola Administrativa</h4>
-                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">Configuración y Sincronización Completa del Sitio Principal</span>
+                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Licencia Web & Consola de Producción</h4>
+                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">Monitoreo en Vivo de Canales, DNS, Métricas y Gestión del Servidor</span>
                   </div>
                 </div>
                 <button 
@@ -2981,7 +3375,33 @@ export default function ProfileView() {
                 </button>
               </div>
 
-              {isLicensingReadOnly && (
+              {/* Selector de Pestañas de la Consola Unificada */}
+              <div className="flex bg-black/40 border border-white/5 p-1 rounded-2xl mb-8 w-full max-w-md mx-auto">
+                <button
+                  type="button"
+                  onClick={() => setWebConsoleActiveTab('config')}
+                  className={`flex-grow h-10 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${
+                    webConsoleActiveTab === 'config'
+                      ? 'bg-emerald-500/10 text-[#4be277] border border-[#4be277]/25 font-bold shadow-[0_0_10px_rgba(75,226,119,0.1)]'
+                      : 'text-[#bccbb9]/40 hover:text-[#bccbb9]/60'
+                  }`}
+                >
+                  <Settings className="w-3.5 h-3.5" /> CONFIGURACIÓN Y DNS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWebConsoleActiveTab('metrics')}
+                  className={`flex-grow h-10 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${
+                    webConsoleActiveTab === 'metrics'
+                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/25 font-bold shadow-[0_0_10px_rgba(59,130,246,0.1)]'
+                      : 'text-[#bccbb9]/40 hover:text-[#bccbb9]/60'
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5" /> MÉTRICAS EN VIVO
+                </button>
+              </div>
+
+              {isLicensingReadOnly && webConsoleActiveTab === 'config' && (
                 <div className="p-5 mb-8 bg-zinc-900 border border-amber-500/20 rounded-3xl space-y-4 text-left shadow-lg relative overflow-hidden w-full">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
                   <div className="flex items-start gap-4">
@@ -3020,205 +3440,571 @@ export default function ProfileView() {
                 </div>
               )}
 
-              {/* Grid content */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 mb-10">
-                {/* Left Column: General Configuration */}
-                <div className="space-y-6">
-                  <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
-                    <h5 className="text-[10px] font-black text-[#4be277] uppercase tracking-widest italic mb-2">Suscripción & Estado</h5>
-                    
-                    {/* Switch Activo */}
-                    <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-2xl">
-                      <div>
-                        <span className="text-[10px] font-black text-white uppercase tracking-wider block">Estado de Dominio & Server</span>
-                        <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">Habilitar reservas desde el sitio web</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          saveSettings({ web_license_active: !webLicenseActive });
-                        }}
-                        className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors ${webLicenseActive ? 'bg-[#4be277]' : 'bg-white/10'}`}
-                      >
-                        <motion.div animate={{ x: webLicenseActive ? 24 : 0 }} className={`w-5 h-5 rounded-full ${webLicenseActive ? 'bg-black' : 'bg-zinc-400'}`} />
-                      </button>
-                    </div>
+              {/* CONTENIDO DE CONFIGURACIÓN Y DNS */}
+              {webConsoleActiveTab === 'config' && (
+                <div className="animate-fadeIn">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 mb-10">
+                    {/* Left Column: General Configuration */}
+                    <div className="space-y-6">
+                      <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
+                        <h5 className="text-[10px] font-black text-[#4be277] uppercase tracking-widest italic mb-2">Suscripción & Estado</h5>
+                        
+                        {/* Switch Activo */}
+                        <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-2xl">
+                          <div>
+                            <span className="text-[10px] font-black text-white uppercase tracking-wider block">Estado de Dominio & Server</span>
+                            <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">Habilitar reservas desde el sitio web</span>
+                          </div>
+                          <button 
+                            onClick={() => {
+                              saveSettings({ web_license_active: !webLicenseActive });
+                            }}
+                            className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors ${webLicenseActive ? 'bg-[#4be277]' : 'bg-white/10'}`}
+                          >
+                            <motion.div animate={{ x: webLicenseActive ? 24 : 0 }} className={`w-5 h-5 rounded-full ${webLicenseActive ? 'bg-black' : 'bg-zinc-400'}`} />
+                          </button>
+                        </div>
 
-                    {/* Slider Días Restantes */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-black text-[#bccbb9]/60 uppercase tracking-wider">Duración de Renovación (Días)</label>
-                        <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/10 px-2 py-0.5 rounded-lg">{webDaysRemaining} Días</span>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="1" 
-                        max="90" 
-                        value={webDaysRemaining} 
-                        onChange={(e) => setWebDaysRemaining(parseInt(e.target.value, 10))}
-                        className="w-full accent-[#4be277]"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Dominio y Frecuencia */}
-                  <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
-                    <h5 className="text-[10px] font-black text-[#4be277] uppercase tracking-widest italic mb-2">Conectividad</h5>
-
-                    {/* Dominio Web */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Dominio Principal Vinculado</label>
-                      <input 
-                        type="text" 
-                        value={webDomain} 
-                        onChange={(e) => setWebDomain(e.target.value)}
-                        className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white uppercase font-bold focus:border-[#4be277] transition-all outline-none"
-                        placeholder="Ej. TUDOMINIO.COM"
-                      />
-                    </div>
-
-                    {/* Sync Frequency dropdown */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Frecuencia de Sincronización Web</label>
-                      <select
-                        value={webSyncFrequency}
-                        onChange={(e) => setWebSyncFrequency(e.target.value)}
-                        className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white font-bold focus:border-[#4be277] transition-all outline-none"
-                      >
-                        <option value="Tiempo Real (Live)" className="bg-zinc-950">Tiempo Real constante</option>
-                        <option value="Cada 5 Minutos" className="bg-zinc-950">Cada 5 Minutos</option>
-                        <option value="Cada 15 Minutos" className="bg-zinc-950">Cada 15 Minutos</option>
-                        <option value="Cada Hora" className="bg-zinc-950">Cada Hora</option>
-                        <option value="Manual" className="bg-zinc-950">Manual (A petición)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column: Key details, Deploy Vercel */}
-                <div className="space-y-6">
-                  {/* Pasarela y Llaves */}
-                  <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
-                    <h5 className="text-[10px] font-black text-[#4be277] uppercase tracking-widest italic mb-2">Pasarela de Pagos</h5>
-
-                    {/* Pasarela de pago web */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Pasarela de Pagos (Para señas)</label>
-                      <select
-                        value={webPaymentGateway}
-                        onChange={(e) => setWebPaymentGateway(e.target.value)}
-                        className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white font-bold focus:border-[#4be277] transition-all outline-none"
-                      >
-                        <option value="Mercado Pago (Latam)" className="bg-zinc-950">Mercado Pago (Latam)</option>
-                        <option value="Stripe API Gateway" className="bg-zinc-950">Stripe API (Global)</option>
-                        <option value="PayPal Pro" className="bg-zinc-950">PayPal Pro (Dólares)</option>
-                        <option value="Efectivo o Transferencia" className="bg-zinc-950">Efectivo / Depósito previo</option>
-                      </select>
-                    </div>
-
-                    {/* Llave pública Pagos */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Llave de Sincronización API</label>
-                      <input 
-                        type="password" 
-                        value={webPaymentKey} 
-                        onChange={(e) => setWebPaymentKey(e.target.value)}
-                        className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white font-bold focus:border-[#4be277] transition-all outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Vercel build and switch regist */}
-                  <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
-                    <h5 className="text-[10px] font-black text-[#4be277] uppercase tracking-widest italic mb-2">Despliegues Automáticos y Control</h5>
-
-                    {/* Endpoint Deploy Vercel */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Vercel Deployment Webhook</label>
-                      <input 
-                        type="text" 
-                        value={webVercelHook} 
-                        onChange={(e) => setWebVercelHook(e.target.value)}
-                        className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-[10px] font-mono text-white/70 focus:border-[#4be277] transition-all outline-none"
-                      />
-                    </div>
-
-                    {/* Switch Permite Registros */}
-                    <div className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl">
-                      <div>
-                        <span className="text-[9px] font-black text-white uppercase tracking-wider block">Registros Web de Jugadores</span>
-                        <span className="text-[7px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">Permitir ingresar sin registrar previamente</span>
-                      </div>
-                      <button 
-                        onClick={() => setWebAllowRegistrations(!webAllowRegistrations)}
-                        className={`w-10 h-5.5 rounded-full flex items-center px-0.5 transition-colors ${webAllowRegistrations ? 'bg-emerald-500' : 'bg-white/10'}`}
-                      >
-                        <motion.div animate={{ x: webAllowRegistrations ? 18 : 0 }} className="w-4.5 h-4.5 rounded-full bg-black/90 shadow-md" />
-                      </button>
-                    </div>
-
-                    {/* Consola interactiva de despliegues en Vercel */}
-                    <div className="bg-black/90 rounded-2xl p-4 border border-white/5 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-black text-emerald-400 font-mono tracking-widest flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full bg-emerald-400 ${isVercelDeploying ? 'animate-ping' : ''}`} />
-                          VERCEL BUILD ENGINE
-                        </span>
-                        <button
-                          type="button"
-                          disabled={isVercelDeploying}
-                          onClick={() => {
-                            setIsVercelDeploying(true);
-                            setVercelDeployLogs(['Iniciando verificación...', 'Compilando código estático en NextJS...']);
-                            setTimeout(() => {
-                              setVercelDeployLogs(prev => [...prev, 'Inyectando variables de producción...', 'Sincronizando licencia LIC-WEB...']);
-                              setTimeout(() => {
-                                setVercelDeployLogs(prev => [...prev, '✓ Despliegue completado con éxito!', '🌐 Listo en: https://ramitofutshow.com']);
-                                setIsVercelDeploying(false);
-                              }, 1500);
-                            }, 1000);
-                          }}
-                          className="text-[9px] font-mono font-black text-[#121414] bg-[#4be277] hover:opacity-90 px-3 py-1 rounded-lg transition-all"
-                        >
-                          {isVercelDeploying ? 'BUILDING...' : 'FORCE BUILD'}
-                        </button>
-                      </div>
-
-                      <div className="bg-stone-950 rounded-xl p-3 max-h-32 overflow-y-auto border border-white/5 font-mono text-[8px] text-[#bccbb9]/70 space-y-1.5">
-                        {vercelDeployLogs.length === 0 ? (
-                          <div className="text-[#bccbb9]/30 italic text-center py-2">No hay compilaciones en curso. Presione FORCE BUILD para sincronizar Vercel.</div>
-                        ) : (
-                          vercelDeployLogs.map((log, i) => (
-                            <div key={i} className={log.startsWith('✓') || log.startsWith('🌐') ? 'text-emerald-400 font-bold' : ''}>
-                              {log}
+                        {/* Slider Días Restantes (Solo visible en plan Pro, oculto en plan Gratis ya que no expira) */}
+                        {vercelPlan === 'pro' && (
+                          <div className="space-y-2 pt-2 border-t border-white/5 animate-fadeIn">
+                            <div className="flex justify-between items-center">
+                              <label className="text-[10px] font-black text-[#bccbb9]/60 uppercase tracking-wider">Duración de Renovación (Días)</label>
+                              <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/10 px-2 py-0.5 rounded-lg">{webDaysRemaining} Días</span>
                             </div>
-                          ))
+                            <input 
+                              type="range" 
+                              min="1" 
+                              max="90" 
+                              value={webDaysRemaining} 
+                              onChange={(e) => setWebDaysRemaining(parseInt(e.target.value, 10))}
+                              className="w-full accent-[#4be277]"
+                            />
+                          </div>
+                        )}
+
+                        {vercelPlan === 'free' && (
+                          <div className="p-3 bg-blue-500/5 border border-blue-500/10 rounded-2xl flex items-start gap-2 pt-3 border-t border-white/5">
+                            <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="text-[8.5px] font-black text-blue-400 uppercase tracking-widest block font-sans">Infraestructura Hobby Activa</span>
+                              <p className="text-[7.5px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed mt-0.5 font-mono">
+                                Plan gratuito de Vercel operativo sin vencimientos ni cargos fijos en el panel.
+                              </p>
+                            </div>
+                          </div>
                         )}
                       </div>
+
+                      {/* Dominio y Frecuencia */}
+                      <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
+                        <h5 className="text-[10px] font-black text-[#4be277] uppercase tracking-widest italic mb-2">Conectividad</h5>
+
+                        {/* Dominio Web */}
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Dominio Principal Vinculado</label>
+                          <input 
+                            type="text" 
+                            value={webDomain} 
+                            onChange={(e) => setWebDomain(e.target.value)}
+                            className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white uppercase font-bold focus:border-[#4be277] transition-all outline-none"
+                            placeholder="Ej. TUDOMINIO.COM"
+                          />
+                        </div>
+
+                        {/* Sync Frequency dropdown */}
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Frecuencia de Sincronización Web</label>
+                          <select
+                            value={webSyncFrequency}
+                            onChange={(e) => setWebSyncFrequency(e.target.value)}
+                            className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white font-bold focus:border-[#4be277] transition-all outline-none"
+                          >
+                            <option value="Tiempo Real (Live)" className="bg-zinc-950">Tiempo Real constante</option>
+                            <option value="Cada 5 Minutos" className="bg-zinc-950">Cada 5 Minutos</option>
+                            <option value="Cada 15 Minutos" className="bg-zinc-950">Cada 15 Minutos</option>
+                            <option value="Cada Hora" className="bg-zinc-950">Cada Hora</option>
+                            <option value="Manual" className="bg-zinc-950">Manual (A petición)</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Key details, Deploy Vercel */}
+                    <div className="space-y-6">
+                      {/* Pasarela y Llaves */}
+                      <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
+                        <h5 className="text-[10px] font-black text-[#4be277] uppercase tracking-widest italic mb-2">Pasarela de Pagos</h5>
+
+                        {/* Pasarela de pago web */}
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Pasarela de Pagos (Para señas)</label>
+                          <select
+                            value={webPaymentGateway}
+                            onChange={(e) => setWebPaymentGateway(e.target.value)}
+                            className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white font-bold focus:border-[#4be277] transition-all outline-none"
+                          >
+                            <option value="Mercado Pago (Latam)" className="bg-zinc-950">Mercado Pago (Latam)</option>
+                            <option value="Stripe API Gateway" className="bg-zinc-950">Stripe API (Global)</option>
+                            <option value="PayPal Pro" className="bg-zinc-950">PayPal Pro (Dólares)</option>
+                            <option value="Efectivo o Transferencia" className="bg-zinc-950">Efectivo / Depósito previo</option>
+                          </select>
+                        </div>
+
+                        {/* Llave pública Pagos */}
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Llave de Sincronización API</label>
+                          <input 
+                            type="password" 
+                            value={webPaymentKey} 
+                            onChange={(e) => setWebPaymentKey(e.target.value)}
+                            className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white font-bold focus:border-[#4be277] transition-all outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Vercel build and switch regist */}
+                      <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
+                        <h5 className="text-[10px] font-black text-[#4be277] uppercase tracking-widest italic mb-2">Despliegues Automáticos y Control</h5>
+
+                        {/* Endpoint Deploy Vercel */}
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Vercel Deployment Webhook</label>
+                          <input 
+                            type="text" 
+                            value={webVercelHook} 
+                            onChange={(e) => setWebVercelHook(e.target.value)}
+                            className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-[10px] font-mono text-white/70 focus:border-[#4be277] transition-all outline-none"
+                          />
+                        </div>
+
+                        {/* Switch Permite Registros */}
+                        <div className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl">
+                          <div>
+                            <span className="text-[9px] font-black text-white uppercase tracking-wider block">Registros de Jugadores • Ramito Fut Show</span>
+                            <span className="text-[7px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">Permitir ingresar sin registrar previamente</span>
+                          </div>
+                          <button 
+                            onClick={() => setWebAllowRegistrations(!webAllowRegistrations)}
+                            className={`w-10 h-5.5 rounded-full flex items-center px-0.5 transition-colors ${webAllowRegistrations ? 'bg-emerald-500' : 'bg-white/10'}`}
+                          >
+                            <motion.div animate={{ x: webAllowRegistrations ? 18 : 0 }} className="w-4.5 h-4.5 rounded-full bg-black/90 shadow-md" />
+                          </button>
+                        </div>
+
+                        {/* Consola interactiva de despliegues en Vercel */}
+                        <div className="bg-black/90 rounded-2xl p-4 border border-white/5 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-black text-emerald-400 font-mono tracking-widest flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full bg-emerald-400 ${isVercelDeploying ? 'animate-ping' : ''}`} />
+                              VERCEL BUILD ENGINE
+                            </span>
+                            <button
+                              type="button"
+                              disabled={isVercelDeploying}
+                              onClick={() => {
+                                setIsVercelDeploying(true);
+                                setVercelDeployLogs(['Iniciando verificación...', 'Compilando código estático en NextJS...']);
+                                setTimeout(() => {
+                                  setVercelDeployLogs(prev => [...prev, 'Inyectando variables de producción...', 'Sincronizando licencia LIC-WEB...']);
+                                  setTimeout(() => {
+                                    setVercelDeployLogs(prev => [...prev, '✓ Despliegue completado con éxito!', '🌐 Listo en: https://ramitofutshow.com']);
+                                    setIsVercelDeploying(false);
+                                  }, 1500);
+                                }, 1000);
+                              }}
+                              className="text-[9px] font-mono font-black text-[#121414] bg-[#4be277] hover:opacity-90 px-3 py-1 rounded-lg transition-all"
+                            >
+                              {isVercelDeploying ? 'BUILDING...' : 'FORCE BUILD'}
+                            </button>
+                          </div>
+
+                          <div className="bg-stone-950 rounded-xl p-3 max-h-32 overflow-y-auto border border-white/5 font-mono text-[8px] text-[#bccbb9]/70 space-y-1.5">
+                            {vercelDeployLogs.length === 0 ? (
+                              <div className="text-[#bccbb9]/30 italic text-center py-2">No hay compilaciones en curso. Presione FORCE BUILD para sincronizar Vercel.</div>
+                            ) : (
+                              vercelDeployLogs.map((log, i) => (
+                                <div key={i} className={log.startsWith('✓') || log.startsWith('🌐') ? 'text-emerald-400 font-bold' : ''}>
+                                  {log}
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Form Footer Buttons */}
-              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3">
-                <button 
-                  onClick={() => setShowWebWindow(false)}
-                  className="flex-1 h-14 rounded-2xl border border-white/10 text-white font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all text-center italic"
-                >
-                  Regresar / Salir sin Guardar
-                </button>
-                <button 
-                  disabled={isLicensingReadOnly}
-                  onClick={handleSaveWebConfig}
-                  className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic ${
-                    isLicensingReadOnly 
-                      ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
-                      : 'bg-emerald-500 text-black hover:opacity-90 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
-                  }`}
-                >
-                  {isLicensingReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar Cambios de Licencia Web'}
-                </button>
-              </div>
+                  {/* PLANIFICACIÓN DE ESCALABILIDAD VERCEL (FREE / PRO) - SECCIÓN FULL WIDTH */}
+                  <div className="p-6 bg-white/[0.01] border border-white/5 rounded-3xl space-y-6 text-left font-sans mt-2 mb-8">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/5 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                          <Gem className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div>
+                          <h5 className="text-[11px] font-black text-white uppercase tracking-wider italic">Planificación de Escalabilidad e Infraestructura</h5>
+                          <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest font-mono mt-0.5 block">ESTADO DE TRANSICIÓN PARA EL PLAN GRATUITO DE VERCEL E INTEGRACIÓN PRO</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                        </span>
+                        <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest font-mono">Infraestructura Lista (Vercel)</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Tarjeta 1: Selector de Plan Vercel */}
+                      <div className="p-4 bg-black/40 border border-white/5 rounded-2xl space-y-4 font-sans">
+                        <span className="text-[8.5px] font-black text-[#4be277] uppercase tracking-wider block">1. NIVEL DE SERVIDOR ACTIVO</span>
+                        
+                        <div className="space-y-2">
+                          {/* Boton Plan Hobby */}
+                          <button
+                            type="button"
+                            onClick={() => setVercelPlan('free')}
+                            className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between outline-none ${
+                              vercelPlan === 'free'
+                                ? 'bg-blue-500/10 border-blue-500/35 text-white shadow-[0_0_15px_rgba(59,130,246,0.1)]'
+                                : 'bg-transparent border-white/5 text-[#bccbb9]/60 hover:border-white/10'
+                            }`}
+                          >
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] font-bold block">Vercel Plan Hobby</span>
+                              <span className="text-[8px] opacity-60 block">Soporte inicial sin costos fijos</span>
+                            </div>
+                            <span className="text-[10px] font-black font-mono bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded text-blue-400">
+                              GRATIS
+                            </span>
+                          </button>
+
+                          {/* Boton Plan Pro */}
+                          <button
+                            type="button"
+                            onClick={() => setVercelPlan('pro')}
+                            className={`w-full p-3 rounded-xl border text-left transition-all flex items-center justify-between outline-none ${
+                              vercelPlan === 'pro'
+                                ? 'bg-purple-500/10 border-purple-500/35 text-white shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                                : 'bg-transparent border-white/5 text-[#bccbb9]/60 hover:border-white/10'
+                            }`}
+                          >
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] font-bold block">Vercel Plan Pro</span>
+                              <span className="text-[8px] opacity-60 block">Para escalados de reservas y marcas</span>
+                            </div>
+                            <span className="text-[10px] font-black font-mono bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded text-purple-400">
+                              $20 / Mes
+                            </span>
+                          </button>
+                        </div>
+
+                        <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl space-y-2">
+                          <div className="flex justify-between text-[8px] font-mono text-[#bccbb9]/50 uppercase">
+                            <span>Ancho de banda:</span>
+                            <span className="text-white font-bold">{vercelPlan === 'pro' ? '1,000 GB (1 TB)' : '100 GB (hobby)'}</span>
+                          </div>
+                          <div className="flex justify-between text-[8px] font-mono text-[#bccbb9]/50 uppercase">
+                            <span>Minutos Compilación:</span>
+                            <span className="text-white font-bold">{vercelPlan === 'pro' ? '24,000 min' : '6,000 min'}</span>
+                          </div>
+                          <div className="flex justify-between text-[8px] font-mono text-[#bccbb9]/50 uppercase">
+                            <span>Timeout Serverless:</span>
+                            <span className="text-white font-bold">{vercelPlan === 'pro' ? '300 seg (Máx)' : '10 seg (Limitado)'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tarjeta 2: Configuración DNS Dominio */}
+                      <div className="p-4 bg-black/40 border border-white/5 rounded-2xl space-y-3 flex flex-col justify-between">
+                        <div>
+                          <span className="text-[8.5px] font-black text-amber-500 uppercase tracking-wider block mb-2">2. HOJA DE RUTA DNS PARA DOMINIO</span>
+                          <p className="text-[8px] text-[#bccbb9]/60 leading-relaxed uppercase mb-3 font-mono border-b border-white/5 pb-2">
+                            Apunte su dominio <span className="text-white lowercase font-bold">{webDomain || 'ramitofutshow.com'}</span> en su hosting de DNS (Cloudflare, DonWeb, etc.) con estas credenciales:
+                          </p>
+                        </div>
+
+                        <div className="space-y-2 text-left">
+                          {/* DNS Record A */}
+                          <div className="p-2.5 bg-stone-950 rounded-xl border border-white/5 relative overflow-hidden group">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText('76.76.21.21');
+                                showToast('Dirección IP A-Record copiada', 'success');
+                              }}
+                              className="absolute top-2.5 right-2.5 text-zinc-500 hover:text-white transition-all outline-none"
+                              title="Copiar valor"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-[7px] font-bold text-amber-400 uppercase font-mono tracking-widest block">A RECORD (Raíz del dominio)</span>
+                            <div className="grid grid-cols-3 gap-1 mt-1 text-[8.5px] font-mono">
+                              <div><span className="text-zinc-500">HOST:</span> <span className="text-white font-bold">@</span></div>
+                              <div className="col-span-2"><span className="text-zinc-500 font-bold">VALOR:</span> <span className="text-[#4be277] font-bold">76.76.21.21</span></div>
+                            </div>
+                          </div>
+
+                          {/* DNS Record CNAME */}
+                          <div className="p-2.5 bg-stone-950 rounded-xl border border-white/5 relative overflow-hidden group">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText('cname.vercel-dns.com.');
+                                showToast('Valor CNAME de Vercel copiado', 'success');
+                              }}
+                              className="absolute top-2.5 right-2.5 text-zinc-500 hover:text-white transition-all outline-none"
+                              title="Copiar valor"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-[7px] font-bold text-amber-400 uppercase font-mono tracking-widest block">CNAME RECORD (Subdominio)</span>
+                            <div className="grid grid-cols-3 gap-1 mt-1 text-[8.5px] font-mono text-left">
+                              <div><span className="text-zinc-500 font-bold">HOST:</span> <span className="text-white font-bold">www</span></div>
+                              <div className="col-span-2 truncate"><span className="text-zinc-500 font-bold">VALOR:</span> <span className="text-[#4be277] font-bold">cname.vercel-dns.com.</span></div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <span className="text-[7.5px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg uppercase tracking-wider block text-center font-mono font-bold">
+                            ✓ DNS LISTO PARA APUNTAR SIN COSTOS
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tarjeta 3: Facturación Estimada y Licencia */}
+                      <div className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-4">
+                        <div>
+                          <span className="text-[8.5px] font-black text-purple-400 uppercase tracking-wider block">3. SIMULADOR DE SUSCRIPCIÓN</span>
+                          <span className="text-[7px] font-mono text-[#bccbb9]/40 uppercase tracking-widest block mt-0.5">COSTO COMBINADO PLAN DE ESCALABILIDAD</span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between p-2 bg-white/[0.01] border border-white/5 rounded-xl">
+                            <div>
+                              <span className="text-[9px] font-black text-white block">Licencia Complejo</span>
+                              <span className="text-[7px] text-[#bccbb9]/40 block uppercase">Mapeo ordinario básico</span>
+                            </div>
+                            <span className="text-xs font-black text-white font-mono">$0 USD</span>
+                          </div>
+
+                          <div className="flex items-center justify-between p-2 bg-white/[0.01] border border-white/5 rounded-xl">
+                            <div>
+                              <span className="text-[9px] font-black text-white block">Suscripción Vercel</span>
+                              <span className="text-[7px] text-[#bccbb9]/40 block uppercase">Plan de hosting virtualizado</span>
+                            </div>
+                            <span className="text-xs font-black text-purple-400 font-mono">{vercelPlan === 'pro' ? '$20 USD' : '$0 USD'}</span>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-[#4be277]/5 border border-[#4be277]/10 rounded-xl flex items-center justify-between">
+                          <div>
+                            <span className="text-[8px] font-black text-[#4be277] uppercase block">TOTAL REGULAR ESTIMADO</span>
+                            <span className="text-[7px] text-[#bccbb9]/50 block uppercase">Próximo ciclo en {webDaysRemaining} días</span>
+                          </div>
+                          <span className="text-xs font-black text-emerald-400 font-mono">{vercelPlan === 'pro' ? '$20.00' : '$0.00'} USD / Mes</span>
+                        </div>
+
+                        {/* Notificar limite */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none self-start">
+                          <input 
+                            type="checkbox"
+                            checked={vercelAutoUpgrade}
+                            onChange={(e) => setVercelAutoUpgrade(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-white/15 bg-black/40 text-blue-500 focus:ring-0 focus:ring-offset-0 checkmark-custom"
+                          />
+                          <span className="text-[7.5px] font-bold text-[#bccbb9]/60 uppercase tracking-wider font-sans">Aviso límite de cuota activo</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Form Footer Buttons */}
+                  <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3">
+                    <button 
+                      onClick={() => setShowWebWindow(false)}
+                      className="flex-1 h-14 rounded-2xl border border-white/10 text-white font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all text-center italic"
+                    >
+                      Regresar / Salir sin Guardar
+                    </button>
+                    <button 
+                      disabled={isLicensingReadOnly}
+                      onClick={handleSaveWebConfig}
+                      className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic ${
+                        isLicensingReadOnly 
+                          ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
+                          : 'bg-emerald-500 text-black hover:opacity-90 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                      }`}
+                    >
+                      {isLicensingReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar Cambios de Licencia Web'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CONTENIDO DE MÉTRICAS EN VIVO */}
+              {webConsoleActiveTab === 'metrics' && (
+                <div className="animate-fadeIn font-sans">
+                  {/* Status Alert Badge */}
+                  <div className="p-4 mb-6 bg-zinc-900/55 border border-blue-500/20 rounded-3xl text-left relative overflow-hidden">
+                    <div className="absolute -right-16 -top-16 w-36 h-36 bg-blue-500/[0.03] rounded-full blur-2xl pointer-events-none" />
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                        <Globe className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider block italic">ESTADO: CONECTADO EN PRODUCCIÓN (TEMPORAL)</span>
+                        <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest leading-relaxed mt-0.5">
+                          Visualizando estadísticas en tiempo real estimadas para el dominio <span className="text-white font-mono lowercase font-bold">{webDomain || 'ramitofutshow.com'}</span>. Los datos se actualizarán automáticamente cada hora o al forzar la compilación del Vercel Build Engine.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grid Statistics */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 text-left">
+                    {/* Stat 1 */}
+                    <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl relative overflow-hidden">
+                      <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Ancho de Banda ({vercelPlan === 'pro' ? 'Vercel Pro' : 'Vercel Hobby'})</span>
+                      <div className="flex items-baseline gap-1 mt-1.5">
+                        <span className="text-2xl font-black text-white tracking-tight">{webLicenseActive ? '4.82 GB' : '0.00 GB'}</span>
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase">/ {vercelPlan === 'pro' ? '1,000 GB' : '100 GB'}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden mt-3">
+                        <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: webLicenseActive ? (vercelPlan === 'pro' ? '0.482%' : '4.82%') : '0%' }} />
+                      </div>
+                      <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider mt-2 block">
+                        {webLicenseActive ? `${vercelPlan === 'pro' ? '0.48%' : '4.82%'} de cuota mensual usado` : '0.00% (LICENCIA WEB EXPIRADA)'}
+                      </span>
+                    </div>
+
+                    {/* Stat 2 */}
+                    <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl">
+                      <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Peticiones Edge (24hs)</span>
+                      <div className="flex items-baseline gap-1 mt-1.5">
+                        <span className="text-2xl font-black text-white tracking-tight">{webLicenseActive ? '18,482' : '0'}</span>
+                        <span className={`text-[9px] font-semibold uppercase tracking-wide ${webLicenseActive ? 'text-emerald-400' : 'text-zinc-500'}`}>{webLicenseActive ? '▲ 14%' : '0%'}</span>
+                      </div>
+                      <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-4 block">
+                        {webLicenseActive ? 'Tiempo respuesta: 14ms (A+)' : 'SITIO WEB SUSPENDIDO'}
+                      </span>
+                    </div>
+
+                    {/* Stat 3 */}
+                    <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl">
+                      <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Invocaciones Serverless</span>
+                      <div className="flex items-baseline gap-1 mt-1.5">
+                        <span className="text-2xl font-black text-white tracking-tight">
+                          {webLicenseActive ? '2,842' : '0'}
+                        </span>
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase">INVS</span>
+                      </div>
+                      <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-4 block">
+                        {webLicenseActive ? 'Promedio duración: 112ms' : 'CONSOLAS DE APPORTACIÓN INACTIVAS'}
+                      </span>
+                    </div>
+
+                    {/* Stat 4 */}
+                    <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl">
+                      <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Uso de Tokens Diario</span>
+                      <div className="flex items-baseline gap-1 mt-1.5">
+                        <span className="text-2xl font-black text-white tracking-tight">{webLicenseActive ? '15.4K' : '0.0K'}</span>
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase font-mono">TOKENS</span>
+                      </div>
+                      <span className={`text-[8px] font-black uppercase tracking-widest mt-4 block ${webLicenseActive ? 'text-[#4be277]' : 'text-red-500'}`}>
+                        {webLicenseActive ? 'Licencia ACTIVA y persistida' : 'LICENCIA WEB INACTIVA'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* CSS Visual Bar Chart */}
+                  <div className="p-6 bg-white/[0.01] border border-white/5 rounded-3xl text-left mb-8">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
+                      <div>
+                        <h5 className="text-[10px] font-black text-white uppercase tracking-wider">Historial de Tránsito de Peticiones</h5>
+                        <p className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest font-mono">Simulación de tráfico por banda horaria (Últimas 12 horas)</p>
+                      </div>
+                      <button 
+                        disabled={isRefreshingVercelMetrics}
+                        onClick={() => {
+                          setIsRefreshingVercelMetrics(true);
+                          if (showToast) showToast('Recalculando telemetría de Vercel...', 'success');
+                          setTimeout(() => {
+                            setIsRefreshingVercelMetrics(false);
+                            if (showToast) showToast('Métricas actualizadas con éxito', 'success');
+                          }, 1200);
+                        }}
+                        className="h-8 px-3.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-black text-[9px] uppercase tracking-widest border border-white/5 transition-all flex items-center gap-1.5 italic outline-none"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingVercelMetrics ? 'animate-spin' : ''}`} />
+                        {isRefreshingVercelMetrics ? 'Actualizando...' : 'Recalcular'}
+                      </button>
+                    </div>
+
+                    {/* Column bars */}
+                    <div className="h-28 flex items-end justify-between gap-1 sm:gap-2.5 px-2">
+                      {[45, 62, 28, 74, 91, 55, 38, 84, 110, 95, 70, 50].map((val, idx) => (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 group">
+                          <div className="w-full bg-zinc-800 rounded-t-md relative h-20 flex items-end overflow-hidden group-hover:bg-zinc-700/60 transition-colors">
+                            <motion.div 
+                              initial={{ height: 0 }}
+                              animate={{ height: `${val}%` }}
+                              transition={{ duration: 0.8, delay: idx * 0.03 }}
+                              className="w-full bg-gradient-to-t from-blue-600 to-blue-400 group-hover:from-emerald-500 group-hover:to-emerald-400 transition-colors"
+                            />
+                          </div>
+                          <span className="text-[7.5px] font-bold text-zinc-500 font-mono">{idx + 8}:00</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Endpoint Request breakdown */}
+                  <div className="p-6 bg-white/[0.01] border border-white/5 rounded-3xl text-left mb-8">
+                    <span className="text-[9px] font-black text-white uppercase tracking-wider block mb-4 italic">Distribución de Peticiones por Endpoint de Producción</span>
+                    
+                    <div className="space-y-3.5">
+                      {[
+                        { path: '/api/bookings', desc: 'Sincronización en tiempo real de turnos y canchas', count: '8,412 reqs', pct: '45%', color: 'bg-blue-500' },
+                        { path: '/api/licenses', desc: 'Validación de licencia VIP / Élite en base de datos', count: '4,102 reqs', pct: '22%', color: 'bg-emerald-500' },
+                        { path: '/api/profiles', desc: 'Autenticación y guardado de firmas del personal', count: '3,124 reqs', pct: '17%', color: 'bg-purple-500' },
+                        { path: '/api/news', desc: 'Tránsito de visualización de banner informativo', count: '2,844 reqs', pct: '16%', color: 'bg-amber-500' }
+                      ].map((endpoint, i) => (
+                        <div key={i} className="flex items-center justify-between gap-4 p-3 bg-zinc-950/40 border border-white/5 rounded-2xl">
+                          <div className="space-y-0.5">
+                            <span className="text-xs font-mono font-bold text-white selection:bg-blue-500">{endpoint.path}</span>
+                            <p className="text-[8.5px] font-semibold text-[#bccbb9]/40 uppercase tracking-wider">{endpoint.desc}</p>
+                          </div>
+                          <div className="flex items-center gap-4 text-right shrink-0">
+                            <div>
+                              <span className="text-[11px] font-black text-white block">{endpoint.count}</span>
+                              <span className="text-[8px] font-bold text-zinc-500 block font-mono">{endpoint.pct} del tráfico</span>
+                            </div>
+                            <div className="w-1.5 h-8 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className={`w-full ${endpoint.color} rounded-full`} style={{ height: endpoint.pct }} />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3">
+                    <button 
+                      onClick={() => setShowWebWindow(false)}
+                      className="w-full h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
+                    >
+                      <ArrowRight className="w-4 h-4 rotate-180" /> Cerrar Consola de Canales
+                    </button>
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         )}
@@ -3227,7 +4013,7 @@ export default function ProfileView() {
       {/* Ventana de Configuración Licencia App PWA (Detallada y Completa) */}
       <AnimatePresence>
         {showAppWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             {/* Background Gradient Decorative elements */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-amber-600/5 rounded-full blur-[120px] pointer-events-none" />
@@ -3270,7 +4056,7 @@ export default function ProfileView() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-white/5">
                     {/* Alerta de renovación */}
                     <div className="p-4 bg-black/40 border border-white/5 rounded-2xl flex flex-col justify-between space-y-3">
                       <div>
@@ -3282,7 +4068,7 @@ export default function ProfileView() {
                       <button
                         type="button"
                         onClick={() => sendRenewalRequestToElite('app')}
-                        className="w-full h-10 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-500 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all"
+                        className="w-full h-10 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-500 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all animate-pulse"
                       >
                         Enviar Alerta de Renovación
                       </button>
@@ -3313,153 +4099,124 @@ export default function ProfileView() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Contacto Global de WhatsApp para Renovación (NUEVO) */}
+                    <div className="p-4 bg-black/40 border border-[#25D366]/20 rounded-2xl flex flex-col justify-between space-y-3">
+                      <div>
+                        <span className="text-[9px] font-black text-[#25D366] uppercase tracking-wider block">📞 RENOVACIÓN TOTAL / ELITE</span>
+                        <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block mt-0.5">
+                          Este es el número móvil de asistencia directa del Administrador Élite.
+                        </span>
+                        <p className="text-[12px] font-mono font-black text-white tracking-wider mt-1.5">{elitePhone}</p>
+                      </div>
+                      <a
+                        href={`https://wa.me/${elitePhone.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full h-10 bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/35 text-[#25D366] rounded-xl font-black text-[9px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" /> Contactar Elite
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!isLicensingReadOnly && (
+                <div className="p-4 mb-6 bg-purple-950/10 border border-purple-500/20 rounded-2xl flex items-start gap-3 text-left font-sans">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0 border border-purple-500/25">
+                    <Smartphone className="w-4 h-4 text-purple-400 font-bold" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-wider block italic">Canal de Renovación Sincronizado</span>
+                    <p className="text-[8.5px] font-bold text-[#bccbb9]/50 uppercase tracking-widest leading-relaxed mt-0.5">
+                      El Admin VIP visualiza tu número de WhatsApp Élite (<span className="text-[#25D366] font-mono font-bold">{elitePhone}</span>) directamente en su alerta de renovación para recordar el pago y coordinar renovaciones. Asegúralo siempre actualizado.
+                    </p>
                   </div>
                 </div>
               )}
 
               {/* Grid content */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 mb-10">
-                {/* Left Column: General Configuration */}
-                <div className="space-y-6">
-                  {/* PWA State and Period */}
-                  <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
-                    <h5 className="text-[10px] font-black text-[#FF9100] uppercase tracking-widest italic mb-2">Suscripción & Período</h5>
+                {/* Column 1: Suscripción & Período */}
+                <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4 text-left">
+                  <h5 className="text-[10px] font-black text-[#FF9100] uppercase tracking-widest italic mb-2">Suscripción & Período</h5>
 
-                    {/* Switch Activo */}
-                    <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-2xl">
-                      <div>
-                        <span className="text-[10px] font-black text-white uppercase tracking-wider block">Estado de Licencia Móvil</span>
-                        <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">Habilitar el ingreso a celulares</span>
-                      </div>
-                      <button 
-                        onClick={() => {
-                          saveSettings({ app_license_active: !appLicenseActive });
-                        }}
-                        className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors ${appLicenseActive ? 'bg-[#FF9100]' : 'bg-white/10'}`}
-                      >
-                        <motion.div animate={{ x: appLicenseActive ? 24 : 0 }} className={`w-5 h-5 rounded-full ${appLicenseActive ? 'bg-black' : 'bg-zinc-400'}`} />
-                      </button>
+                  {/* Switch Activo */}
+                  <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-2xl">
+                    <div>
+                      <span className="text-[10px] font-black text-white uppercase tracking-wider block">Estado de Licencia Móvil</span>
+                      <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">Habilitar el ingreso a celulares</span>
                     </div>
-
-                    {/* Slider Días Restantes */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <label className="text-[10px] font-black text-[#bccbb9]/60 uppercase tracking-wider">Duración de Licencia App (Días)</label>
-                        <span className="text-xs font-mono font-black text-amber-500 bg-amber-500/10 border border-amber-500/10 px-2 py-0.5 rounded-lg">{appDaysRemaining} Días</span>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="1" 
-                        max="120" 
-                        value={appDaysRemaining} 
-                        onChange={(e) => setAppDaysRemaining(parseInt(e.target.value, 10))}
-                        className="w-full accent-[#FF9100]"
-                      />
-                    </div>
+                    <button 
+                      onClick={() => {
+                        saveSettings({ app_license_active: !appLicenseActive });
+                      }}
+                      className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors ${appLicenseActive ? 'bg-[#FF9100]' : 'bg-white/10'}`}
+                    >
+                      <motion.div animate={{ x: appLicenseActive ? 24 : 0 }} className={`w-5 h-5 rounded-full ${appLicenseActive ? 'bg-black' : 'bg-zinc-400'}`} />
+                    </button>
                   </div>
 
-                  {/* PWA Identity and Support Phone */}
-                  <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
-                    <h5 className="text-[10px] font-black text-[#FF9100] uppercase tracking-widest italic mb-2">Identidad e Integración</h5>
-
-                    {/* Nombre PWA */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Nombre Corto de Instalación (PWA)</label>
-                      <input 
-                        type="text" 
-                        value={appPwaShortName} 
-                        onChange={(e) => setAppPwaShortName(e.target.value)}
-                        className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white uppercase font-bold focus:border-[#FF9100] transition-all outline-none"
-                        placeholder="Ej. RAMITO APP"
-                      />
+                  {/* Info Box: Días Restantes (Slider removido para prevenir manipulación manual) */}
+                  <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl space-y-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[9.5px] font-black text-amber-500 uppercase tracking-wider">Duración de Licencia App</label>
+                      <span className="text-xs font-mono font-black text-amber-400 bg-amber-500/15 border border-amber-500/20 px-2.5 py-1 rounded-xl">
+                        {appDaysRemaining} Días Restantes
+                      </span>
                     </div>
-
-                    {/* Support WhatsApp Link */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Número Soporte en App (Format WhatsApp)</label>
-                      <input 
-                        type="text" 
-                        value={newAdminPhone} 
-                        onChange={(e) => setNewAdminPhone(e.target.value)}
-                        className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white uppercase font-bold focus:border-[#FF9100] transition-all outline-none"
-                      />
-                    </div>
-
-                    {/* Offline Cache dropdown */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Estrategia offline (Service Worker)</label>
-                      <select
-                        value={appOfflineCache}
-                        onChange={(e) => setAppOfflineCache(e.target.value)}
-                        className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white font-bold focus:border-[#FF9100] transition-all outline-none"
-                      >
-                        <option value="Pre-cargar reservas y perfiles" className="bg-zinc-950">Pre-cargar reservas y perfiles completas</option>
-                        <option value="Solo guardar datos de sesión activa" className="bg-zinc-950">Solo guardar sesión del jugador</option>
-                        <option value="Sin caché offline (Requiere internet siempre)" className="bg-zinc-950">Sin caché offline (Estricto)</option>
-                      </select>
-                    </div>
+                    <p className="text-[8.5px] font-bold text-[#bccbb9]/50 uppercase tracking-widest leading-relaxed">
+                      ⚠️ CONTROL SINCRONIZADO: El valor de días se recarga y acumula únicamente canjeando los cupones activos del administrador.
+                    </p>
                   </div>
                 </div>
 
-                {/* Right Column: Push alerts */}
-                <div className="space-y-6">
-                  <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
-                    <h5 className="text-[10px] font-black text-[#FF9100] uppercase tracking-widest italic mb-2">Servicios de Notificaciones SUPABASE</h5>
- 
-                    {/* Switch Push alert */}
-                    <div className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl">
-                      <div>
-                        <span className="text-[9px] font-black text-white uppercase tracking-wider block">Habilitar Servidor de Notificaciones Supabase</span>
-                        <span className="text-[7px] font-bold text-[#bccbb9]/30 uppercase tracking-widest mt-0.5 block">Enviar notificaciones push automáticas por Supabase Realtime / Edge Functions</span>
-                      </div>
-                      <button 
-                        onClick={() => setAppPushEnabled(!appPushEnabled)}
-                        className={`w-10 h-5.5 rounded-full flex items-center px-0.5 transition-colors ${appPushEnabled ? 'bg-amber-500' : 'bg-white/10'}`}
-                      >
-                        <motion.div animate={{ x: appPushEnabled ? 18 : 0 }} className="w-4.5 h-4.5 rounded-full bg-black/95 shadow-md" />
-                      </button>
-                    </div>
- 
-                    {/* FCM Token Config */}
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Supabase Push Trigger App ID</label>
-                      <input 
-                        type="text" 
-                        value={appPushId} 
-                        onChange={(e) => setAppPushId(e.target.value)}
-                        className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white focus:border-[#FF9100] transition-all outline-none font-mono"
-                      />
-                    </div>
- 
-                    {/* Consola de Push test instantánea */}
-                    <div className="bg-black/90 rounded-2xl p-4 border border-white/5 space-y-3">
-                      <span className="text-[9px] font-black text-amber-500 font-mono tracking-widest flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                        CONSOLA PUSH NOTIFICATION (SUPABASE REALTIME)
-                      </span>
-                      <input 
-                        type="text" 
-                        value={testPushMessage} 
-                        onChange={(e) => setTestPushMessage(e.target.value)} 
-                        placeholder="ESCRIBE LA NOTIFICACIÓN DE PRUEBA DE SUPABASE..."
-                        className="w-full h-10 bg-zinc-900 border border-white/5 rounded-xl px-3 text-[9px] font-black font-mono text-white outline-none focus:border-amber-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!testPushMessage.trim()) {
-                            showToast('Escriba un mensaje para mandar', 'error');
-                            return;
-                          }
-                          showToast(`🔔 SUPABASE PUSH SENT: "${testPushMessage.toUpperCase()}"`, 'success');
-                          setTestPushMessage('');
-                        }}
-                        className="w-full h-10 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/50 text-amber-500 font-black font-mono text-[9px] uppercase tracking-widest italic transition-all"
-                      >
-                        🚀 ENVIAR NOTIFICACIÓN AL INSTANTE
-                      </button>
-                    </div>
+                {/* Column 2: Identidad e Integración */}
+                <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4 text-left">
+                  <h5 className="text-[10px] font-black text-[#FF9100] uppercase tracking-widest italic mb-2">Identidad e Integración</h5>
+
+                  {/* Nombre PWA */}
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block">Nombre Corto de Instalación (PWA)</label>
+                    <input 
+                      type="text" 
+                      value={appPwaShortName} 
+                      onChange={(e) => setAppPwaShortName(e.target.value)}
+                      className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white uppercase font-bold focus:border-[#FF9100] transition-all outline-none"
+                      placeholder="Ej. RAMITO APP"
+                    />
                   </div>
+
+                  {/* Elite Support Phone configuration / presentation */}
+                  {!isLicensingReadOnly ? (
+                    <div className="p-4 bg-black/60 border border-[#25D366]/25 rounded-2xl space-y-2.5 text-left font-sans">
+                      <span className="text-[8.5px] font-black text-[#25D366] uppercase tracking-widest block font-bold">📞 Tu Número Móvil Élite Admin</span>
+                      <p className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest leading-normal">
+                        Configura aquí tu celular de contacto. El Admin VIP lo verá directamente en su sesión para coordinar contigo los pagos de renovación.
+                      </p>
+                      <input 
+                        type="text" 
+                        value={elitePhone} 
+                        onChange={(e) => {
+                          setElitePhone(e.target.value);
+                          localStorage.setItem('ramito_elite_phone', e.target.value);
+                        }} 
+                        placeholder="Ej: +51 987 654 321" 
+                        className="w-full h-11 bg-black/40 border border-[#25D366]/20 rounded-xl px-4 text-xs font-mono font-bold text-white focus:border-[#25D366] transition-all outline-none" 
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-3.5 bg-black/60 border border-[#25D366]/10 rounded-2xl space-y-1.5 text-left font-sans">
+                      <span className="text-[8.5px] font-black text-[#25D366]/60 uppercase tracking-widest block font-bold font-sans">Soporte Licencia Élite Admin</span>
+                      <div className="flex items-center justify-between gap-2 bg-[#25D366]/5 border border-[#25D366]/15 rounded-xl p-2 px-3.5">
+                        <span className="font-mono text-xs font-black text-[#25D366] tracking-wider">{elitePhone}</span>
+                        <span className="text-[7.5px] font-black text-[#25D366] bg-[#25D366]/5 px-2 py-1 rounded-lg border border-[#25D366]/15 uppercase tracking-widest shrink-0 font-sans font-bold">
+                          Canal Elite
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -3491,7 +4248,7 @@ export default function ProfileView() {
       {/* Ventana de Configuración Licencia Cierre de Emergencia Completa (Pantalla Completa) */}
       <AnimatePresence>
         {showEmergencyWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             {/* Background Gradient Decorative elements */}
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-red-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[120px] pointer-events-none" />
@@ -3526,10 +4283,10 @@ export default function ProfileView() {
                     <div>
                       <span className="text-[11px] font-black text-red-500 tracking-wider flex items-center gap-1.5 italic uppercase">
                         <Crown className="w-3.5 h-3.5 text-red-500 inline shrink-0" strokeWidth={2.5} />
-                        MODO DE SÓLO LECTURA (VIP ADMIN)
+                        MODO DE SÓLO LECTURA (SOPORTE DE VENTAS)
                       </span>
                       <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
-                        No posees permisos de Élite para suspender actividades en los servidores de producción de Ramito. Contacta al Administrador Principal para solicitar delegación temporal de llaves de emergencia.
+                        No posees permisos de Élite ni VIP para suspender actividades en los servidores de producción de Ramito. Contacta al Administrador Principal para solicitar delegación temporal de llaves de emergencia.
                       </p>
                     </div>
                   </div>
@@ -3546,27 +4303,28 @@ export default function ProfileView() {
                     {/* Switch principal */}
                     <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-2xl">
                       <div>
-                        <span className="text-[10px] font-black text-white uppercase tracking-wider block">Activar Cierre de Emergencia</span>
+                        <span className="text-[10px] font-black text-white uppercase tracking-wider block">Activar Cierre General</span>
                         <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">Bloquea reservas nuevas e inicios de juego en la APP</span>
                       </div>
                       {!isReadOnly ? (
                         <button 
+                          type="button"
                           onClick={() => {
                             const newVal = !emergencyMode;
                             setEmergencyMode(newVal);
                             
                             addAuditLog(
-                              newVal ? 'ACTIVACIÓN DE CIERRE DE EMERGENCIA' : 'DESACTIVACIÓN DE CIERRE DE EMERGENCIA',
-                              `Cierre preventivo general modificado a ${newVal ? 'ACTIVADO' : 'NORMAL'}.`,
+                              newVal ? 'ACTIVACIÓN DE CIERRE GENERAL' : 'DESACTIVACIÓN DE CIERRE GENERAL',
+                              `Cierre de complejo modificado a ${newVal ? 'ACTIVADO' : 'NORMAL'}.`,
                               newVal ? 'alert' : 'success'
                             );
 
                             // Trigger real system notification with high-impact details
                             const emergencyMessageObj = {
                               id: `emergency_${Date.now()}`,
-                              title: newVal ? 'CIERRE CRÍTICO DE EMERGENCIA' : 'REAPERTURA DE COMPLEJO',
+                              title: newVal ? (emergencyType === 'critical' ? '🔴 CIERRE CRÍTICO DE EMERGENCIA' : '⚠️ CIERRE PREVENTIVO ACTIVO') : 'REAPERTURA DE COMPLEJO',
                               body: newVal 
-                                ? `La administración ha declarado un Cierre de Emergencia. Aviso oficial: ${emergencyMessage ? emergencyMessage.toUpperCase() : 'CONTRATIEMPO TÉCNICO / FUERZA MAYOR'}. Reservas bloqueadas.`
+                                ? `La administración ha declarado un bloqueo temporal. Aviso oficial: ${emergencyMessage ? emergencyMessage.toUpperCase() : 'CONTRATIEMPO TÉCNICO / MANTENIMIENTO PREVENTIVO'}.`
                                 : '¡Complejo Deportivo rehabilitado con éxito! Se reanuda la reserva de turnos online de forma inmediata.',
                               time: 'Hace un momento',
                               read: false
@@ -3575,7 +4333,7 @@ export default function ProfileView() {
                               setNotifications((prev: any[]) => [emergencyMessageObj, ...(prev || [])]);
                             }
 
-                            if (showToast) showToast(newVal ? 'Cierre de Emergencia Activado' : 'Cierre de Emergencia Desactivado', 'success');
+                            if (showToast) showToast(newVal ? 'Cierre de Complejo Activado' : 'Cierre de Complejo Desactivado', 'success');
                           }}
                           className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors shrink-0 ${emergencyMode ? 'bg-red-500' : 'bg-white/10'}`}
                         >
@@ -3584,6 +4342,60 @@ export default function ProfileView() {
                       ) : (
                         <span className="text-[8px] font-black text-[#FF9100] bg-[#FF9100]/10 border border-[#FF9100]/20 px-2 py-1 rounded shrink-0">VIP READ ONLY</span>
                       )}
+                    </div>
+
+                    {/* Modalidad de Cierre selector de impacto */}
+                    <div className="space-y-2 pt-3 border-t border-white/5 font-sans">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider">Modalidad del Bloqueo</label>
+                        <span className={`text-[7px] font-mono font-black uppercase px-2 py-0.5 rounded ${
+                          emergencyType === 'critical' 
+                            ? 'text-red-400 bg-red-400/5 border border-red-500/10' 
+                            : 'text-amber-400 bg-amber-400/5 border border-amber-500/10'
+                        }`}>
+                          {emergencyType === 'critical' ? '🚨 Máxima Alerta' : '⚠️ Operativo Sano'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Botón Crítico */}
+                        <button
+                          type="button"
+                          disabled={isReadOnly}
+                          onClick={() => {
+                            setEmergencyType('critical');
+                            setEmergencyMessage("EL COMPLEJO PERMANECERÁ CERRADO TEMPORALMENTE DEBIDO A FUERZAS MAYOR, LES AGRADECEMOS SU COMPRENSIÓN.");
+                            if (showToast) showToast('Cierre cambiado a Crítico (Fuerza Mayor)', 'success');
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            emergencyType === 'critical'
+                              ? 'bg-red-500/10 border-red-500/40 text-white shadow-[0_0_12px_rgba(239,68,68,0.1)]'
+                              : 'bg-transparent border-white/5 text-[#bccbb9]/40 hover:border-white/10 hover:text-[#bccbb9]/60'
+                          }`}
+                        >
+                          <span className="text-[9px] font-black uppercase text-red-500 block">🚨 Crítico</span>
+                          <span className="text-[7px] text-[#bccbb9]/30 font-bold block uppercase mt-0.5 font-mono">Fuerza Mayor</span>
+                        </button>
+
+                        {/* Botón Preventivo */}
+                        <button
+                          type="button"
+                          disabled={isReadOnly}
+                          onClick={() => {
+                            setEmergencyType('preventive');
+                            setEmergencyMessage("NUESTROS CAMPOS SE ENCUENTRAN BAJO MANTENIMIENTO PREVENTIVO ORDINARIO PARA REESTABLECER EL TERRENO DE JUEGO. REAPERTURA PRONTO.");
+                            if (showToast) showToast('Cierre cambiado a Preventivo (Mantenimiento)', 'success');
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            emergencyType === 'preventive'
+                              ? 'bg-amber-500/10 border-amber-500/40 text-white shadow-[0_0_12px_rgba(245,158,11,0.1)]'
+                              : 'bg-transparent border-white/5 text-[#bccbb9]/40 hover:border-white/10 hover:text-[#bccbb9]/60'
+                          }`}
+                        >
+                          <span className="text-[9px] font-black uppercase text-amber-500 block">⚠️ Preventivo</span>
+                          <span className="text-[7px] text-[#bccbb9]/30 font-bold block uppercase mt-0.5 font-mono">Cuidado / Limpieza</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
  
@@ -3681,18 +4493,37 @@ export default function ProfileView() {
                     <div className="flex justify-center py-2">
                       {/* Smartphone Wrapper */}
                       <div className="relative w-full max-w-[240px] h-[400px] bg-zinc-950 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col justify-between p-1.5 text-center select-none">
-                        <div className="w-full h-full rounded-[2.2rem] overflow-hidden relative bg-black">
+                        <div className="w-full h-full rounded-[2.2rem] overflow-hidden relative bg-black flex flex-col items-center justify-center px-3">
                           {/* Image rendering */}
                           <img 
                             src="/emergencia.png" 
                             alt="Cierre de Emergencia" 
-                            className="w-full h-full object-cover select-none pointer-events-none"
+                            className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none opacity-20"
                             referrerPolicy="no-referrer"
                           />
                           
+                          {/* Dynamic live banner representation inside mock phone */}
+                          <div className={`relative z-10 w-full p-3 rounded-2xl border bg-black/95 text-center space-y-1.5 scale-90 ${
+                            emergencyType === 'critical' ? 'border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.1)]' : 'border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.1)]'
+                          }`}>
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center mx-auto text-[10px] ${
+                              emergencyType === 'critical' ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400'
+                            }`}>
+                              {emergencyType === 'critical' ? '🚨' : '⚠️'}
+                            </div>
+                            <span className={`text-[6px] font-black tracking-widest uppercase block ${
+                              emergencyType === 'critical' ? 'text-red-400' : 'text-amber-400'
+                            }`}>
+                              {emergencyType === 'critical' ? 'Cierre Crítico' : 'Cierre Preventivo'}
+                            </span>
+                            <p className="text-[6px] font-bold text-white/90 uppercase tracking-wide leading-tight font-mono max-h-16 overflow-y-auto no-scrollbar">
+                              {emergencyMessage || 'MENSAJE DE CIERRE O MANTENIMIENTO PREVENTIVO GENERAL.'}
+                            </p>
+                          </div>
+                          
                           {/* Dark glow container to represent phone notch */}
-                          <div className="absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-black/80 to-transparent flex justify-center">
-                            <div className="w-20 h-3 bg-black rounded-b-xl" />
+                          <div className="absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-black/80 to-transparent flex justify-center pointer-events-none">
+                            <div className="w-14 h-2.5 bg-black rounded-b-lg" />
                           </div>
                         </div>
                       </div>
@@ -3724,7 +4555,7 @@ export default function ProfileView() {
                       : 'bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 hover:border-red-500/50 text-red-400 hover:border-red-500/60 shadow-[0_0_20px_rgba(239,68,68,0.15)]'
                   }`}
                 >
-                  <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Cambios de Emergencia'}
+                  <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Solo Lectura)' : 'Guardar y Sincronizar Cambios de Emergencia'}
                 </button>
               </div>
             </div>
@@ -3735,11 +4566,11 @@ export default function ProfileView() {
       {/* Ventana de Configuración de Mantenimiento del Sistema Completa (Pantalla Completa) */}
       <AnimatePresence>
         {showMaintenanceWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             {/* Background elements Deco */}
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-amber-600/5 rounded-full blur-[120px] pointer-events-none" />
-
+ 
             <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
@@ -3750,7 +4581,7 @@ export default function ProfileView() {
                   <div>
                     <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Módulo de Mantenimiento del Sistema</h4>
                     <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
-                      GESTOR EXCLUSIVO PARA CONFIGURAR LA PANTALLA DE TRABAJOS DE MEJORA EN LA APP
+                      GESTOR EXCLUSIVO EN PANEL DE LICENCIAS PARA EL BLOQUEO / TRABAJOS TÉCNICOS DE LA APP
                     </span>
                   </div>
                 </div>
@@ -3761,8 +4592,8 @@ export default function ProfileView() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-
-              {isReadOnly && (
+ 
+              {isMaintenanceReadOnly && (
                 <div className="p-5 mb-8 bg-zinc-950/60 w-full rounded-3xl border border-red-500/20 space-y-4 text-left shadow-lg relative overflow-hidden animate-fade-in">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl pointer-events-none" />
                   <div className="flex items-start gap-4">
@@ -3771,16 +4602,16 @@ export default function ProfileView() {
                     </div>
                     <div>
                       <span className="text-[11px] font-black text-red-500 tracking-wider flex items-center gap-1.5 italic uppercase">
-                        MODO DE SÓLO LECTURA (VIP ADMIN)
+                        MODO DE SÓLO LECTURA ({userRole === 'admin_vip' ? 'VIP ADMIN' : 'VENDEDOR / REGULAR OPERADOR'})
                       </span>
                       <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
-                        No posees permisos de Élite para modificar con persistencia crítica algunos ajustes globales, pero puedes alternar momentáneamente o previsualizar el comportamiento de la app en mantenimiento.
+                        El modo de mantenimiento de la aplicación es administrado con privilegios exclusivos por el Admin Élite. No posees autorización para modificar o desactivar este bloqueo global en el Panel de Licencias.
                       </p>
                     </div>
                   </div>
                 </div>
               )}
-
+ 
               {/* Informative Status Widget */}
               <div className="p-5 mb-8 bg-zinc-900/40 border border-amber-500/10 rounded-3xl text-left relative overflow-hidden">
                 <div className="absolute -right-16 -top-16 w-36 h-36 bg-amber-500/[0.03] rounded-full blur-2xl pointer-events-none animate-pulse" />
@@ -3797,7 +4628,7 @@ export default function ProfileView() {
                       ID CONSOLE: LIC-SYS-MANT-2026-FUT
                     </span>
                   </div>
-
+ 
                   <div className="p-4 bg-zinc-950/50 border border-white/5 rounded-2xl flex flex-col justify-between">
                     <div>
                       <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Diseño de Bloqueo</span>
@@ -3811,32 +4642,99 @@ export default function ProfileView() {
                   </div>
                 </div>
               </div>
-
+ 
               {/* Interactive configurations details */}
-              <div className="max-w-xl mx-auto space-y-6 relative mb-8">
+              <div className="max-w-xl mx-auto space-y-6 relative mb-8 w-full">
                 {/* Switch de Mantenimiento */}
                 <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4 text-left">
                   <h5 className="text-[10px] font-black text-amber-500 uppercase tracking-widest italic mb-2">Interruptor Maestro de Bloqueo</h5>
                   
-                  <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-2xl">
-                    <div>
-                      <span className="text-[10px] font-black text-white uppercase tracking-wider block font-sans">Activar Mantenimiento</span>
-                      <span className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block mt-0.5">Muestra la pantalla de trabajos de mejora técnica inmediatamente en la APP</span>
+                  {!maintenanceMode ? (
+                    <div className="flex items-center justify-between p-3.5 bg-black/40 border border-white/5 rounded-2xl">
+                      <div>
+                        <span className="text-[10px] font-black text-white uppercase tracking-wider block font-sans">Activar Mantenimiento</span>
+                        <span className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block mt-0.5">Muestra la pantalla de trabajos de mejora técnica inmediatamente en la APP</span>
+                      </div>
+                      <button 
+                        disabled={isMaintenanceReadOnly}
+                        onClick={() => {
+                          if (isMaintenanceReadOnly) {
+                            showToast('No tienes permisos de Élite para cambiar este ajuste.', 'error');
+                            return;
+                          }
+                          setMaintenanceMode(true);
+                          localStorage.setItem('ramito_maintenance', 'true');
+                          if (showToast) showToast('Modo Mantenimiento Activado', 'success');
+                          addAuditLog('PUESTA EN MANTENIMIENTO', 'El Admin Élite ordenó detener el servicio de reserva de la app móvil.', 'success');
+                        }}
+                        className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors shrink-0 bg-white/10 ${isMaintenanceReadOnly ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        <motion.div animate={{ x: 0 }} className="w-5 h-5 rounded-full bg-zinc-400" />
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => {
-                        const newVal = !maintenanceMode;
-                        setMaintenanceMode(newVal);
-                        localStorage.setItem('ramito_maintenance', String(newVal));
-                        if (showToast) showToast(newVal ? 'Modo Mantenimiento Activado' : 'Modo Mantenimiento Desactivado', 'success');
-                      }}
-                      className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors shrink-0 ${maintenanceMode ? 'bg-red-500' : 'bg-white/10'}`}
-                    >
-                      <motion.div animate={{ x: maintenanceMode ? 24 : 0 }} className={`w-5 h-5 rounded-full ${maintenanceMode ? 'bg-white' : 'bg-zinc-400'}`} />
-                    </button>
-                  </div>
-                </div>
+                  ) : (
+                    // Mantenimiento está ACTIVO. Para sacarlo se necesita la clave élite del admin de nuevo.
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3.5 bg-red-950/20 border border-red-500/20 rounded-2xl">
+                        <div>
+                          <span className="text-[10px] font-black text-[#FF9100] uppercase tracking-wider block font-sans">Mantenimiento Activo</span>
+                          <span className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block mt-0.5">El sistema móvil de reservas se encuentra completamente en pausa</span>
+                        </div>
+                        <span className="px-2.5 py-1 text-[8.5px] font-black font-mono text-red-500 bg-red-500/10 border border-red-500/25 rounded-md animate-pulse">
+                          BLOQUEADO
+                        </span>
+                      </div>
 
+                      {isMaintenanceReadOnly ? (
+                        <div className="p-3.5 bg-zinc-950 border border-white/5 rounded-xl text-center">
+                          <p className="text-[8.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest leading-relaxed">
+                            UN ADMINISTRADOR ÉLITE AUTORIZADO DEBE DESACTIVAR EL MANTENIMIENTO DESDE SU CONSOLA EXCLUSIVA.
+                          </p>
+                        </div>
+                      ) : (
+                        // Formulario de desactivación mediante clave
+                        <div className="p-4 bg-zinc-950 border border-amber-500/20 rounded-2xl space-y-3">
+                          <div className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            <span className="text-[8.5px] font-black text-amber-500 uppercase tracking-wider block italic font-mono">Verificar Identidad para Desactivar</span>
+                          </div>
+                          
+                          <p className="text-[8px] font-black text-[#bccbb9]/50 uppercase tracking-widest leading-relaxed">
+                            Para restablecer el servicio normal en vivo, por favor ingrese su CLAVE DE INGRESO ÉLITE:
+                          </p>
+
+                          <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                            <input 
+                              type="password"
+                              value={verifyEliteKey}
+                              onChange={(e) => setVerifyEliteKey(e.target.value)}
+                              placeholder="INGRESE CLAVE ÉLITE DE ACCESO"
+                              className="flex-1 h-10 bg-black border border-white/10 rounded-xl px-3 text-[9px] font-bold tracking-widest font-mono text-center text-white placeholder-[#bccbb9]/30 outline-none focus:border-amber-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (verifyEliteKey === eliteKey) {
+                                  setMaintenanceMode(false);
+                                  localStorage.setItem('ramito_maintenance', 'false');
+                                  setVerifyEliteKey('');
+                                  showToast('¡Modo Mantenimiento Desactivado! Sistema restablecido.', 'success');
+                                  addAuditLog('FIN DE MANTENIMIENTO', 'El Admin Élite introdujo sus credenciales y restableció la app móvil.', 'success');
+                                } else {
+                                  showToast('La clave de ingreso Élite es incorrecta.', 'error');
+                                }
+                              }}
+                              className="h-10 px-5 bg-amber-500/10 hover:bg-amber-500/25 border border-amber-500/30 text-amber-400 hover:text-white transition-all rounded-xl text-[9px] font-black uppercase tracking-widest italic font-sans"
+                            >
+                              Verificar y Reactivar Sistema
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+ 
                 {/* Vista Previa en Tiempo Real de Mantenimiento / Bloqueo */}
                 <div className="p-5 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4 text-left">
                   <div className="flex items-center justify-between">
@@ -3845,11 +4743,11 @@ export default function ProfileView() {
                       En Vivo
                     </span>
                   </div>
-
+ 
                   <p className="text-[9px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
                     Esta es la imagen y logotipo inamovible de cristal y luces de estadio que verán los usuarios al activar el bloqueo preventivo.
                   </p>
-
+ 
                   <div className="flex justify-center py-2">
                     {/* Smartphone Wrapper */}
                     <div className="relative w-full max-w-[270px] h-[450px] bg-zinc-950 border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl flex flex-col justify-between p-1.5 text-center select-none">
@@ -3871,17 +4769,17 @@ export default function ProfileView() {
                   </div>
                 </div>
               </div>
-
+ 
               {/* Footer */}
               <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3">
                 <button 
                   onClick={() => setShowMaintenanceWindow(false)}
                   className="flex-1 h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
                 >
-                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Ajustes
+                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Licencias
                 </button>
                 <button 
-                  disabled={isReadOnly}
+                  disabled={isMaintenanceReadOnly}
                   onClick={() => {
                     localStorage.setItem('ramito_maintenance', String(maintenanceMode));
                     localStorage.setItem('ramito_maintenance_msg', maintenanceCustomMsg);
@@ -3895,12 +4793,221 @@ export default function ProfileView() {
                     setShowMaintenanceWindow(false);
                   }}
                   className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 ${
-                    isReadOnly 
+                    isMaintenanceReadOnly 
                       ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
                       : 'bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/50 text-amber-400 hover:border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
                   }`}
                 >
-                  <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Cambios de Mantenimiento'}
+                  <Save className="w-4 h-4" /> {isMaintenanceReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Cambios de Mantenimiento'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Ventana del Servidor de Códigos de Activación (Full Screen Premium) */}
+      <AnimatePresence>
+        {showCodesWindow && (
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full font-sans animate-fade-in no-scrollbar">
+            {/* Background elements Deco */}
+            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                    <Key className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Servidor de Códigos - Consola Élite</h4>
+                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
+                      GESTOR DE LLAVES Y GENERACIÓN DE CUPONES DE RECARGA (MÓVIL PWA)
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowCodesWindow(false)}
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg shrink-0 outline-none"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Informative Header / Card */}
+              <div className="p-5 mb-8 bg-zinc-900/40 border border-purple-500/10 rounded-3xl text-left relative overflow-hidden">
+                <div className="absolute -right-16 -top-16 w-36 h-36 bg-purple-500/[0.03] rounded-full blur-2xl pointer-events-none animate-pulse" />
+                
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[10px] font-black text-purple-400 tracking-wider flex items-center gap-1.5 italic uppercase animate-pulse">
+                      Soporte de Reactivación Activa
+                    </span>
+                    <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                      La generación de cupones permite brindar días de gracia y prórroga válidos para la Licencia del App Móvil de los clientes. Al canjearse un cupón, los días especificados se sumarán automáticamente al período activo de la licencia.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interacciones */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10 text-left font-sans items-start w-full">
+                {/* Column 1: Configurar / Generar */}
+                <div className="lg:col-span-5 space-y-6 w-full">
+                  <div className="p-6 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4">
+                    <h5 className="text-[10px] font-black text-purple-400 uppercase tracking-widest italic mb-2">Generador de Cupones</h5>
+
+                    <div className="space-y-2.5">
+                      <label className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Código del Cupón</label>
+                      <input 
+                        type="text"
+                        value={newCodeName}
+                        onChange={(e) => setNewCodeName(e.target.value.toUpperCase())}
+                        placeholder="EJ: RENOVAR-VIP-60D"
+                        className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-[11px] font-black font-mono text-white placeholder-[#bccbb9]/30 outline-none uppercase focus:border-purple-500"
+                      />
+                    </div>
+
+                    <div className="space-y-4 pt-1">
+                      {/* Días de Validez MANUAL */}
+                      <div className="space-y-2">
+                        <label className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Días de Validez de la Recarga (Manual Exacto)</label>
+                        <input 
+                          type="number"
+                          min="1"
+                          max="3650"
+                          value={newCodeDays}
+                          onChange={(e) => setNewCodeDays(e.target.value)}
+                          placeholder="Ej: 90"
+                          className="w-full h-11 bg-zinc-950 border border-white/10 rounded-xl px-4 text-left font-mono text-[11px] font-black text-white placeholder-[#bccbb9]/30 outline-none focus:border-purple-500"
+                        />
+                        <p className="text-[8px] font-semibold text-[#bccbb9]/40 uppercase tracking-wider">
+                          * Ingrese el número exacto de días de prórroga manualmente. Se adicionará con precisión matemática este período de gracia al canjearse.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Aplica Para</label>
+                        <div className="flex items-center h-10 w-full rounded-xl border border-purple-500/15 bg-purple-500/5 px-3.5 text-[8.5px] font-bold uppercase tracking-wider text-purple-300">
+                          Sólo APP Móvil PWA
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddCustomCode}
+                      className="w-full h-12 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/50 text-purple-300 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all outline-none"
+                    >
+                      <Plus className="w-4 h-4" /> Registrar Cupón Activo
+                    </button>
+                  </div>
+                </div>
+
+                {/* Column 2: Listado de Códigos en Circulación */}
+                <div className="lg:col-span-7 space-y-6 w-full">
+                  <div className="p-6 bg-white/[0.01] border border-white/5 rounded-3xl space-y-4 animate-fade-in w-full overflow-hidden">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                      <h5 className="text-[10px] font-black text-[#bccbb9]/40 uppercase tracking-widest italic">Listado de Códigos en Circulación</h5>
+                      <span className="text-[8px] font-mono font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                        {customCodes.length} REGISTROS COLECTADOS
+                      </span>
+                    </div>
+
+                    {customCodes.length === 0 ? (
+                      <div className="p-10 rounded-2xl border border-dashed border-white/5 text-center flex flex-col justify-center items-center gap-2">
+                        <Key className="w-8 h-8 text-[#bccbb9]/20" />
+                        <p className="text-[9px] font-bold text-[#bccbb9]/30 uppercase tracking-widest">No hay códigos en circulación creados</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1 no-scrollbar w-full">
+                        {customCodes.map((item, index) => {
+                          const itemNumber = customCodes.length - index;
+                          return (
+                            <div 
+                              key={item.id}
+                              className={`p-3.5 sm:p-4 bg-zinc-950/70 border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 transition-all w-full overflow-hidden ${
+                                item.used 
+                                  ? 'border-red-500/25 bg-red-950/10 shadow-[inner_0_1px_3px_rgba(239,68,68,0.05)]' 
+                                  : 'border-[#4be277]/20 bg-[#4be277]/5 shadow-[inner_0_1px_3px_rgba(75,226,119,0.05)]'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                {/* Cuadrado de Número (Verde si disponible, Rojo si ocupado/usado) */}
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10.5px] font-black font-mono transition-all border shrink-0 relative ${
+                                  item.used 
+                                    ? 'bg-red-500/15 border-red-500/35 text-red-500 shadow-[0_0_8px_rgba(239,68,68,0.1)]' 
+                                    : 'bg-[#4be277]/15 border-[#4be277]/35 text-[#4be277] shadow-[0_0_10px_rgba(75,226,119,0.15)]'
+                                }`} title={item.used ? `Cupón #${itemNumber} - USADO/OCUPADO` : `Cupón #${itemNumber} - DISPONIBLE`}>
+                                  <span>{itemNumber}</span>
+                                </div>
+
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-mono text-[11px] xs:text-[12px] sm:text-[12.5px] font-black text-white uppercase tracking-wider break-all leading-tight">
+                                      {item.code}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(item.code);
+                                        showToast('Código copiado al portapapeles', 'success');
+                                      }}
+                                      className="text-[#bccbb9]/45 hover:text-white transition-colors shrink-0 outline-none p-1.5 -m-1.5 hover:bg-white/5 rounded"
+                                      title="Copiar código"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  
+                                  {/* Números en verde si disponible, en rojo si usado/ocupado */}
+                                  <span className={`text-[8.5px] sm:text-[9px] font-black uppercase tracking-widest mt-1.5 leading-none block ${
+                                    item.used 
+                                      ? 'text-red-500 font-black' 
+                                      : 'text-[#4be277] font-black'
+                                  }`}>
+                                    +{item.days} DÍAS DE LICENCIA • APP PWA
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Sección de Estado y Botones */}
+                              <div className="flex items-center justify-between sm:justify-end gap-2.5 shrink-0 border-t border-white/5 sm:border-none pt-2 sm:pt-0">
+                                <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg border leading-none block whitespace-nowrap text-center min-w-[80px] ${
+                                  item.used 
+                                    ? 'bg-red-500/10 border-red-500/30 text-red-500' 
+                                    : 'bg-[#4be277]/10 border-[#4be277]/40 text-[#4be277]'
+                                }`}>
+                                  {item.used ? 'OCUPADO' : 'DISPONIBLE'}
+                                </span>
+                                
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCustomCode(item.id)}
+                                  className="w-9 h-9 bg-red-400/5 hover:bg-red-500/25 text-red-400 hover:text-white rounded-xl flex items-center justify-center transition-all border border-red-500/10 hover:border-red-500/25 outline-none shrink-0"
+                                  title="Eliminar código"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={() => setShowCodesWindow(false)}
+                  className="flex-1 h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2 outline-none"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" /> Cerrar y Regresar a Licencias
                 </button>
               </div>
             </div>
@@ -3911,7 +5018,7 @@ export default function ProfileView() {
       {/* Ventana de Configuración de Transferencias Rotativas */}
       <AnimatePresence>
         {showTransferWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             {/* Background elements */}
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#4be277]/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none" />
@@ -4168,7 +5275,7 @@ export default function ProfileView() {
       {/* Ventana de Configuración de Cantina, Bebidas y Extras */}
       <AnimatePresence>
         {showCantinaWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             {/* Glow Background */}
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#FF9100]/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
@@ -4338,7 +5445,7 @@ export default function ProfileView() {
                                   }}
                                   className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white active:scale-95 text-[8.5px] font-black uppercase tracking-widest rounded-lg border border-white/10 transition-all shrink-0"
                                 >
-                                  ⚡ RECARGAR +10
+                                  RECARGAR +10
                                 </button>
                                 <button
                                   type="button"
@@ -4349,7 +5456,7 @@ export default function ProfileView() {
                                   }}
                                   className="px-3 py-1.5 bg-[#4be277]/10 hover:bg-[#4be277]/20 text-[#4be277] active:scale-95 text-[8.5px] font-black uppercase tracking-widest rounded-lg border border-[#4be277]/10 transition-all shrink-0"
                                 >
-                                  ⚡ RECARGAR +25
+                                  RECARGAR +25
                                 </button>
                               </div>
                             </div>
@@ -4516,9 +5623,9 @@ export default function ProfileView() {
                                 }}
                                 className="w-full h-8 bg-black/60 border border-white/10 rounded-lg px-2 text-[10px] text-zinc-300 font-bold outline-none focus:border-[#FF9100]"
                               >
-                                <option value="drink">🥤 BEBIDA / CANTINA</option>
-                                <option value="equipment">👕 EQUIPAMIENTO</option>
-                                <option value="extra">✨ ADICIONAL / EXTRAS</option>
+                                <option value="drink">BEBIDA / CANTINA</option>
+                                <option value="equipment">EQUIPAMIENTO</option>
+                                <option value="extra">ADICIONAL / EXTRAS</option>
                               </select>
                             </div>
 
@@ -4534,12 +5641,12 @@ export default function ProfileView() {
                                 }}
                                 className="w-full h-8 bg-black/60 border border-white/10 rounded-lg px-2 text-[10px] text-zinc-300 font-bold outline-none focus:border-[#FF9100]"
                               >
-                                <option value="water">🥤 Vaso / Gaseosa</option>
-                                <option value="gatorade">🔥 Isotónica / Energía</option>
-                                <option value="beer">🍺 Cerveza / Bebida Fría</option>
-                                <option value="vests">👕 Chaleco / Indumentaria</option>
-                                <option value="ball">⚽ Pelota Oficial</option>
-                                <option value="bbq">🍖 Parrilla / Carbón</option>
+                                <option value="water">Vaso / Gaseosa</option>
+                                <option value="gatorade">Isotónica / Energía</option>
+                                <option value="beer">Cerveza / Bebida Fría</option>
+                                <option value="vests">Chaleco / Indumentaria</option>
+                                <option value="ball">Pelota Oficial</option>
+                                <option value="bbq">Parrilla / Carbón</option>
                               </select>
                             </div>
                           </div>
@@ -4593,7 +5700,7 @@ export default function ProfileView() {
       {/* Ventana de Políticas y Advertencias de Cancha 1 */}
       <AnimatePresence>
         {showCourt1PolicyWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             {/* Background elements */}
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#4be277]/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-600/5 rounded-full blur-[120px] pointer-events-none" />
@@ -4714,7 +5821,7 @@ export default function ProfileView() {
       {/* Ventana de Políticas y Advertencias de Cancha 2 */}
       <AnimatePresence>
         {showCourt2PolicyWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             {/* Background elements */}
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-yellow-600/5 rounded-full blur-[120px] pointer-events-none" />
@@ -4821,7 +5928,7 @@ export default function ProfileView() {
                   className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 ${
                     isReadOnly 
                       ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
-                      : 'bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 hover:border-amber-500/50 text-amber-500 hover:border-amber-500/60 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                      : 'bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/25 hover:border-[#4be277]/50 text-[#4be277] hover:border-[#4be277]/60 shadow-[0_0_20px_rgba(75,226,119,0.15)]'
                   }`}
                 >
                   <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Reglas'}
@@ -4832,198 +5939,10 @@ export default function ProfileView() {
         )}
       </AnimatePresence>
 
-      {/* Ventana de Métricas de Conexión Vercel */}
-      <AnimatePresence>
-        {showVercelMetricsWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
-            {/* Ambient Backgrounds */}
-            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
-
-            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                    <Activity className="w-6 h-6 text-blue-400" />
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Conexión Vercel & Métricas de Canales</h4>
-                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
-                      MONITOREO DE ANCHO DE BANDA, PETICIONES EDGE Y TOKENS REGISTRO
-                    </span>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setShowVercelMetricsWindow(false)}
-                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Status Alert Badge */}
-              <div className="p-4 mb-6 bg-zinc-900/55 border border-blue-500/20 rounded-3xl text-left relative overflow-hidden">
-                <div className="absolute -right-16 -top-16 w-36 h-36 bg-blue-500/[0.03] rounded-full blur-2xl pointer-events-none" />
-                <div className="flex items-start gap-3.5">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <Globe className="w-5 h-5 text-blue-400" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black text-blue-400 uppercase tracking-wider block italic">ESTADO: CONECTADO EN PRODUCCIÓN (TEMPORAL)</span>
-                    <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest leading-relaxed mt-0.5">
-                      Visualizando estadísticas en tiempo real estimadas para el dominio <span className="text-white font-mono lowercase font-bold">{webDomain}</span>. Los datos se actualizarán automáticamente cada hora o al forzar la compilación del Vercel Build Engine.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Grid Statistics */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 text-left font-sans">
-                {/* Stat 1 */}
-                <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl relative overflow-hidden">
-                  <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Ancho de Banda</span>
-                  <div className="flex items-baseline gap-1 mt-1.5">
-                    <span className="text-2xl font-black text-white tracking-tight">{webLicenseActive ? '4.82 GB' : '0.00 GB'}</span>
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase">/ 100 GB</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden mt-3">
-                    <div className="h-full bg-blue-500 rounded-full transition-all duration-500" style={{ width: webLicenseActive ? '4.82%' : '0%' }} />
-                  </div>
-                  <span className="text-[8px] font-bold text-blue-400 uppercase tracking-wider mt-2 block">
-                    {webLicenseActive ? '4.82% de cuota mensual usado' : '0.00% (LICENCIA WEB EXPIRADA)'}
-                  </span>
-                </div>
-
-                {/* Stat 2 */}
-                <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl">
-                  <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Peticiones Edge (24hs)</span>
-                  <div className="flex items-baseline gap-1 mt-1.5">
-                    <span className="text-2xl font-black text-white tracking-tight">{webLicenseActive ? '18,482' : '0'}</span>
-                    <span className={`text-[9px] font-semibold uppercase tracking-wide ${webLicenseActive ? 'text-emerald-400' : 'text-zinc-500'}`}>{webLicenseActive ? '▲ 14%' : '0%'}</span>
-                  </div>
-                  <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-4 block">
-                    {webLicenseActive ? 'Tiempo respuesta: 14ms (A+)' : 'SITIO WEB SUSPENDIDO'}
-                  </span>
-                </div>
-
-                {/* Stat 3 */}
-                <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl">
-                  <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Invocaciones Serverless</span>
-                  <div className="flex items-baseline gap-1 mt-1.5">
-                    <span className="text-2xl font-black text-white tracking-tight">
-                      {webLicenseActive && appLicenseActive ? '2,842' : (webLicenseActive || appLicenseActive ? '1,421' : '0')}
-                    </span>
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase">INVS</span>
-                  </div>
-                  <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest mt-4 block">
-                    {webLicenseActive || appLicenseActive ? 'Promedio duración: 112ms' : 'CONSOLAS DE APPORTACIÓN INACTIVAS'}
-                  </span>
-                </div>
-
-                {/* Stat 4 */}
-                <div className="p-5 bg-white/[0.01] border border-white/5 rounded-2xl">
-                  <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Uso de Tokens Diario</span>
-                  <div className="flex items-baseline gap-1 mt-1.5">
-                    <span className="text-2xl font-black text-white tracking-tight">{appLicenseActive ? '15.4K' : '0.0K'}</span>
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase">TOKENS</span>
-                  </div>
-                  <span className={`text-[8px] font-black uppercase tracking-widest mt-4 block ${appLicenseActive ? 'text-[#4be277]' : 'text-red-500'}`}>
-                    {appLicenseActive ? 'Licencia ACTIVA y persistida' : 'LICENCIA APP EXPIRADA'}
-                  </span>
-                </div>
-              </div>
-
-              {/* CSS Visual Bar Chart */}
-              <div className="p-6 bg-white/[0.01] border border-white/5 rounded-3xl text-left mb-8 font-sans">
-                <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
-                  <div>
-                    <h5 className="text-[10px] font-black text-white uppercase tracking-wider">Historial de Tránsito de Peticiones</h5>
-                    <p className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest font-mono">Simulación de tráfico por banda horaria (Últimas 12 horas)</p>
-                  </div>
-                  <button 
-                    disabled={isRefreshingVercelMetrics}
-                    onClick={() => {
-                      setIsRefreshingVercelMetrics(true);
-                      if (showToast) showToast('Recalculando telemetría de Vercel...', 'success');
-                      setTimeout(() => {
-                        setIsRefreshingVercelMetrics(false);
-                        if (showToast) showToast('Métricas actualizadas con éxito', 'success');
-                      }, 1200);
-                    }}
-                    className="h-8 px-3.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-black text-[9px] uppercase tracking-widest border border-white/5 transition-all flex items-center gap-1.5 italic"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${isRefreshingVercelMetrics ? 'animate-spin' : ''}`} />
-                    {isRefreshingVercelMetrics ? 'Actualizando...' : 'Recalcular'}
-                  </button>
-                </div>
-
-                {/* Column bars */}
-                <div className="h-28 flex items-end justify-between gap-1 sm:gap-2.5 px-2">
-                  {[45, 62, 28, 74, 91, 55, 38, 84, 110, 95, 70, 50].map((val, idx) => (
-                    <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 group">
-                      <div className="w-full bg-zinc-800 rounded-t-md relative h-20 flex items-end overflow-hidden group-hover:bg-zinc-700/60 transition-colors">
-                        <motion.div 
-                          initial={{ height: 0 }}
-                          animate={{ height: `${val}%` }}
-                          transition={{ duration: 0.8, delay: idx * 0.03 }}
-                          className="w-full bg-gradient-to-t from-blue-600 to-blue-400 group-hover:from-emerald-500 group-hover:to-emerald-400 transition-colors"
-                        />
-                      </div>
-                      <span className="text-[7.5px] font-bold text-zinc-500 font-mono">{idx + 8}:00</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Endpoint Request breakdown */}
-              <div className="p-6 bg-white/[0.01] border border-white/5 rounded-3xl text-left mb-8 font-sans">
-                <span className="text-[9px] font-black text-white uppercase tracking-wider block mb-4 italic">Distribución de Peticiones por Endpoint de Producción</span>
-                
-                <div className="space-y-3.5">
-                  {[
-                    { path: '/api/bookings', desc: 'Sincronización en tiempo real de turnos y canchas', count: '8,412 reqs', pct: '45%', color: 'bg-blue-500' },
-                    { path: '/api/licenses', desc: 'Validación de licencia VIP / Élite en base de datos', count: '4,102 reqs', pct: '22%', color: 'bg-emerald-500' },
-                    { path: '/api/profiles', desc: 'Autenticación y guardado de firmas del personal', count: '3,124 reqs', pct: '17%', color: 'bg-purple-500' },
-                    { path: '/api/news', desc: 'Tránsito de visualización de banner informativo', count: '2,844 reqs', pct: '16%', color: 'bg-amber-500' }
-                  ].map((endpoint, i) => (
-                    <div key={i} className="flex items-center justify-between gap-4 p-3 bg-zinc-950/40 border border-white/5 rounded-2xl">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-mono font-bold text-white selection:bg-blue-500">{endpoint.path}</span>
-                        <p className="text-[8.5px] font-semibold text-[#bccbb9]/40 uppercase tracking-wider">{endpoint.desc}</p>
-                      </div>
-                      <div className="flex items-center gap-4 text-right shrink-0">
-                        <div>
-                          <span className="text-[11px] font-black text-white block">{endpoint.count}</span>
-                          <span className="text-[8px] font-bold text-zinc-500 block font-mono">{endpoint.pct} del tráfico</span>
-                        </div>
-                        <div className="w-1.5 h-8 bg-zinc-800 rounded-full overflow-hidden">
-                          <div className={`w-full ${endpoint.color} rounded-full`} style={{ height: endpoint.pct }} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3">
-                <button 
-                  onClick={() => setShowVercelMetricsWindow(false)}
-                  className="w-full h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
-                >
-                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Ajustes
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* Ventana de Resguardo de Base de Datos y Multimedia */}
       <AnimatePresence>
         {showStorageBackupWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             {/* Ambient Backgrounds */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
@@ -5294,7 +6213,7 @@ export default function ProfileView() {
       {/* Ventana de Configuración de Perfil (Pantalla Completa) */}
       <AnimatePresence>
         {showProfileModal && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full">
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
             <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-[#4be277]/5 rounded-full blur-[120px] pointer-events-none" />
 
@@ -5327,7 +6246,7 @@ export default function ProfileView() {
                   
                   {/* Galería de Avatares Oficiales de Fútbol y Copa del Mundo */}
                   <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-3 bg-zinc-950/40">
-                    <span className="text-[8.5px] font-black text-[#4be277] uppercase tracking-widest block font-bold">⚽ ELIGE TU AVATAR OFICIAL DE JUGADOR / OPERADOR</span>
+                    <span className="text-[8.5px] font-black text-[#4be277] uppercase tracking-widest block font-bold">ELIGE TU AVATAR OFICIAL DE JUGADOR / OPERADOR</span>
                     <div className="grid grid-cols-4 gap-2">
                       {[
                         { name: 'Balón Campeón', url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%2314B8A6" stroke-width="2" stroke-opacity="0.3"/><circle cx="50" cy="50" r="26" fill="%2314B8A6" fill-opacity="0.1" stroke="%2314B8A6" stroke-width="2"/><polygon points="50,35 60,42 56,54 44,54 40,42" fill="none" stroke="%2314B8A6" stroke-width="2"/><line x1="50" y1="35" x2="50" y2="24" stroke="%2314B8A6" stroke-width="2"/><line x1="40" y1="42" x2="29" y2="39" stroke="%2314B8A6" stroke-width="2"/><line x1="60" y1="42" x2="71" y2="39" stroke="%2314B8A6" stroke-width="2"/><line x1="44" y1="54" x2="36" y2="65" stroke="%2314B8A6" stroke-width="2"/><line x1="56" y1="54" x2="64" y2="65" stroke="%2314B8A6" stroke-width="2"/></svg>' },
@@ -5402,97 +6321,144 @@ export default function ProfileView() {
                     />
                   </div>
 
+                  {/* Phone / WhatsApp Input */}
+                  <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-2 bg-zinc-950/40">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-3.5 h-3.5 text-[#4be277]" />
+                      <h3 className="text-[9px] font-black text-white uppercase italic tracking-wider">Teléfono / WhatsApp de Respaldo</h3>
+                    </div>
+                    <input 
+                      type="text" 
+                      value={newPersonalPhone}
+                      onChange={(e) => setNewPersonalPhone(e.target.value)}
+                      placeholder="+51 987 654 321" 
+                      className="w-full h-11 bg-black/40 border border-white/10 rounded-xl px-4 text-white text-xs font-mono font-bold tracking-wide outline-none focus:border-[#4be277]/50 transition-all cursor-text font-sans"
+                    />
+                    <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed pt-1">
+                      Nota: Este número de teléfono o WhatsApp se utiliza para recuperar tu correo, clave o PIN de inmediato si los olvidas.
+                    </p>
+                  </div>
+
                   {/* Personal Key / Password Input */}
                   <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-2 bg-zinc-950/40">
                     <div className="flex items-center gap-2">
                       <Key className="w-3.5 h-3.5 text-[#4be277]" />
-                      <h3 className="text-[9px] font-black text-white uppercase italic tracking-wider">Nueva Llave de Acceso Personal (Password)</h3>
+                      <h3 className="text-[9px] font-black text-white uppercase italic tracking-wider">Tu Llave Maestra de Acceso Personal</h3>
                     </div>
                     <div className="relative">
                       <input 
                         type={personalKeyVisible ? 'text' : 'password'} 
                         value={newPersonalKey} 
                         onChange={(e) => setNewPersonalKey(e.target.value)} 
-                        className="w-full h-11 bg-black/40 border border-white/10 focus:border-[#4be277]/50 rounded-xl px-4 text-white text-xs font-mono font-bold tracking-[0.2em] outline-none transition-all cursor-text" 
-                        placeholder="Dejar vacío para mantener actual"
+                        className="w-full h-11 bg-black/40 border border-white/10 focus:border-[#4be277]/50 rounded-xl pl-4 pr-32 text-white text-xs font-mono font-black tracking-widest outline-none transition-all cursor-text" 
+                        placeholder="INGRESE SU NUEVA LLAVE MAESTRA"
                       />
-                      <button 
-                        type="button" 
-                        onClick={() => setPersonalKeyVisible(!personalKeyVisible)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[7.5px] font-mono font-black text-[#bccbb9]/40 hover:text-[#bccbb9] uppercase tracking-wider px-2 py-1 rounded hover:bg-white/5 active:scale-95 transition-all"
-                      >
-                        {personalKeyVisible ? 'OCULTAR' : 'MOSTRAR'}
-                      </button>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+                        <button 
+                          type="button" 
+                          onClick={() => setPersonalKeyVisible(!personalKeyVisible)}
+                          className="text-[7.5px] font-mono font-black text-[#bccbb9]/60 hover:text-white uppercase tracking-wider px-2 py-1 rounded hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
+                        >
+                          {personalKeyVisible ? 'OCULTAR' : 'MOSTRAR'}
+                        </button>
+                      </div>
                     </div>
+                    <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed pt-1">
+                      Nota: Esta Llave Maestra es exclusiva para tu perfil registrado. Puedes cambiarla cuando desees; utilízala junto a tu correo para ingresar a la plataforma.
+                    </p>
+                  </div>
+
+                  {/* PIN / Llave Secundaria de Acceso Rápido */}
+                  <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-2 bg-zinc-950/40 relative overflow-hidden animate-fade-in text-left">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-[#4be277]" />
+                      <h3 className="text-[9px] font-black text-white uppercase italic tracking-wider">Tu Código Especial / PIN de Acceso Rápido</h3>
+                    </div>
+                    <div className="relative">
+                      <input 
+                        type={personalPinVisible ? 'text' : 'password'} 
+                        value={newPersonalPin} 
+                        onChange={(e) => setNewPersonalPin(e.target.value)} 
+                        maxLength={12}
+                        className="w-full h-11 bg-black/40 border border-white/10 focus:border-[#4be277]/50 rounded-xl pl-4 pr-32 text-white text-xs font-mono font-black tracking-widest outline-none transition-all cursor-text" 
+                        placeholder="INGRESE SU PIN / LLAVE SECUNDARIA"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10">
+                        <button 
+                          type="button" 
+                          onClick={() => setPersonalPinVisible(!personalPinVisible)}
+                          className="text-[7.5px] font-mono font-black text-[#bccbb9]/60 hover:text-white uppercase tracking-wider px-2 py-1 rounded hover:bg-white/5 active:scale-95 transition-all cursor-pointer"
+                        >
+                          {personalPinVisible ? 'OCULTAR' : 'MOSTRAR'}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed pt-1">
+                      Nota: Configura un PIN o Llave Secundaria (4 a 12 caracteres alfanuméricos) para ingresar instantáneamente desde la pantalla de inicio con un solo clic en la pestaña "PIN Rápido" sin ingresar tu correo electrónico.
+                    </p>
                   </div>
                 </div>
 
-                {/* SECCIÓN 3: LLAVE MAESTRA DE REGISTRO */}
-                {userRole === 'admin_elite' && (
-                  <div className="space-y-4 font-sans text-left">
-                    <span className="text-[8px] sm:text-[9px] font-black text-[#4be277] uppercase tracking-widest block font-bold">
-                      3. Llave Maestra de Registro Élite
-                    </span>
-                    
-                    <div className="glass-panel rounded-3xl border border-white/5 p-4 bg-zinc-950/40">
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center px-1">
+                {/* SECCIÓN 3: PARÁMETROS DE SEGURIDAD EXCLUSIVOS */}
+                {(userRole === 'admin_elite' || userRole === 'admin_vip') && (
+                  <div className="space-y-4 animate-fade-in">
+                    <span className="text-[8px] sm:text-[9px] font-black text-[#4be277] uppercase tracking-widest block font-bold">3. Parámetros de Seguridad del Complejo</span>
+
+                    {userRole === 'admin_elite' && (
+                      <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-4 bg-zinc-950/40 relative overflow-hidden text-left">
+                        <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
+                          <ShieldCheck className="w-4.5 h-4.5 text-[#4be277]" />
+                          <h3 className="text-[10px] font-black text-white uppercase italic tracking-wider">Llave de Seguridad Élite</h3>
+                        </div>
+                        
+                        <div className="space-y-2">
                           <label className="text-[9px] font-black text-[#4be277] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
-                            <Crown className="w-3.5 h-3.5 text-[#4be277]" strokeWidth={2.5} />
+                            <Crown className="w-3.5 h-3.5" strokeWidth={2.5} />
                             Llave Registro Élite Admin
                           </label>
-                          <button 
-                            type="button" 
-                            onClick={() => generateStrongKey('elite')}
-                            className="text-[7.5px] font-black text-[#4be277]/80 hover:text-[#4be277] uppercase tracking-widest hover:underline flex items-center gap-1 font-mono transition-colors"
-                          >
-                            <RefreshCw className="w-2.5 h-2.5" /> Auto-Sugerir
-                          </button>
+                          <input 
+                            type="text" 
+                            value={newEliteKey} 
+                            onChange={(e) => setNewEliteKey(e.target.value)} 
+                            className="w-full h-11 bg-black/50 border border-[#4be277]/30 rounded-xl px-4 text-white text-xs font-mono font-black tracking-widest outline-none focus:border-[#4be277] transition-all cursor-text font-bold" 
+                            placeholder="CÓDIGO ÉLITE REGISTRO"
+                          />
                         </div>
-                        <input 
-                          type="text" 
-                          value={newEliteKey} 
-                          onChange={(e) => setNewEliteKey(e.target.value)} 
-                          className="w-full h-11 bg-black/50 border border-[#4be277]/30 rounded-xl px-4 text-white text-xs font-mono font-black tracking-widest outline-none focus:border-[#4be277] transition-all cursor-text" 
-                          placeholder="CÓDIGO ÉLITE REGISTRO"
-                        />
+                        <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed">
+                          Nota: Esta es la clave requerida por el sistema para autorizar el registro de un nuevo operador con rango Élite Admin. Al guardar la cuenta, se actualizará este código de forma global.
+                        </p>
                       </div>
-                    </div>
+                    )}
+
+                    {userRole === 'admin_vip' && (
+                      <div className="w-full glass-panel rounded-3xl border border-white/5 p-4 space-y-4 bg-zinc-950/40 relative overflow-hidden text-left">
+                        <div className="flex items-center gap-2 border-b border-white/5 pb-2.5">
+                          <ShieldCheck className="w-4.5 h-4.5 text-[#FFD600]" />
+                          <h3 className="text-[10px] font-black text-white uppercase italic tracking-wider">Llave Maestra de Registro VIP</h3>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-[9px] font-black text-[#FFD600] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
+                            <Gem className="w-3.5 h-3.5" strokeWidth={2.5} />
+                            Llave Registro VIP Admin
+                          </label>
+                          <input 
+                            type="text" 
+                            value={newVipKey} 
+                            onChange={(e) => setNewVipKey(e.target.value)} 
+                            className="w-full h-11 bg-black/50 border border-[#FFD600]/30 rounded-xl px-4 text-[#FFD600] text-xs font-mono font-black tracking-widest outline-none focus:border-[#FFD600] transition-all cursor-text font-bold" 
+                            placeholder="CÓDIGO VIP REGISTRO"
+                          />
+                        </div>
+                        <p className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-wider leading-relaxed">
+                          Nota: Esta es la clave requerida por el sistema para autorizar el registro de un nuevo operador con rango VIP Admin. Al guardar la cuenta, se actualizará este código de forma global.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {userRole === 'admin_vip' && (
-                  <div className="space-y-4 font-sans text-left">
-                    <span className="text-[8px] sm:text-[9px] font-black text-[#FFD600] uppercase tracking-widest block font-bold">
-                      3. Llave Maestra de Registro VIP
-                    </span>
-                    
-                    <div className="glass-panel rounded-3xl border border-white/5 p-4 bg-zinc-950/40">
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center px-1">
-                          <label className="text-[9px] font-black text-[#FFD600] uppercase tracking-widest italic flex items-center gap-1.5 font-bold">
-                            <Gem className="w-3.5 h-3.5 text-[#FFD600]" strokeWidth={2.5} />
-                            Llave Registro VIP Admin
-                          </label>
-                          <button 
-                            type="button" 
-                            onClick={() => generateStrongKey('vip')}
-                            className="text-[7.5px] font-black text-[#FFD600]/80 hover:text-[#FFD600] uppercase tracking-widest hover:underline flex items-center gap-1 font-mono transition-colors"
-                          >
-                            <RefreshCw className="w-2.5 h-2.5" /> Auto-Sugerir
-                          </button>
-                        </div>
-                        <input 
-                          type="text" 
-                          value={newVipKey} 
-                          onChange={(e) => setNewVipKey(e.target.value)} 
-                          className="w-full h-11 bg-black/50 border border-[#FFD600]/30 rounded-xl px-4 text-white text-xs font-mono font-black tracking-widest outline-none focus:border-[#FFD600] transition-all cursor-text" 
-                          placeholder="CÓDIGO VIP REGISTRO"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Save button */}
                 <button 

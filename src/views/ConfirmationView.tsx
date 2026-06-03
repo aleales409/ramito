@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Calendar, Clock, Trophy, Wallet, Receipt, Copy, Info, AlertTriangle, Shirt, GlassWater, Sparkles, Check, CreditCard, Smartphone, Shield, X, ArrowRight, Activity } from 'lucide-react';
+import { Calendar, Clock, Trophy, Wallet, Receipt, Copy, Info, AlertTriangle, Shirt, GlassWater, Sparkles, Check, CreditCard, Smartphone, Shield, X, ArrowRight, Activity, Beer, Droplet, Flame, CupSoda } from 'lucide-react';
 import { getTransferAccounts } from '../lib/transferRotation';
 import { useApp } from '../context/AppContext';
 import { getCantinaItems } from '../lib/cantina';
@@ -13,6 +13,7 @@ export default function ConfirmationView() {
   const isAdmin = role === 'admin_vip' || role === 'admin_elite';
   const { setAllBookings, setNotifications, showToast } = useApp();
   const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'cash' | 'mercadopago'>(isAdmin ? 'cash' : 'transfer');
+  const [paymentPlan, setPaymentPlan] = useState<'full' | 'deposit'>('full');
   const [showMPSandbox, setShowMPSandbox] = useState(false);
   const [isProcessingMP, setIsProcessingMP] = useState(false);
   const { activeAccount } = getTransferAccounts();
@@ -22,17 +23,23 @@ export default function ConfirmationView() {
   // Configuración de catálogo dinámica leída en tiempo real desde el catálogo general
   const cantinaItems = getCantinaItems();
   const EXTRAS_CATALOG = cantinaItems
-    .filter(item => item.showInBooking !== false)
+    .filter(item => item.showInBooking !== false || item.id === 'gatorade_single' || item.id === 'water_single' || item.id === 'beer_single')
     .map(item => {
       let icon = GlassWater;
       let color = 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
 
-      if (item.iconId === 'gatorade') {
-        icon = Sparkles;
+      if (item.id === 'gatorade_pack') {
+        icon = CupSoda;
+        color = 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20';
+      } else if (item.id === 'gatorade_single') {
+        icon = Flame;
         color = 'text-orange-400 bg-orange-500/10 border-orange-500/20';
-      } else if (item.iconId === 'beer') {
-        icon = GlassWater;
-        color = 'text-amber-300 bg-amber-500/10 border-amber-500/20';
+      } else if (item.id === 'water_single') {
+        icon = Droplet;
+        color = 'text-[#4be277] bg-[#4be277]/10 border-[#4be277]/20';
+      } else if (item.id === 'beer_single') {
+        icon = Beer;
+        color = 'text-amber-400 bg-amber-500/10 border-amber-500/20';
       } else if (item.iconId === 'vests') {
         icon = Shirt;
         color = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
@@ -63,8 +70,11 @@ export default function ConfirmationView() {
   const slotDate = date || 'Lunes 24 Mayo';
   const baseCourtPrice = price || court?.price || 120;
   const serviceFee = 5;
-  const extrasTotal = selectedExtras.reduce((sum, e) => sum + e.price, 0);
+  const showExtras = paymentMethod !== 'cash';
+  const effectiveExtras = showExtras ? selectedExtras : [];
+  const extrasTotal = effectiveExtras.reduce((sum, e) => sum + e.price, 0);
   const totalPrice = baseCourtPrice + serviceFee + extrasTotal;
+  const depositAmount = Math.round(baseCourtPrice * 0.20);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -87,9 +97,14 @@ export default function ConfirmationView() {
     const status = (paymentMethod === 'transfer' || paymentMethod === 'cash') ? 'pending_payment' : 'upcoming';
     const userName = isAdmin ? (clientName || 'Administrador') : (localStorage.getItem('ramito_user_name') || 'Anónimo');
     
+    const isDeposit = paymentMethod === 'transfer' && paymentPlan === 'deposit';
+    const plan = isDeposit ? 'deposit' : 'full';
+    const paid = isDeposit ? depositAmount : totalPrice;
+    const balance = isDeposit ? (totalPrice - depositAmount) : 0;
+
     const bookingId = Math.random().toString(36).substr(2, 9);
-    const extrasListNames = selectedExtras.map(e => e.name);
-    const formattedFieldName = courtName + (selectedExtras.length > 0 ? ` (+${selectedExtras.map(e => e.short).join(', ')})` : '');
+    const extrasListNames = effectiveExtras.map(e => e.name);
+    const formattedFieldName = courtName + (effectiveExtras.length > 0 ? ` (+${effectiveExtras.map(e => e.short).join(', ')})` : '');
     
     const bookingData = {
       id: bookingId,
@@ -100,6 +115,9 @@ export default function ConfirmationView() {
       user: userName,
       status: status,
       payment_method: paymentMethod,
+      payment_plan: plan,
+      paid_amount: paid,
+      pending_balance: balance,
       extras: extrasListNames,
       extras_delivered: false,
       created_at: new Date().toISOString()
@@ -111,7 +129,7 @@ export default function ConfirmationView() {
     // Crear notificaciones correspondientes para el usuario y administrador
     const userNotificationBody = paymentMethod === 'cash'
       ? `Tu turno para el ${slotDate} a las ${slotTime} ha sido pre-reservado. Recuerda abonar en efectivo al llegar.`
-      : `Tu turno para el ${slotDate} a las ${slotTime} ha sido pre-reservado. Sube tu comprobante para validarlo.`;
+      : `Tu turno para el ${slotDate} a las ${slotTime} ha sido pre-reservado. Sube tu comprobante de ${plan === 'deposit' ? 'seña' : 'pago total'} para validarlo.`;
 
     setNotifications((prev: any) => [
       ...prev,
@@ -123,7 +141,7 @@ export default function ConfirmationView() {
       },
       {
         title: 'Nueva Reserva Registrada',
-        body: `El jugador ${userName} reservó el campo "${courtName}" para el ${slotDate} a las ${slotTime} (${paymentMethod === 'cash' ? 'Pago en Puerta' : 'Transferencia Bancaria'}).`,
+        body: `El jugador ${userName} reservó el campo "${courtName}" para el ${slotDate} a las ${slotTime} (${paymentMethod === 'cash' ? 'Pago en Puerta' : `Transferencia de ${plan === 'deposit' ? 'Seña' : 'Pago Total'}`}).`,
         time: 'Ahora',
         read: false
       }
@@ -158,23 +176,43 @@ export default function ConfirmationView() {
       if (paymentMethod === 'cash') {
         showToast('¡Reserva registrada con éxito! Recuerde cobrar/abonar en efectivo al llegar al complejo.', 'success');
       } else {
-        showToast('¡Reserva registrada con éxito! Sube tu comprobante de transferencia para confirmarla.', 'success');
+        showToast(`¡Reserva registrada con éxito! Sube tu comprobante de ${plan === 'deposit' ? 'seña' : 'pago total'} para confirmarla.`, 'success');
       }
     } else {
       showToast('¡Reserva confirmada con éxito!', 'success');
     }
 
-    // Ir directamente a la pantalla de gestión del usuario "Mis Reservas" tal como fue solicitado
-    navigate('/my-bookings');
+    // Navegar a la pantalla de éxito pasando la información de la reserva para el divisor Fútbol Split
+    navigate('/success', {
+      state: {
+        bookingData: {
+          id: bookingId,
+          date: slotDate,
+          time: slotTime,
+          field: courtName,
+          amount: `$ ${totalPrice.toLocaleString('es-AR')}`,
+          status: status,
+          payment_method: paymentMethod,
+          payment_plan: plan,
+          paid_amount: paid,
+          pending_balance: balance
+        }
+      }
+    });
   };
 
   const completeWithMercadoPago = async (simulatedCardBrand: string) => {
     const status = 'upcoming'; 
     const userName = isAdmin ? (clientName || 'Administrador') : (localStorage.getItem('ramito_user_name') || 'Anónimo');
     
+    const isDeposit = paymentPlan === 'deposit';
+    const plan = isDeposit ? 'deposit' : 'full';
+    const paid = isDeposit ? depositAmount : totalPrice;
+    const balance = isDeposit ? (totalPrice - depositAmount) : 0;
+
     const bookingId = Math.random().toString(36).substr(2, 9);
-    const extrasListNames = selectedExtras.map(e => e.name);
-    const formattedFieldName = courtName + (selectedExtras.length > 0 ? ` (+${selectedExtras.map(e => e.short).join(', ')})` : '');
+    const extrasListNames = effectiveExtras.map(e => e.name);
+    const formattedFieldName = courtName + (effectiveExtras.length > 0 ? ` (+${effectiveExtras.map(e => e.short).join(', ')})` : '');
     
     const bookingData = {
       id: bookingId,
@@ -185,6 +223,9 @@ export default function ConfirmationView() {
       user: userName,
       status: status,
       payment_method: 'mercadopago',
+      payment_plan: plan,
+      paid_amount: paid,
+      pending_balance: balance,
       mp_payment_id: `mp_${Math.floor(Math.random() * 1000000000)}`,
       mp_card_brand: simulatedCardBrand,
       extras: extrasListNames,
@@ -233,7 +274,25 @@ export default function ConfirmationView() {
     localStorage.setItem('last_booking_status', status);
     localStorage.setItem('last_payment_method', 'mercadopago');
     showToast(`¡Pago electrónico exitoso con Mercado Pago (${simulatedCardBrand})! Turno CONFIRMADO de forma inmediata.`, 'success');
-    navigate('/my-bookings');
+    
+    // Redirigir a la pantalla de éxito con los datos para Fútbol Split
+    navigate('/success', {
+      state: {
+        bookingData: {
+          id: bookingId,
+          date: slotDate,
+          time: slotTime,
+          field: courtName,
+          amount: `$ ${totalPrice.toLocaleString('es-AR')}`,
+          status: status,
+          payment_method: 'mercadopago',
+          payment_plan: plan,
+          paid_amount: paid,
+          pending_balance: balance,
+          mp_card_brand: simulatedCardBrand
+        }
+      }
+    });
   };
 
   return (
@@ -311,66 +370,6 @@ export default function ConfirmationView() {
         </div>
       </section>
 
-
-      {/* Consumos Extras Option Selection */}
-      <section className="bg-[#1a1c1c]/60 backdrop-blur-xl rounded-3xl p-5 space-y-4 border border-white/10">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[10px] font-bold text-[#FF9100] uppercase tracking-[0.2em] flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4" />
-            Consumos Extras (Opcional)
-          </h3>
-          <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
-            RESERVAR AHORA
-          </span>
-        </div>
-        
-        <div className="grid grid-cols-1 gap-2.5">
-          {EXTRAS_CATALOG.map((extra) => {
-            const isSelected = selectedExtras.some(e => e.id === extra.id);
-            const IconComponent = extra.icon;
-            
-            return (
-              <button
-                key={extra.id}
-                type="button"
-                onClick={() => handleExtraToggle(extra)}
-                className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all relative overflow-hidden group ${
-                  isSelected 
-                    ? 'border-[#FF9100] bg-[#FF9100]/5 shadow-[0_4px_20px_rgba(255,145,0,0.1)]' 
-                    : 'border-white/5 bg-black/20 hover:border-white/15'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${extra.color}`}>
-                    <IconComponent className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-black text-white block uppercase tracking-wide leading-tight group-hover:text-amber-300 transition-colors">
-                      {extra.name}
-                    </span>
-                    <span className="text-[8px] font-mono font-bold text-[#bccbb9]/50 block mt-0.5">
-                      AGREGAR AL MONTO FINAL
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xs font-black text-[#4be277] font-mono">
-                    +$ {extra.price.toFixed(2)}
-                  </span>
-                  <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
-                    isSelected ? 'border-[#FF9100] bg-transparent' : 'border-white/20'
-                  }`}>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-[#FF9100]" strokeWidth={3} />}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-
       {/* Detalles de Pago */}
       <section className="bg-[#1a1c1c]/60 backdrop-blur-xl rounded-3xl p-5 space-y-4 border border-white/10">
         <h3 className="text-[10px] font-bold text-[#4be277] uppercase tracking-[0.2em]">Resumen de Pago</h3>
@@ -379,7 +378,7 @@ export default function ConfirmationView() {
             <span className="text-xs font-semibold uppercase italic">Alquiler de cancha</span>
             <span className="text-xs font-bold">$ {baseCourtPrice.toFixed(2)}</span>
           </div>
-          {selectedExtras.map((extra) => (
+          {effectiveExtras.map((extra) => (
             <div key={extra.id} className="flex justify-between items-center text-[#bccbb9]">
               <span className="text-xs font-semibold uppercase italic">{extra.name}</span>
               <span className="text-xs font-bold">$ {extra.price.toFixed(2)}</span>
@@ -423,6 +422,83 @@ export default function ConfirmationView() {
           </section>
         )}
 
+        {/* Plan de Pago: Seña vs Pago Total */}
+        {paymentMethod === 'cash' ? (
+          <section className="bg-[#1a1c1c]/60 backdrop-blur-xl rounded-3xl p-5 space-y-3.5 border border-[#4be277]/15 shadow-2xl text-left">
+            <div className="flex items-center gap-2">
+              <Receipt className="w-4.5 h-4.5 text-[#4be277]" />
+              <h3 className="text-[10px] font-bold text-[#4be277] uppercase tracking-[0.2em]">Pago en Efectivo en Puerta</h3>
+            </div>
+            <p className="text-[9.5px] text-[#bccbb9]/80 font-bold uppercase tracking-wide leading-relaxed">
+              Para pagos en <strong className="text-white">Efectivo en puerta</strong> no se cobra seña previa. El <strong className="text-[#4be277]">100% del valor total</strong> de la reserva (alquiler de cancha y la compra de bebidas/extras seleccionadas) se abona directamente al ingresar al complejo.
+            </p>
+            <div className="p-3 bg-black/40 rounded-xl border border-white/5 flex flex-col gap-1">
+              <span className="text-[7.5px] font-black text-[#bccbb9]/60 uppercase tracking-widest block leading-none">TOTAL A SALDAR EN EL COMPLEJO</span>
+              <span className="text-base font-black text-white font-display italic leading-none">$ {totalPrice.toFixed(2)}</span>
+              <span className="text-[7.5px] text-zinc-400 font-bold uppercase tracking-wider block mt-1 leading-none">
+                Incluye: Cancha ($ {baseCourtPrice.toFixed(2)}) + Luz/Tasa ($ {serviceFee.toFixed(2)}) + Adicionales ($ {extrasTotal.toFixed(2)})
+              </span>
+            </div>
+          </section>
+        ) : (
+          <section className="bg-[#1a1c1c]/60 backdrop-blur-xl rounded-3xl p-5 space-y-4 border border-purple-500/15 shadow-2xl text-left">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4.5 h-4.5 text-purple-400 animate-pulse" />
+              <h3 className="text-[10px] font-bold text-purple-300 uppercase tracking-[0.2em]">Opciones de Pago de Reserva</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Opción Seña Mínima */}
+              <button
+                type="button"
+                onClick={() => setPaymentPlan('deposit')}
+                className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all relative overflow-hidden h-32 ${
+                  paymentPlan === 'deposit' 
+                    ? 'border-purple-400 bg-purple-500/5 shadow-[0_4px_20px_rgba(168,85,247,0.15)]' 
+                    : 'border-white/5 bg-black/20 hover:border-white/10'
+                }`}
+              >
+                <div className="space-y-0.5">
+                  <span className="text-[8px] font-black text-purple-400 uppercase tracking-widest block leading-none">ABONAR ENLACE SEÑA</span>
+                  <span className="text-sm font-black text-white font-display italic mt-1.5 block leading-none">$ {depositAmount.toFixed(2)}</span>
+                </div>
+                <p className="text-[7px] text-[#bccbb9]/60 font-bold uppercase tracking-wider leading-relaxed mt-2">
+                  Pagas solo el 20% de la cancha para asegurar el turno ahora. El saldo y bebidas de $ {(totalPrice - depositAmount).toFixed(2)} se abona en puerta.
+                </p>
+                {paymentPlan === 'deposit' && (
+                  <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center">
+                    <Check className="w-2.5 h-2.5 text-white animate-pulse" strokeWidth={3} />
+                  </div>
+                )}
+              </button>
+
+              {/* Opción Pago Completo */}
+              <button
+                type="button"
+                onClick={() => setPaymentPlan('full')}
+                className={`p-4 rounded-2xl border text-left flex flex-col justify-between transition-all relative overflow-hidden h-32 ${
+                  paymentPlan === 'full' 
+                    ? 'border-[#4be277] bg-[#4be277]/5 shadow-[0_4px_20px_rgba(75,226,119,0.15)]' 
+                    : 'border-white/5 bg-black/20 hover:border-white/10'
+                }`}
+              >
+                <div className="space-y-0.5">
+                  <span className="text-[8px] font-black text-[#4be277] uppercase tracking-widest block leading-none">PAGO TOTAL COMPLETO</span>
+                  <span className="text-sm font-black text-[#4be277] font-display italic mt-1.5 block leading-none">$ {totalPrice.toFixed(2)}</span>
+                </div>
+                <p className="text-[7px] text-[#bccbb9]/60 font-bold uppercase tracking-wider leading-relaxed mt-2">
+                  Saldar todo hoy. Incluye el alquiler de cancha, servicios de iluminación y todos los extras/bebidas elegidos.
+                </p>
+                {paymentPlan === 'full' && (
+                  <div className="absolute top-3 right-3 w-4 h-4 rounded-full bg-[#4be277] flex items-center justify-center">
+                    <Check className="w-2.5 h-2.5 text-white animate-pulse" strokeWidth={3} />
+                  </div>
+                )}
+              </button>
+            </div>
+          </section>
+        )}
+
       {/* Método de Pago */}
       <section className="space-y-4">
         <h3 className="text-[10px] font-bold text-white uppercase tracking-[0.2em]">Método de Pago</h3>
@@ -450,6 +526,13 @@ export default function ConfirmationView() {
               animate={{ opacity: 1, height: 'auto' }}
               className="p-5 rounded-2xl border border-[#4be277]/20 bg-[#4be277]/5 space-y-4 overflow-hidden text-left"
             >
+              <div className="p-3 bg-black/60 rounded-xl border border-white/5 flex flex-col items-center justify-center text-center space-y-1">
+                <span className="text-[8.5px] font-black text-[#4be277] uppercase tracking-widest leading-none">MONTO A MANDAR EN LA OPERACIÓN</span>
+                <span className="text-xl font-black text-white italic font-display">$ {(paymentPlan === 'deposit' ? depositAmount : totalPrice).toFixed(2)}</span>
+                <span className="text-[7.5px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5 block leading-none">
+                  {paymentPlan === 'deposit' ? `SEÑA DE TURNO (Saldo restante de $ ${(totalPrice - depositAmount).toFixed(2)} se paga en la entrada del complejo)` : 'CANCELACIÓN DEL VALOR TOTAL DE LA RESERVA'}
+                </span>
+              </div>
               <div className="flex items-center gap-1.5 p-2 rounded-xl bg-[#4be277]/10 border border-[#4be277]/25 text-[8.5px] font-black text-[#4be277] uppercase tracking-wider font-sans">
                 <Info className="w-3.5 h-3.5 shrink-0 animate-pulse" />
                 <span>Cuenta de Producción • Rotación de Enlace Activa</span>
@@ -525,6 +608,7 @@ export default function ConfirmationView() {
           <label 
             onClick={() => {
               setPaymentMethod('cash');
+              setPaymentPlan('full');
             }}
             className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer ${
               paymentMethod === 'cash' ? 'border-[#4be277] bg-[#4be277]/5' : 'border-white/10 bg-[#1a1c1c]'
@@ -553,36 +637,115 @@ export default function ConfirmationView() {
       </section>
 
       {/* Políticas */}
-      <section className="bg-[#1e2020] rounded-2xl p-4 flex flex-col gap-3">
-        <div className="flex gap-4">
-          <Info className="w-5 h-5 text-[#4be277] flex-shrink-0" />
-          <div className="space-y-1">
-            <p className="text-[10px] font-semibold text-[#bccbb9] leading-relaxed uppercase tracking-wider">
+      <section className="bg-[#1e2020] rounded-2xl p-4 flex flex-col gap-3.5">
+        {/* Calzado */}
+        <div className="flex gap-3 text-left">
+          <Info className="w-4 h-4 text-[#4be277] flex-shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <span className="text-[9px] font-black text-[#4be277] uppercase tracking-wider block">CALZADO PERMITIDO</span>
+            <p className="text-[9.5px] text-zinc-300 font-bold uppercase tracking-wide leading-normal">
               {courtName.toUpperCase().includes('CÉSPED') || court?.id === '1' ? (
-                localStorage.getItem('ramito_court1_policy') || 'CANCELACIÓN GRATUITA HASTA 24 HORAS ANTES DEL INICIO. EL USO DE CHIMPUNES CON COCOS GRANDES ESTÁ PROHIBIDO POR CUIDADO DEL CÉSPED.'
-              ) : (courtName.toUpperCase().includes('SIN CÉSPED') || court?.id === '2') ? (
-                localStorage.getItem('ramito_court2_policy') || 'EL USO DE CALZADO CON TAPONES O COCÓS (BOTINES) ESTÁ ABSOLUTAMENTE PROHIBIDO POR CUESTIONES DE SEGURIDAD Y CUIDADO DE LA LOSA. SE EXIGE EL USO EXCLUSIVO DE ZAPATILLAS DE SUELA LISA DE GOMA (SUELA FLAT/FUTSAL).'
+                <span><strong>SOLO ZAPATILLAS O BOTINES F5 (MULTITAPÓN)</strong>. PROHIBICIÓN DE TAPONES LARGOS DE METAL.</span>
               ) : (
-                'CANCELACIÓN GRATUITA HASTA 24 HORAS ANTES DEL INICIO.'
+                <span><strong>SE PERMITEN BOTINES O ZAPATILLAS</strong>. PROHIBIDO TAPONES METÁLICOS EN ESTA CANCHA DE TIERRA.</span>
               )}
             </p>
           </div>
         </div>
 
-        {/* 1 HOUR RULES HIGHLIGHT IN RED */}
-        <div className="bg-red-950/40 p-4 rounded-xl border border-red-500/50 flex gap-3 text-left">
-          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5 animate-pulse" />
-          <div className="space-y-2 w-full">
-            <span className="text-[10px] font-black text-red-400 uppercase tracking-widest block leading-none">🚨 NORMATIVA DE MODIFICACIÓN Y CANCELACIÓN</span>
-            <p className="text-[10px] font-bold text-red-100/90 uppercase tracking-wide leading-relaxed">
-              SE PERMITEN CAMBIOS DE HORARIO, MODIFICACIONES O CANCELACIONES DE TU TURNO RESERVADO <span className="text-white font-black underline decoration-red-500 decoration-2">ÚNICAMENTE HASTA 1 HORA ANTES</span> DE SU INICIO.
-            </p>
-            <div className="bg-red-600 text-white font-black text-[10px] uppercase tracking-wider px-3 py-1.5 rounded-lg border border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.55)] block text-center">
-              📢 ADVERTENCIA: NO SE REALIZAN DEVOLUCIONES DE DINERO BAJO NINGUNA CIRCUNSTANCIA.
+        {/* Reglas de Pago y Reprogramación */}
+        <div className="bg-red-950/15 p-3 rounded-xl border border-red-500/20 flex gap-3 text-left">
+          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="space-y-2.5 w-full">
+            <span className="text-[9px] font-black text-red-400 uppercase tracking-wider block">NOTAS IMPORTANTES DE PAGO & CANCELACIÓN</span>
+            
+            <div className="grid grid-cols-1 gap-1.5 text-[9.5px]">
+              <div className="flex items-start gap-1.5">
+                <span className="text-red-400 font-bold shrink-0">•</span>
+                <p className="text-zinc-200 leading-normal font-bold uppercase tracking-wide">
+                  <strong className="text-white">DINERO IMPACTADO:</strong> SIN DEVOLUCIONES BAJO NINGÚN CONCEPTO TRAS EL PAGO.
+                </p>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-red-400 font-bold shrink-0">•</span>
+                <p className="text-zinc-200 leading-normal font-bold uppercase tracking-wide">
+                  <strong className="text-white">CAMBIOS DE FECHA/HORA:</strong> ÚNICAMENTE CON AL MENOS <strong className="text-amber-400">1 HORA DE ANTICIPACIÓN</strong>.
+                </p>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-red-400 font-bold shrink-0">•</span>
+                <p className="text-zinc-200 leading-normal font-bold uppercase tracking-wide">
+                  <strong className="text-white">TOLERANCIA LÍMITE:</strong> CON MENOS DE 1 HORA DE ANTICIPACIÓN, SE DARÁ POR PERDIDO EL TURNO SIN CAMBIO NI SALDO A FAVOR.
+                </p>
+              </div>
             </div>
+
+            <p className="text-[8px] font-black text-center text-red-300 text-red-300/90 bg-red-900/10 py-1.5 px-2 rounded border border-red-500/15 uppercase tracking-widest leading-none">
+              ⚠️ PAGO REALIZADO ES COMPROMISO DE JUEGO.
+            </p>
           </div>
         </div>
       </section>
+
+      {/* Consumos Extras Option Selection */}
+      {paymentMethod !== 'cash' && (
+        <section className="bg-[#1a1c1c]/60 backdrop-blur-xl rounded-3xl p-5 space-y-4 border border-[#FF9100]/20 shadow-2xl text-left">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[10px] font-bold text-[#FF9100] uppercase tracking-[0.2em] flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-[#FF9100]" />
+              Consumos Extras (Opcional)
+            </h3>
+            <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded border border-white/5">
+              RESERVAR AHORA
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-2.5">
+            {EXTRAS_CATALOG.map((extra) => {
+              const isSelected = selectedExtras.some(e => e.id === extra.id);
+              const IconComponent = extra.icon;
+              
+              return (
+                <button
+                  key={extra.id}
+                  type="button"
+                  onClick={() => handleExtraToggle(extra)}
+                  className={`w-full p-4 rounded-2xl border text-left flex items-start justify-between transition-all relative overflow-hidden group ${
+                    isSelected 
+                      ? 'border-[#FF9100] bg-[#FF9100]/5 shadow-[0_4px_20px_rgba(255,145,0,0.1)]' 
+                      : 'border-white/5 bg-black/20 hover:border-white/15'
+                  }`}
+                >
+                  <div className="flex items-start gap-3 w-full pr-8">
+                    <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 mt-0.5 ${extra.color}`}>
+                      <IconComponent className="w-4 h-4" />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-xs font-black text-white block uppercase tracking-wide leading-tight group-hover:text-amber-300 transition-colors">
+                        {extra.name}
+                      </span>
+                      <span className="text-xs font-black text-[#4be277] font-mono block">
+                        +$ {extra.price.toFixed(2)}
+                      </span>
+                      <span className="text-[7.5px] font-mono font-bold text-[#bccbb9]/40 block leading-none uppercase">
+                        AGREGAR AL MONTO FINAL
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="absolute top-4 right-4 flex items-center justify-center">
+                    <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
+                      isSelected ? 'border-[#FF9100] bg-transparent' : 'border-white/20'
+                    }`}>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-[#FF9100]" strokeWidth={3} />}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
         </div> {/* End Right Column */}
       </div> {/* End Grid */}
@@ -659,9 +822,9 @@ export default function ConfirmationView() {
                     <span>Horario seleccionado:</span>
                     <span className="font-bold text-white">{slotTime} Hs</span>
                   </div>
-                  {selectedExtras.length > 0 && (
+                  {effectiveExtras.length > 0 && (
                     <div className="text-[9px] text-amber-400 font-bold uppercase leading-relaxed">
-                      Extras: {selectedExtras.map(e => e.name).join(', ')}
+                      Extras: {effectiveExtras.map(e => e.name).join(', ')}
                     </div>
                   )}
                   <div className="pt-2 border-t border-white/5 flex justify-between items-center">

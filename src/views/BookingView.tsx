@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Trophy, 
   Star, 
@@ -47,8 +47,11 @@ const DEFAULT_FEATURES = [
 
 export default function BookingView() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast, allBookings, setAllBookings, courts, setCourts, schedule, emergencyMode } = useApp();
-  const [selectedCourtId, setSelectedCourtId] = useState<string | null>(null);
+  const [selectedCourtId, setSelectedCourtId] = useState<string | null>(() => {
+    return location.state?.initialCourt || null;
+  });
   const [selectedDate, setSelectedDate] = useState(24);
   
   // Waitlist system state
@@ -154,49 +157,61 @@ export default function BookingView() {
   const role = localStorage.getItem('ramito_user_role');
   const isAdmin = role === 'admin_elite' || role === 'admin_vip';
 
-  // Solo se permiten interacciones a usuarios registrados. Los invitados son redirigidos.
+  // Permite a usuarios ver el catálogo de canchas, pero requiere estar conectado para iniciar el proceso de reserva de un campo específico.
   useEffect(() => {
     const userName = localStorage.getItem('ramito_user_name');
-    if (!userName) {
-      showToast('Por favor, inicia sesión para reservar turnos.', 'error');
-      navigate('/login');
+    if (selectedCourtId && !userName) {
+      showToast('Por favor, inicia sesión para comenzar el proceso de reserva.', 'error');
+      navigate('/login', { state: { from: '/booking', pendingCourtSelection: selectedCourtId } });
     }
-  }, [navigate, showToast]);
+  }, [selectedCourtId, navigate, showToast]);
 
   const selectedCourt = courts.find((c: any) => c.id === selectedCourtId);
 
   const isWeekend = selectedDate === 29 || selectedDate === 30; // 29: Sáb, 30: Dom
-  const openTimeStr = isWeekend
-    ? (schedule?.weekend?.open || '15:00')
-    : (schedule?.weekday?.open || '18:00');
-  const closeTimeStr = isWeekend
-    ? (schedule?.weekend?.close || '23:00')
-    : (schedule?.weekday?.close || '23:00');
+  const timeRange = isWeekend ? schedule?.weekend : schedule?.weekday;
+
+  const openTimeStr = timeRange?.open || (isWeekend ? '15:00' : '18:00');
+  const closeTimeStr = timeRange?.close || (isWeekend ? '23:00' : '23:00');
+  const openTime2Str = timeRange?.open2 || '08:00';
+  const closeTime2Str = timeRange?.close2 || '13:00';
+  const useTwoShifts = timeRange?.useTwoShifts || false;
 
   // Generador de turnos por hora según el horario activo
   const getDynamicSlotsForSchedule = () => {
     try {
-      const [openH, openM] = openTimeStr.split(':').map(Number);
-      const [closeH, closeM] = closeTimeStr.split(':').map(Number);
+      const generateForRange = (openStr: string, closeStr: string) => {
+        if (!openStr || !closeStr) return [];
+        const [openH, openM] = openStr.split(':').map(Number);
+        const [closeH, closeM] = closeStr.split(':').map(Number);
 
-      const times: string[] = [];
-      const totalStartVal = openH * 60 + openM;
-      let totalEndVal = closeH * 60 + closeM;
+        const list: string[] = [];
+        const totalStartVal = openH * 60 + openM;
+        let totalEndVal = closeH * 60 + closeM;
 
-      if (totalEndVal < totalStartVal) {
-        totalEndVal += 24 * 60; // Horario que pasa de medianoche
-      }
+        if (totalEndVal < totalStartVal) {
+          totalEndVal += 24 * 60; // Horario que pasa de medianoche
+        }
 
-      for (let val = totalStartVal; val < totalEndVal; val += 60) {
-        const adjustedVal = val % (24 * 60);
-        const h = Math.floor(adjustedVal / 60);
-        const m = adjustedVal % 60;
-        const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-        times.push(timeStr);
+        for (let val = totalStartVal; val < totalEndVal; val += 60) {
+          const adjustedVal = val % (24 * 60);
+          const h = Math.floor(adjustedVal / 60);
+          const m = adjustedVal % 60;
+          const timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+          list.push(timeStr);
+        }
+        return list;
+      };
+
+      let times = generateForRange(openTimeStr, closeTimeStr);
+      if (useTwoShifts && openTime2Str && closeTime2Str) {
+        const times2 = generateForRange(openTime2Str, closeTime2Str);
+        // Merge and sort uniquely
+        times = Array.from(new Set([...times, ...times2])).sort();
       }
       return times;
     } catch (e) {
-      return ['18:00', '20:00', '21:00', '22:00'];
+      return ['18:00', '19:00', '20:00', '21:00', '22:00'];
     }
   };
 
@@ -221,16 +236,25 @@ export default function BookingView() {
         const [sh, sm] = timeStr.split(':').map(Number);
         const slotVal = sh * 60 + sm;
 
-        const [oh, om] = openTimeStr.split(':').map(Number);
-        const openVal = oh * 60 + om;
+        const checkRange = (opStr: string, clStr: string) => {
+          if (!opStr || !clStr) return false;
+          const [oh, om] = opStr.split(':').map(Number);
+          const openVal = oh * 60 + om;
 
-        const [ch, cm] = closeTimeStr.split(':').map(Number);
-        let closeVal = ch * 60 + cm;
+          const [ch, cm] = clStr.split(':').map(Number);
+          let closeVal = ch * 60 + cm;
 
-        if (closeVal < openVal) {
-          return slotVal >= openVal || slotVal <= closeVal;
+          if (closeVal < openVal) {
+            return slotVal >= openVal || slotVal <= closeVal;
+          }
+          return slotVal >= openVal && slotVal <= closeVal;
+        };
+
+        let inRange = checkRange(openTimeStr, closeTimeStr);
+        if (useTwoShifts && openTime2Str && closeTime2Str) {
+          inRange = inRange || checkRange(openTime2Str, closeTime2Str);
         }
-        return slotVal >= openVal && slotVal <= closeVal;
+        return inRange;
       } catch (e) {
         return true;
       }
@@ -385,6 +409,9 @@ export default function BookingView() {
                     <span className="text-lg font-black text-white font-display italic">
                       $ {court.price || 120}<span className="text-[10px] text-[#bccbb9]/60 font-sans font-bold uppercase">/hr</span>
                     </span>
+                    <span className="text-[9px] font-black text-purple-400 block tracking-widest leading-none mt-1">
+                      SEÑA (20%): $ {((court.price || 120) * 0.2).toFixed(0)}
+                    </span>
                   </div>
                 </div>
               </motion.div>
@@ -481,10 +508,15 @@ export default function BookingView() {
 
                     <div className="w-full h-[1px] bg-white/5 my-1.5" />
                     
-                    <span className={`text-[10px] font-black tracking-widest mb-3.5 ${
+                    <span className={`text-[10px] font-black tracking-widest mb-1 ${
                       status === 'booked' ? 'text-zinc-600' : 'text-[#bccbb9]'
                     }`}>
                       $ {activePrice}
+                    </span>
+                    <span className={`text-[8.5px] font-black tracking-wider uppercase mb-3.5 ${
+                      status === 'booked' ? 'text-zinc-700' : 'text-purple-400'
+                    }`}>
+                      Seña: $ {(activePrice * 0.20).toFixed(0)}
                     </span>
                     
                     <button 
@@ -509,7 +541,8 @@ export default function BookingView() {
                             } 
                           });
                         } else {
-                          navigate('/login');
+                          showToast('Por favor, inicia sesión para realizar la reserva.', 'error');
+                          navigate('/login', { state: { from: '/booking', pendingCourtSelection: selectedCourtId } });
                         }
                       }}
                       className={`w-full py-3 rounded-xl text-[9px] font-black transition-all active:scale-95 uppercase tracking-widest text-center ${
@@ -649,6 +682,10 @@ export default function BookingView() {
                         onChange={(e) => setEditingCourt({ ...editingCourt, price: Math.max(0, Number(e.target.value)) })} 
                         className="w-full h-14 bg-black/60 border border-white/10 rounded-2xl px-5 text-white font-black text-xs outline-none focus:border-[#FF9100]/60 focus:bg-black transition-all" 
                       />
+                      <div className="flex justify-between items-center px-1 bg-purple-500/5 border border-purple-500/15 p-2 rounded-xl mt-1">
+                        <span className="text-[8.5px] font-black text-purple-400 uppercase tracking-wider block">Seña Requerida Automatizada (20%):</span>
+                        <span className="text-[11px] font-black text-white italic font-mono bg-purple-500/15 px-2 py-0.5 rounded-lg border border-purple-500/20">$ {((editingCourt.price || 120) * 0.20).toFixed(0)}</span>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-[#bccbb9] uppercase tracking-widest block font-bold">Valoración (Rating)</label>

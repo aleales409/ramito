@@ -36,7 +36,8 @@ import {
   Zap,
   Smartphone,
   Landmark,
-  Shield
+  Shield,
+  FileText
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCantinaItems, saveCantinaItems } from '../lib/cantina';
@@ -105,6 +106,8 @@ export default function MyBookingsView() {
   };
 
   const [showConsolidation, setShowConsolidation] = useState(false);
+  const [activeSplitBookingId, setActiveSplitBookingId] = useState<string | null>(null);
+  const [splitPlayerCount, setSplitPlayerCount] = useState<number>(10);
 
   const calculateTotals = () => {
     let totalBase = 0;
@@ -430,11 +433,18 @@ export default function MyBookingsView() {
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && uploadingFor) {
+      const isPdfValue = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       // Intentar crear URL del archivo cargado para máxima fidelidad visual del comprobante real
       try {
         const localUrl = URL.createObjectURL(file);
         setAllBookings((prev: any) => prev.map((b: any) => 
-          b.id === uploadingFor ? { ...b, status: 'pending_approval', receiptUrl: localUrl } : b
+          b.id === uploadingFor ? { 
+            ...b, 
+            status: 'pending_approval', 
+            receiptUrl: localUrl,
+            isPdf: isPdfValue,
+            fileName: file.name
+          } : b
         ));
         
         // Registrar notificación interactiva en tiempo real para administración
@@ -546,7 +556,7 @@ export default function MyBookingsView() {
         ref={fileInputRef} 
         onChange={onFileChange} 
         className="hidden" 
-        accept="image/*" 
+        accept="image/*,application/pdf" 
       />
 
       {/* Header */}
@@ -818,7 +828,7 @@ export default function MyBookingsView() {
                   }
                 : { 
                     name: 'Cancha 2 • La Bombonera', 
-                    tag: 'Losa Deportiva Pro', 
+                    tag: 'Tierra Compactada', 
                     tagStyle: 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                   };
 
@@ -894,18 +904,24 @@ export default function MyBookingsView() {
             const hasReceipt = !!booking.receiptUrl;
 
             const isCancha1 = booking.field?.toUpperCase().includes('CANCHA 1') || booking.field?.toUpperCase().includes('MARACANÁ') || booking.field?.toUpperCase().includes('MONUMENTAL') || !booking.field?.toUpperCase().includes('CANCHA 2');
+            
+            const isDeposit = booking.payment_plan === 'deposit';
+            const rawAmt = parseFloat(booking.amount?.replace(/[^0-9.]/g, '') || '120');
+            const paidAmount = isDeposit ? (booking.paid_amount || Math.round(rawAmt * 0.20)) : null;
+            const pendingBalance = isDeposit ? (booking.pending_balance || Math.max(0, rawAmt - (paidAmount || 0))) : 0;
+
             const courtDetail = isCancha1 
               ? { 
                   name: 'Cancha 1 • El Maracaná', 
                   tag: 'Césped Sintético Pro', 
                   tagStyle: 'bg-[#4be277]/10 text-[#4be277] border-[#4be277]/20',
-                  rules: 'Normativa: Botines con multitaco de goma (cocos chicos) o zapatillas comunes. Prohibido chimpunes de coco alto.' 
+                  rules: 'NORMATIVA: SOLO BOTINES MULTITAPÓN F5 O ZAPATILLAS. PROHIBICIÓN DE TAPONES LARGOS.' 
                 }
               : { 
                   name: 'Cancha 2 • La Bombonera', 
-                  tag: 'Losa Deportiva Pro', 
+                  tag: 'Tierra Compactada', 
                   tagStyle: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-                  rules: 'Normativa: Solo zapatillas con suela lisa de goma para futsal o lona. Prohibido todo botín con cocos/tapones.' 
+                  rules: 'NORMATIVA: APTO BOTINES O ZAPATILLAS DEPORTIVAS. SE PROHÍBEN ESTRICTAMENTE TAPONES DE METAL.' 
                 };
 
             return (
@@ -951,17 +967,20 @@ export default function MyBookingsView() {
 
                       {/* Status Badge */}
                       <div className={`px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider text-right border shrink-0 flex items-center gap-1 ${
-                        isUpcoming ? 'bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277]' : 
-                        isPendingApproval ? 'bg-[#FF9100]/10 border-[#FF9100]/20 text-[#FF9100] animate-pulse' :
-                        isPendingPayment ? (booking.payment_method === 'cash' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-red-500/10 border-red-500/20 text-red-500') :
-                        'bg-white/5 border-white/10 text-[#bccbb9]'
+                        isUpcoming 
+                          ? (isDeposit ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277]') 
+                          : isPendingApproval ? 'bg-[#FF9100]/10 border-[#FF9100]/20 text-[#FF9100] animate-pulse' 
+                          : isPendingPayment ? (booking.payment_method === 'cash' ? 'bg-amber-500/10 border-amber-500/20 text-amber-500' : 'bg-red-500/10 border-red-500/20 text-red-500') 
+                          : 'bg-white/5 border-white/10 text-[#bccbb9]'
                       }`}>
-                        {isUpcoming && <Check className="w-2.5 h-2.5 text-[#4be277] shrink-0" />}
+                        {isUpcoming && <Check className={`w-2.5 h-2.5 shrink-0 ${isDeposit ? 'text-purple-400' : 'text-[#4be277]'}`} />}
                         {isPendingApproval && <AlertTriangle className="w-2.5 h-2.5 text-[#FF9100] shrink-0 animate-pulse" />}
                         {isPendingPayment && <Clock className="w-2.5 h-2.5 text-red-400 shrink-0" />}
-                        {isUpcoming ? 'CONFIRMADO' : 
-                         isPendingApproval ? 'POR VALIDAR' : 
-                         isPendingPayment ? (booking.payment_method === 'cash' ? 'POR CONFIRMAR EN PUERTA' : 'PAGO PENDIENTE') : 'FINALIZADO'}
+                        {isUpcoming 
+                          ? (isDeposit ? 'SEÑADO • SALDO EN PUERTA' : 'PAGO COMPLETO CONFIRMADO') 
+                          : isPendingApproval ? (isDeposit ? 'SEÑA POR VALIDAR' : 'APROBACIÓN PENDIENTE') 
+                          : isPendingPayment ? (booking.payment_method === 'cash' ? 'POR CONFIRMAR EN PUERTA' : (isDeposit ? 'SEÑA PENDIENTE' : 'PAGO PENDIENTE')) 
+                          : 'FINALIZADO'}
                       </div>
                     </div>
 
@@ -1003,13 +1022,30 @@ export default function MyBookingsView() {
                         </div>
                       </div>
 
-                      <div className="text-right shrink-0">
+                      <div className="text-right shrink-0 flex flex-col items-end">
                         <span className="text-[7.5px] font-bold text-[#bccbb9]/60 uppercase block tracking-widest leading-none mb-1">
-                          COSTO TOTAL
+                          {isDeposit ? 'Plan de Pago Seña' : 'Costo Total'}
                         </span>
-                        <span className="text-sm font-black text-[#4be277] font-display italic">
-                          {booking.amount || '$ 125.00'}
-                        </span>
+                        {isDeposit ? (
+                          <div className="text-right space-y-0.5">
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <span className="text-[9px] font-bold text-zinc-400">Total Turno + Extras:</span>
+                              <span className="text-[11px] font-black text-white leading-none">{booking.amount || '$ 125.00'}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <span className="text-[9px] font-black text-purple-400">Seña pagada:</span>
+                              <span className="text-[11px] font-black text-purple-400 leading-none">$ {paidAmount}</span>
+                            </div>
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 bg-red-500/10 rounded border border-red-500/20 justify-end mt-1">
+                              <span className="text-[8px] font-black text-red-500 uppercase tracking-wider">Por cobrar en cancha:</span>
+                              <span className="text-xs font-black text-red-400 font-display italic leading-none">$ {pendingBalance}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm font-black text-[#4be277] font-display italic">
+                            {booking.amount || '$ 125.00'}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -1164,7 +1200,19 @@ export default function MyBookingsView() {
                               </span>
                             </div>
 
-                            <div className="p-3 bg-[#1a0033]/40 rounded-xl space-y-2 border border-purple-500/10">
+                            <div className="p-3 bg-[#1a0033]/40 rounded-xl space-y-2.5 border border-purple-500/10">
+                              <div className="px-3 py-2 bg-purple-500/10 border border-purple-500/25 rounded-lg flex justify-between items-center text-left">
+                                <span className="text-[8.5px] font-black text-purple-300 uppercase tracking-wider block">VALOR A TRANSFERIR AHORA:</span>
+                                <span className="text-sm font-black text-white font-mono italic">
+                                  $ {isDeposit ? paidAmount?.toFixed(2) : (booking.amount || '$ 120.00')}
+                                </span>
+                              </div>
+                              <p className="text-[7.5px] font-bold text-purple-300/60 uppercase tracking-wide leading-relaxed">
+                                {isDeposit ? 'OPCIÓN SEÑA INICIAL: El saldo restante se cancela antes de jugar en la entrada.' : 'PAGO COMPLETO AL 100%: Cubre el total del turno y todos los adicionales solicitados.'}
+                              </p>
+                              <p className="text-[8.5px] font-black text-purple-300 uppercase tracking-wide leading-relaxed">
+                                FORMATOS ACEPTADOS: CAPTURAS, FOTOS (PNG, JPG) O DOCUMENTOS PDF
+                              </p>
                               <p className="text-[9px] text-[#bccbb9]/85 font-semibold uppercase tracking-wide leading-relaxed">
                                 Realiza el envío antes de tu partido y adjunta el comprobante para habilitar el turno:
                               </p>
@@ -1192,7 +1240,7 @@ export default function MyBookingsView() {
                                 className="h-10 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 hover:border-purple-500/50 text-purple-300 rounded-xl flex items-center justify-center gap-1.5 font-black text-[8.5px] uppercase tracking-widest transition-all"
                               >
                                 <Camera className="w-3.5 h-3.5" />
-                                Subir Captura
+                                SUBIR COMPROBANTE / PDF
                               </button>
                               <button
                                 onClick={(e) => {
@@ -1237,14 +1285,16 @@ export default function MyBookingsView() {
                               </div>
                               
                               <div className="flex justify-between items-center text-[9px] pt-2 border-t border-white/5 leading-none text-left mt-2">
-                                <span className="text-[#bccbb9]/40 font-bold uppercase">IMPORTE VERIFICADO:</span>
-                                <span className="text-xs font-black text-[#4be277] font-display italic">{booking.amount || '$ 120.00'}</span>
+                                <span className="text-[#bccbb9]/40 font-bold uppercase">{isDeposit ? 'SEÑA VERIFICADA EN ADM:' : 'IMPORTE COMPLETO VERIFICADO:'}</span>
+                                <span className="text-xs font-black text-[#4be277] font-display italic">
+                                  {isDeposit ? `$ ${paidAmount}` : (booking.amount || '$ 120.00')}
+                                </span>
                               </div>
                             </div>
                             
                             <div className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2.5 border-t border-white/5">
                               <div className="flex items-center gap-2.5 min-w-0">
-                                {/* Mini image thumbnail inside the ticket */}
+                                {/* Mini PDF or image thumbnail inside the ticket */}
                                 <div 
                                   onClick={() => {
                                     const receiptObj = { 
@@ -1253,24 +1303,40 @@ export default function MyBookingsView() {
                                     };
                                     setViewingBookingReceipt(receiptObj);
                                   }}
-                                  className="w-10 h-10 rounded-lg bg-black border border-purple-400/35 overflow-hidden relative cursor-pointer hover:border-purple-300 transition-all shrink-0 flex items-center justify-center group"
+                                  className="w-10 h-10 rounded-lg bg-black border border-purple-400/35 overflow-hidden relative cursor-pointer hover:border-purple-300 transition-all shrink-0 flex items-center justify-center group text-center"
                                   title="Ampliar comprobante original"
                                 >
-                                  <img 
-                                    src={booking.receiptUrl || 'https://images.unsplash.com/photo-1554224155-1696413565d3?auto=format&fit=crop&q=80&w=600'} 
-                                    alt="Captura comprobante" 
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                                  />
+                                  {booking.isPdf ? (
+                                    <div className="w-full h-full flex items-center justify-center bg-red-950/40 text-red-400">
+                                      <FileText className="w-5 h-5 shrink-0" />
+                                    </div>
+                                  ) : (
+                                    <img 
+                                      src={booking.receiptUrl || 'https://images.unsplash.com/photo-1554224155-1696413565d3?auto=format&fit=crop&q=80&w=600'} 
+                                      alt="Captura comprobante" 
+                                      className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                                    />
+                                  )}
                                   <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Eye className="w-3.5 h-3.5 text-white" />
+                                    <Eye className="w-3.5 h-3.5 text-white animate-pulse" />
                                   </div>
                                 </div>
                                 
-                                <div className="text-left font-mono leading-tight min-w-0">
-                                  <span className="text-[7.5px] font-black text-[#4be277] uppercase block mb-0.5 flex items-center gap-1">
-                                    <Camera className="w-3.5 h-3.5 text-[#4be277] shrink-0" /> CAPTURA DISPONIBLE
+                                <div className="text-left font-mono leading-tight min-w-0 flex-1">
+                                  <span className={`text-[7.5px] font-black uppercase block mb-0.5 flex items-center gap-1 ${booking.isPdf ? 'text-red-400' : 'text-[#4be277]'}`}>
+                                    {booking.isPdf ? (
+                                      <>
+                                        <FileText className="w-3.5 h-3.5 text-red-400 shrink-0" /> DOCUMENTO PDF ADJUNTO
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Camera className="w-3.5 h-3.5 text-[#4be277] shrink-0" /> CAPTURA DISPONIBLE
+                                      </>
+                                    )}
                                   </span>
-                                  <span className="text-[7px] text-[#bccbb9]/40 block truncate">Toca la imagen para previsualizar</span>
+                                  <span className="text-[7.2px] text-[#bccbb9]/50 block truncate max-w-[120px]" title={booking.isPdf ? (booking.fileName || 'comprobante.pdf') : 'Toca la imagen para previsualizar'}>
+                                    {booking.isPdf ? (booking.fileName || 'comprobante.pdf') : 'Toca la imagen para ver'}
+                                  </span>
                                 </div>
                               </div>
                               
@@ -1293,7 +1359,7 @@ export default function MyBookingsView() {
                                   className="px-2 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-lg text-[7px] font-black uppercase tracking-wider transition-all"
                                   title="Subir otra captura de transferencia"
                                 >
-                                  Cambiar Foto
+                                  Cambiar Foto / PDF
                                 </button>
                               </div>
                             </div>
@@ -1352,16 +1418,7 @@ export default function MyBookingsView() {
                       </button>
                     )}
 
-                    {/* 1. Player triggers receipt upload */}
-                    {!isAdmin && isPendingPayment && (
-                      <button 
-                        onClick={() => handleFileUpload(booking.id)}
-                        className="w-full h-12 bg-white text-[#121414] rounded-xl flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest italic hover:bg-zinc-200 transition-all shadow-xl"
-                      >
-                        <Camera className="w-4 h-4" />
-                        Subir Foto de Transferencia
-                      </button>
-                    )}
+                    {/* Unificado en el ticket digital de transferencia superior */}
 
                     {/* 2. Elite Administrative Decisions & Validator */}
                     {isAdmin && isPendingApproval && (
@@ -1394,7 +1451,7 @@ export default function MyBookingsView() {
                       </button>
                     )}
 
-                    {/* 3. Social sharing options */}
+                    {/* 3. Social sharing options & Fútbol Split */}
                     {!isAdmin && (isUpcoming || isPendingApproval) && (
                       <button 
                         onClick={() => {
@@ -1411,6 +1468,129 @@ export default function MyBookingsView() {
                         <Share2 className="w-3.5 h-3.5 text-[#FF9100]" />
                         Invitar Amigos por WhatsApp
                       </button>
+                    )}
+
+                    {!isAdmin && (isUpcoming || isPendingApproval || isPendingPayment) && (
+                      <div className="space-y-1.5">
+                        <button 
+                          onClick={() => {
+                            if (activeSplitBookingId === booking.id) {
+                              setActiveSplitBookingId(null);
+                            } else {
+                              setActiveSplitBookingId(booking.id);
+                              setSplitPlayerCount(10);
+                            }
+                          }}
+                          className={`w-full h-11 border rounded-xl flex items-center justify-center gap-2 font-black text-[9px] uppercase tracking-widest italic transition-all cursor-pointer select-none ${
+                            activeSplitBookingId === booking.id 
+                              ? 'bg-[#4be277]/10 border-[#4be277]/35 text-[#4be277]' 
+                              : 'bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20 text-[#4be277]'
+                          }`}
+                        >
+                          <DollarSign className="w-3.5 h-3.5 text-[#4be277]" />
+                          {activeSplitBookingId === booking.id ? 'Ocultar Fútbol Split ❌' : 'Fútbol Split • Dividir Cuenta 💰'}
+                        </button>
+
+                        <AnimatePresence>
+                          {activeSplitBookingId === booking.id && (
+                            <motion.div 
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="bg-[#4be277]/[0.02] border border-[#4be277]/15 rounded-2xl p-4 space-y-3 mt-1 overflow-hidden"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-[8.5px] font-black uppercase text-[#bccbb9] tracking-wider">Calculadora Fútbol Split</span>
+                                <span className="text-[7.5px] font-black font-mono text-[#4be277] bg-[#4be277]/10 border border-[#4be277]/20 px-2 py-0.5 rounded uppercase tracking-widest">
+                                  {isCancha1 ? "Cancha 1" : "Cancha 2"}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-3 bg-black/50 p-3 rounded-2xl border border-white/5">
+                                <div className="flex flex-col gap-0.5 text-left">
+                                  <span className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest leading-none">Total Jugadores</span>
+                                  <div className="flex items-center gap-1.5 mt-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setSplitPlayerCount(p => Math.max(2, p - 1))}
+                                      className="w-7 h-7 bg-white/5 hover:bg-white/10 active:scale-95 rounded-lg text-white font-black text-xs flex items-center justify-center transition-all cursor-pointer"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="text-xs font-black font-mono text-white w-6 text-center">{splitPlayerCount}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setSplitPlayerCount(p => Math.min(22, p + 1))}
+                                      className="w-7 h-7 bg-white/5 hover:bg-white/10 active:scale-95 rounded-lg text-white font-black text-xs flex items-center justify-center transition-all cursor-pointer"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+
+                                <div className="text-right">
+                                  <span className="text-[7px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block leading-none mb-1">Cuota por Jugador</span>
+                                  <span className="text-xs font-black text-[#4be277] font-mono block leading-none">
+                                    $ {Math.ceil(((() => {
+                                      const amt = booking.amount || '';
+                                      let cleaned = amt;
+                                      if (cleaned.includes('.')) {
+                                        const parts = cleaned.split('.');
+                                        if (parts[parts.length - 1] === '00' || parts[parts.length - 1].length === 2) {
+                                          parts.pop();
+                                          cleaned = parts.join('');
+                                        }
+                                      }
+                                      const digitsOnly = cleaned.replace(/\D/g, '');
+                                      const val = parseInt(digitsOnly, 10);
+                                      return isNaN(val) ? 35000 : val;
+                                    })() / splitPlayerCount)).toLocaleString('es-AR')}
+                                  </span>
+                                  <span className="text-[6px] font-bold text-[#bccbb9]/30 uppercase tracking-tight block mt-1">
+                                    Neto unitario exacto
+                                  </span>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const isCourt1 = booking.field?.toUpperCase().includes('CANCHA 1') || booking.field?.toUpperCase().includes('MARACANÁ') || !booking.field?.toUpperCase().includes('CANCHA 2');
+                                  const cName = isCourt1 ? 'Cancha 1 • El Maracaná 🏟️' : 'Cancha 2 • La Bombonera 🏟️';
+                                  
+                                  const amt = booking.amount || '';
+                                  let cleaned = amt;
+                                  if (cleaned.includes('.')) {
+                                    const parts = cleaned.split('.');
+                                    if (parts[parts.length - 1] === '00' || parts[parts.length - 1].length === 2) {
+                                      parts.pop();
+                                      cleaned = parts.join('');
+                                    }
+                                  }
+                                  const digitsOnly = cleaned.replace(/\D/g, '');
+                                  const totalAmountVal = isNaN(parseInt(digitsOnly, 10)) ? 35000 : parseInt(digitsOnly, 10);
+                                  const perPlayerShare = Math.ceil(totalAmountVal / splitPlayerCount);
+                                  
+                                  const shareAmountStr = `$ ${perPlayerShare.toLocaleString('es-AR')}`;
+                                  const totalCostStr = `$ ${totalAmountVal.toLocaleString('es-AR')}`;
+                                  
+                                  const textMsg = `¡Muchachos! Ya tenemos reservada la cancha: *${cName}* 🏟️\n🗓️ *Fecha*: ${booking.date}\n⏰ *Horario*: ${booking.time} hs\n\nSomos *${splitPlayerCount}* jugadores en total, por lo que nos toca pagar *${shareAmountStr}* a cada uno para la cancha. 💰 ¡No falten! ⚽🏆\n\n_(Monto total: ${totalCostStr})_\n_Enviado desde Ramito Fut Show_`;
+                                  
+                                  if (navigator.clipboard) {
+                                    navigator.clipboard.writeText(textMsg);
+                                    showToast(`¡Fútbol Split copiado para ${splitPlayerCount} jugadores! Pegalo en tu grupo.`, 'success');
+                                  } else {
+                                    showToast('No se pudo copiar el texto automáticamente.', 'error');
+                                  }
+                                }}
+                                className="w-full h-10 rounded-xl bg-[#4be277] text-black font-black text-[8.5px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-1.5 cursor-pointer shadow-[0_4px_12px_rgba(75,226,119,0.2)] hover:opacity-95"
+                              >
+                                <DollarSign className="w-3.5 h-3.5 font-bold" /> Copiar Cuota del Equipo (WhatsApp Split)
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     )}
 
                     {/* 4. Secondary actions (e.g., cancel reservation or see location info) */}
@@ -1697,19 +1877,45 @@ export default function MyBookingsView() {
                 <div className="lg:col-span-7 flex flex-col bg-black/40 border border-white/5 p-6 rounded-[2.5rem] justify-center items-center relative overflow-hidden">
                   <div className="absolute top-3 left-6">
                     <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block italic">
-                      📸 CAPTURA ORIGINAL CARGADA POR JUGADOR
+                      {viewingBookingReceipt.isPdf ? '📄 DOCUMENTO PDF INTERACTIVO' : '📸 CAPTURA ORIGINAL CARGADA POR JUGADOR'}
                     </span>
                   </div>
                   
                   <div className="w-full flex-grow flex items-center justify-center py-6">
-                    <img 
-                      src={viewingBookingReceipt.receiptUrl || 'https://images.unsplash.com/photo-1554224155-1696413565d3?auto=format&fit=crop&q=80&w=600'} 
-                      alt="Comprobante original" 
-                      className="max-w-full max-h-[60vh] rounded-2xl object-contain border border-white/10 shadow-3xl select-all hover:scale-[1.02] transition-transform duration-300 pointer-events-auto"
-                    />
+                    {viewingBookingReceipt.isPdf ? (
+                      <div className="flex flex-col items-center justify-center p-8 bg-zinc-955/65 rounded-[2rem] border border-red-500/15 max-w-sm text-center space-y-5 shadow-2xl">
+                        <div className="w-20 h-20 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-bounce">
+                          <FileText className="w-10 h-10 text-red-500" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <span className="text-sm font-black text-white block uppercase tracking-wider">Documento PDF Adjunto</span>
+                          <span className="text-[10px] text-zinc-400 font-mono block truncate max-w-[240px]" title={viewingBookingReceipt.fileName || 'comprobante.pdf'}>
+                            {viewingBookingReceipt.fileName || 'comprobante.pdf'}
+                          </span>
+                        </div>
+                        <a 
+                          href={viewingBookingReceipt.receiptUrl} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-[0_4px_12px_rgba(239,68,68,0.35)] flex items-center gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          ABRIR COMPROBANTE PDF
+                        </a>
+                      </div>
+                    ) : (
+                      <img 
+                        src={viewingBookingReceipt.receiptUrl || 'https://images.unsplash.com/photo-1554224155-1696413565d3?auto=format&fit=crop&q=80&w=600'} 
+                        alt="Comprobante original" 
+                        className="max-w-full max-h-[60vh] rounded-2xl object-contain border border-white/10 shadow-3xl select-all hover:scale-[1.02] transition-transform duration-300 pointer-events-auto"
+                      />
+                    )}
                   </div>
 
                   <div className="w-full text-center mt-2">
+                    <span className="text-[8px] font-bold text-[#bccbb9]/40 tracking-widest uppercase mb-1 block">
+                      EL SISTEMA PERMITE VISUALIZAR CAPTURAS DIRECTAS O DESCARGAR PDFS SEGURAS
+                    </span>
                     <span className="text-[8.5px] font-bold text-[#bccbb9]/40 tracking-widest uppercase">
                       Deslice o pellizque la imagen para ampliar en dispositivos móviles si es necesario
                     </span>
@@ -1891,7 +2097,7 @@ export default function MyBookingsView() {
 
           const isCancha1 = viewingOfficialTicket.field?.toUpperCase().includes('CANCHA 1') || viewingOfficialTicket.field?.toUpperCase().includes('MARACANÁ') || viewingOfficialTicket.field?.toUpperCase().includes('MONUMENTAL') || !viewingOfficialTicket.field?.toUpperCase().includes('CANCHA 2');
           const courtTitle = isCancha1 ? 'Cancha 1 • El Maracaná' : 'Cancha 2 • La Bombonera';
-          const surfaceType = isCancha1 ? 'Césped Sintético' : 'Losa / Cemento Multiuso';
+          const surfaceType = isCancha1 ? 'CÉSPED SINTÉTICO' : 'TIERRA COMPACTADA';
 
           const handleSimulatePrint = () => {
             setIsSimulatingPrint(true);
@@ -2179,12 +2385,12 @@ TOTAL COBRADO FÍSICO: ${viewingOfficialTicket.amount || '$ 120.00'}
 
         {viewingCourtDetails && (() => {
           const fieldName = viewingCourtDetails.field || "";
-          const isLosa = fieldName.toLowerCase().includes('cancha 2') || fieldName.toLowerCase().includes('losa') || fieldName.toLowerCase().includes('sin césped') || fieldName.toLowerCase().includes('cemento');
+          const isLosa = fieldName.toLowerCase().includes('cancha 2') || fieldName.toLowerCase().includes('losa') || fieldName.toLowerCase().includes('sin césped') || fieldName.toLowerCase().includes('cemento') || fieldName.toLowerCase().includes('tierra');
           const courtTitle = isLosa ? 'Cancha 2 • La Bombonera' : 'Cancha 1 • El Maracaná';
-          const surfaceType = isLosa ? 'Losa / Cemento Multiuso' : 'Césped Sintético Pro 50mm';
+          const surfaceType = isLosa ? 'TIERRA COMPACTADA' : 'CÉSPED SINTÉTICO PRO 50MM';
           const footwearRule = isLosa 
-            ? 'Zapatillas de suela de goma lisa o plana (futsal / indoor). Está terminantemente prohibido usar botines de campo, tapones o calzado con cocos de cualquier tipo.'
-            : 'Botines multitacos (salitas / turf) o zapatillas de fútbol sala. Prohibido tapones de metal o cocos largos de campo natural.';
+            ? 'PERMITIDO BOTINES O ZAPATILLAS DEPORTIVAS. COMPLETAMENTE PROHIBIDO TAPONES METÁLICOS.'
+            : 'SOLO BOTINES MULTITAPÓN F5 O ZAPATILLAS. PROHIBICIÓN DE TAPONES LARGOS.';
           
           return (
             <motion.div 
@@ -2258,31 +2464,7 @@ TOTAL COBRADO FÍSICO: ${viewingOfficialTicket.amount || '$ 120.00'}
                       </div>
                     </div>
 
-                    {/* Features checklist */}
-                    <div className="bg-[#141616] rounded-[2rem] p-5 border border-white/5 text-left space-y-3.5">
-                      <span className="text-[9.5px] font-black text-[#FF9100] uppercase tracking-[0.2em] block flex items-center gap-1.5 leading-none">
-                        <Zap className="w-4 h-4 text-[#FF9100] shrink-0" /> SERVICIOS E INFRAESTRUCTURA INCLUIDA
-                      </span>
-                      
-                      <div className="grid grid-cols-2 gap-3 pt-1">
-                        <div className="flex items-center gap-2 text-white/80">
-                          <Check className="w-3.5 h-3.5 text-[#4be277] shrink-0" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider">Luz LED de Alta Potencia</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/80">
-                          <Check className="w-3.5 h-3.5 text-[#4be277] shrink-0" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider">Balón y Chalecos Gratis</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/80">
-                          <Check className="w-3.5 h-3.5 text-[#4be277] shrink-0" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider">Estacionamiento Privado</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-white/80">
-                          <Check className="w-3.5 h-3.5 text-[#4be277] shrink-0" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider">Duchas y Camerinos</span>
-                        </div>
-                      </div>
-                    </div>
+
 
                     {/* General policies & rules */}
                     <div className="bg-[#141616] rounded-[2rem] p-5 border border-white/5 text-left space-y-3">

@@ -46,15 +46,6 @@ const DEFAULT_ITEMS: CantinaItem[] = [
     showInBooking: false
   },
   {
-    id: 'vests',
-    name: 'Alquiler de Chalecos (10 pzas)',
-    price: 15,
-    stock: 5,
-    type: 'equipment',
-    iconId: 'vests',
-    showInBooking: true
-  },
-  {
     id: 'ball',
     name: 'Alquiler Pelota Profesional FIFA',
     price: 10,
@@ -80,7 +71,12 @@ export function getCantinaItems(): CantinaItem[] {
     try {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Enforce removal of vests (chalecos no van) as requested
+        const filtered = parsed.filter((item: any) => item.id !== 'vests');
+        if (filtered.length !== parsed.length) {
+          localStorage.setItem('ramito_cantina_items', JSON.stringify(filtered));
+        }
+        return filtered;
       }
     } catch {
       // Fallback
@@ -124,15 +120,6 @@ export function getCantinaItems(): CantinaItem[] {
       type: 'drink',
       iconId: 'beer',
       showInBooking: false
-    },
-    {
-      id: 'vests',
-      name: localStorage.getItem('ramito_cantina_name_vests') || 'Alquiler de Chalecos (10 pzas)',
-      price: parseFloat(localStorage.getItem('ramito_cantina_price_vests') || '15'),
-      stock: parseInt(localStorage.getItem('ramito_cantina_stock_vests') || '5', 10),
-      type: 'equipment',
-      iconId: 'vests',
-      showInBooking: true
     },
     {
       id: 'ball',

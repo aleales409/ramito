@@ -13,12 +13,12 @@ export const COURTS: Court[] = [
   },
   {
     id: '2',
-    name: 'Cancha sin Césped',
+    name: 'Cancha de Tierra',
     location: 'Ramito Fut Show - Complejo Principal',
     price: 100,
     rating: 4.7,
     type: 'Fútbol 5',
-    features: ['Losa Deportiva', 'Al aire libre', 'Graderías'],
+    features: ['Tierra Compactada', 'Al aire libre', 'Graderías'],
     imageUrl: 'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?q=80&w=800&auto=format&fit=crop'
   }
 ];

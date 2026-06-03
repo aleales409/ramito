@@ -15,13 +15,18 @@ interface AppContextType {
   setEliteKey: (key: string) => void;
   vipKey: string;
   setVipKey: (key: string) => void;
+  universalUserKey: string;
+  setUniversalUserKey: (key: string) => void;
   notifications: any[];
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   allBookings: any[];
   setAllBookings: React.Dispatch<React.SetStateAction<any[]>>;
   courts: any[];
   setCourts: React.Dispatch<React.SetStateAction<any[]>>;
-  schedule: { weekday: { open: string; close: string }, weekend: { open: string; close: string } };
+  schedule: { 
+    weekday: { open: string; close: string; open2?: string; close2?: string; useTwoShifts?: boolean }, 
+    weekend: { open: string; close: string; open2?: string; close2?: string; useTwoShifts?: boolean } 
+  };
   setSchedule: React.Dispatch<React.SetStateAction<any>>;
   appLicenseActive: boolean;
   setAppLicenseActive: (active: boolean) => void;
@@ -31,6 +36,8 @@ interface AppContextType {
   setMaintenanceMode: (active: boolean) => void;
   emergencyMode: boolean;
   setEmergencyMode: (active: boolean) => void;
+  emergencyType: string;
+  setEmergencyType: (type: string) => void;
   emergencyMessage: string;
   setEmergencyMessage: (message: string) => void;
   marqueeText: string;
@@ -116,11 +123,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [stadiumName]);
 
   const [eliteKey, setEliteKey] = useState(() => {
-    return localStorage.getItem('ramito_elite_key') || '123456';
+    return localStorage.getItem('ramito_elite_key') || 'ELITE-9A7F-D3B8-K2C5';
   });
 
   const [vipKey, setVipKey] = useState(() => {
-    return localStorage.getItem('ramito_vip_key') || '654321';
+    return localStorage.getItem('ramito_vip_key') || 'VIP-3E8F-C1A5-J7B9';
+  });
+
+  const [universalUserKey, setUniversalUserKey] = useState(() => {
+    return localStorage.getItem('ramito_universal_user_key') || 'USER-7D2A-B9C4-F5E1';
   });
 
   const [notifications, setNotifications] = useState<any[]>(() => {
@@ -169,6 +180,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         receiptUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&q=80&w=600',
         phone: '+51 955 443 322',
         extras: ['Alquiler Pelota Profesional FIFA']
+      },
+      { 
+        id: 'b_agus_castro_default', 
+        date: 'Hoy', 
+        time: '21:00', 
+        field: 'Cancha 1 • El Maracaná', 
+        status: 'upcoming', 
+        amount: 'S/. 120.00', 
+        user: 'Agus Castro',
+        phone: '+51 987 654 321',
+        extras: ['Pack Hidratación (2 Gatorade + 2 Aguas)']
       },
       { 
         id: 'b4', 
@@ -229,6 +251,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return saved !== null ? saved === 'true' : false;
   });
 
+  const [emergencyType, setEmergencyType] = useState(() => {
+    return localStorage.getItem('ramito_emergency_type') || 'critical';
+  });
+
   const [emergencyMessage, setEmergencyMessage] = useState(() => {
     return localStorage.getItem('ramito_emergency_message') || 'EL COMPLEJO PERMANECERÁ CERRADO TEMPORALMENTE DEBIDO A FUERZAS MAYOR, LES AGRADECEMOS SU COMPRENSIÓN.';
   });
@@ -253,13 +279,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [ledgerTransactions, setLedgerTransactions] = useState<any[]>(() => {
     const saved = localStorage.getItem('ramito_ledger_txs');
-    return saved ? JSON.parse(saved) : [
-      { id: 'tx1', time: '15:30', detail: 'Juan Pérez • Cancha Sintética (18:00)', method: 'Mercado Pago (Aprobado)', amount: 12000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' },
-      { id: 'tx2', time: '14:15', detail: 'María Gómez • Cancha de Tenis (19:00)', method: 'Efectivo en Puerta', amount: 8000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
-      { id: 'tx3', time: '12:00', detail: 'Carlos Soto • Cancha Sintética (15:00)', method: 'Transferencia Bancaria', amount: 12000, type: 'transfer', labelColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
-      { id: 'tx4', time: '10:45', detail: 'Lucas Díaz • Cancha de Pádel (16:30)', method: 'Efectivo en Puerta', amount: 7000, type: 'cash', labelColor: 'text-zinc-300 bg-zinc-800/40 border-zinc-700/30' },
-      { id: 'tx5', time: '09:15', detail: 'Andrés Ruiz • Cancha de Pádel (17:30)', method: 'Mercado Pago (API Link)', amount: 6000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [cantinaItems, setCantinaItems] = useState<CantinaItem[]>(() => {
@@ -308,6 +328,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
           if (settings.elite_key) setEliteKey(settings.elite_key);
           if (settings.vip_key) setVipKey(settings.vip_key);
+          if (settings.universal_user_key) setUniversalUserKey(settings.universal_user_key);
         }
 
         // Load Bookings
@@ -318,6 +339,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         if (bookings && !bookingsError) {
           setAllBookings(bookings);
+        }
+
+        // Load Ledger Transactions
+        const { data: ledgerTxs, error: ledgerError } = await supabase
+          .from('ledger_transactions')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (ledgerTxs && !ledgerError) {
+          setLedgerTransactions(ledgerTxs);
+        }
+
+        // Load Cantina Items
+        const { data: cantinaDb, error: cantinaError } = await supabase
+          .from('cantina_items')
+          .select('*');
+
+        if (cantinaDb && !cantinaError && cantinaDb.length > 0) {
+          setCantinaItems(cantinaDb);
         }
       } catch (err) {
         console.error('Error loading data from Supabase', err);
@@ -343,6 +383,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [vipKey]);
 
   useEffect(() => {
+    localStorage.setItem('ramito_universal_user_key', universalUserKey);
+  }, [universalUserKey]);
+
+  useEffect(() => {
     localStorage.setItem('ramito_app_license', appLicenseActive.toString());
   }, [appLicenseActive]);
 
@@ -357,6 +401,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem('ramito_emergency_mode', emergencyMode.toString());
   }, [emergencyMode]);
+
+  useEffect(() => {
+    localStorage.setItem('ramito_emergency_type', emergencyType);
+  }, [emergencyType]);
 
   useEffect(() => {
     localStorage.setItem('ramito_emergency_message', emergencyMessage);
@@ -428,6 +476,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (newSettings.admin_phone !== undefined) setAdminPhone(newSettings.admin_phone);
       if (newSettings.elite_key !== undefined) setEliteKey(newSettings.elite_key);
       if (newSettings.vip_key !== undefined) setVipKey(newSettings.vip_key);
+      if (newSettings.universal_user_key !== undefined) setUniversalUserKey(newSettings.universal_user_key);
       if (newSettings.app_license_active !== undefined) {
         setAppLicenseActive(newSettings.app_license_active);
         if (!newSettings.app_license_active) {
@@ -478,6 +527,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setEliteKey,
       vipKey,
       setVipKey,
+      universalUserKey,
+      setUniversalUserKey,
       notifications,
       setNotifications,
       allBookings,
@@ -494,6 +545,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setMaintenanceMode,
       emergencyMode,
       setEmergencyMode,
+      emergencyType,
+      setEmergencyType,
       emergencyMessage,
       setEmergencyMessage,
       marqueeText,
