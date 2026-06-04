@@ -2611,12 +2611,13 @@ export default function ProfileView() {
                         </div>
 
                         {/* Notificar limite */}
-                        <label className="flex items-center gap-2 cursor-pointer select-none self-start">
+                        <label className={`flex items-center gap-2 select-none self-start ${isLicensingReadOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                           <input 
                             type="checkbox"
                             checked={vercelAutoUpgrade}
                             onChange={(e) => setVercelAutoUpgrade(e.target.checked)}
-                            className="w-3.5 h-3.5 rounded border-white/15 bg-black/40 text-blue-500 focus:ring-0 focus:ring-offset-0 checkmark-custom"
+                            disabled={isLicensingReadOnly}
+                            className={`w-3.5 h-3.5 rounded border-white/15 bg-black/40 text-blue-500 focus:ring-0 focus:ring-offset-0 checkmark-custom ${isLicensingReadOnly ? 'cursor-not-allowed' : ''}`}
                           />
                           <span className="text-[7.5px] font-bold text-[#bccbb9]/60 uppercase tracking-wider font-sans">Aviso límite de cuota activo</span>
                         </label>
@@ -2951,9 +2952,11 @@ export default function ProfileView() {
                     </div>
                     <button 
                       onClick={() => {
+                        if (isLicensingReadOnly) return;
                         saveSettings({ app_license_active: !appLicenseActive });
                       }}
-                      className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors ${appLicenseActive ? 'bg-[#FF9100]' : 'bg-white/10'}`}
+                      disabled={isLicensingReadOnly}
+                      className={`w-12 h-6 px-0.5 rounded-full flex items-center transition-colors ${appLicenseActive ? 'bg-[#FF9100]' : 'bg-white/10'} ${isLicensingReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <motion.div animate={{ x: appLicenseActive ? 24 : 0 }} className={`w-5 h-5 rounded-full ${appLicenseActive ? 'bg-black' : 'bg-zinc-400'}`} />
                     </button>
@@ -2984,7 +2987,8 @@ export default function ProfileView() {
                       type="text" 
                       value={appPwaShortName} 
                       onChange={(e) => setAppPwaShortName(e.target.value)}
-                      className="w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white uppercase font-bold focus:border-[#FF9100] transition-all outline-none"
+                      disabled={isLicensingReadOnly}
+                      className={`w-full h-12 bg-black/40 border border-white/10 rounded-xl px-4 text-xs text-white uppercase font-bold focus:border-[#FF9100] transition-all outline-none ${isLicensingReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
                       placeholder="Ej. RAMITO APP"
                     />
                   </div>
