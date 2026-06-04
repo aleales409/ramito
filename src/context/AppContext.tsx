@@ -4,6 +4,7 @@ import { updateVercelLicense } from '../lib/vercelSync';
 import { COURTS } from '../data';
 import { getCantinaItems, saveCantinaItems, CantinaItem } from '../lib/cantina';
 import { requestNotificationPermission, sendPushNotification } from '../lib/notifications';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface AppContextType {
   isComplexOpen: boolean;
@@ -313,7 +314,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       requestNotificationPermission();
 
       try {
-        const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
         if (!isSupabaseConfigured) {
           console.log('Skipping Supabase fetching because configuration is missing/invalid. Offline simulation mode is active.');
           return;
@@ -650,9 +650,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (newSettings.courts !== undefined) setCourts(newSettings.courts);
     if (newSettings.schedule_days !== undefined) setScheduleDays(newSettings.schedule_days);
 
-    // Then try to sync to Supabase
     try {
-      const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
       if (isSupabaseConfigured) {
         let updateData = { ...newSettings };
         if (newSettings.schedule_days !== undefined) {

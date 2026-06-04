@@ -5,6 +5,7 @@ import { Calendar, Clock, Trophy, Wallet, Receipt, Copy, Info, AlertTriangle, Sh
 import { getTransferAccounts } from '../lib/transferRotation';
 import { useApp } from '../context/AppContext';
 import { getCantinaItems } from '../lib/cantina';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export default function ConfirmationView() {
   const navigate = useNavigate();
@@ -148,7 +149,6 @@ export default function ConfirmationView() {
     ]);
 
     try {
-      const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
       if (isSupabaseConfigured) {
         const { error } = await supabase.from('bookings').insert([{
           id: bookingId,
@@ -252,7 +252,6 @@ export default function ConfirmationView() {
     ]);
 
     try {
-      const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
       if (isSupabaseConfigured) {
         await supabase.from('bookings').insert([{
           id: bookingId,

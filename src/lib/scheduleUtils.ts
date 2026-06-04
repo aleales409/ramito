@@ -27,6 +27,7 @@ export function generarMarquee(scheduleDays: Record<string, ScheduleDay>): strin
     const seg = [morning, afternoon, night]
       .filter(Boolean)
       .join(' / ');
+    if (!seg) return null;
     return `${capitalize(day)} ${seg}`;
   });
 

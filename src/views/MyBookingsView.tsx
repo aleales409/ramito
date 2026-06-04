@@ -42,6 +42,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { getCantinaItems, saveCantinaItems } from '../lib/cantina';
 import NotificationBell from '../components/NotificationBell';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const USER_AVATARS: Record<string, string> = {
   'CARLOS MENDOZA': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23FBBF24" stroke-width="2" stroke-opacity="0.3"/><path d="M 35,30 L 65,30 A 15,15 0 0,1 50,60 A 15,15 0 0,1 35,30 Z" fill="%23FBBF24" fill-opacity="0.1" stroke="%23FBBF24" stroke-width="2"/><path d="M 35,38 H 28 A 5,5 0 0,1 28,48 H 35" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 65,38 H 72 A 5,5 0 0,0 72,48 H 65" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,60 V 70 M 40,70 H 60" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,16 L 52,21 L 57,21 L 53,24 L 55,29 L 50,26 L 45,29 L 47,24 L 43,21 L 48,21 Z" fill="%23FBBF24" fill-opacity="0.2" stroke="%23FBBF24" stroke-width="1"/></svg>', // Mundial Oro
@@ -275,7 +276,6 @@ export default function MyBookingsView() {
 
   const handleRescheduleBooking = async (id: string, newDate: string, newTime: string) => {
     try {
-      const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
       if (isSupabaseConfigured) {
         const { error } = await supabase
           .from('bookings')
@@ -479,7 +479,6 @@ export default function MyBookingsView() {
     const booking = bookings.find((b: any) => b.id === id);
     
     try {
-      const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
       if (isSupabaseConfigured) {
         const { error } = await supabase
           .from('bookings')

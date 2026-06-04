@@ -3,6 +3,7 @@ import { Trophy, Bell, LogOut, AlertTriangle, RefreshCw, Sparkles } from 'lucide
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export default function TopAppBar() {
   const { marqueeText, secondaryMarqueeText, schedule, showToast, userName, userRole: role, setUserName, setUserRole, setUserAvatar, emergencyMode, emergencyMessage } = useApp();
@@ -18,7 +19,6 @@ export default function TopAppBar() {
     const userId = localStorage.getItem('ramito_user_id');
     // Clean active session from Supabase to allow future login
     try {
-      const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
       if (isSupabaseConfigured && sessionId && userId) {
         await supabase.from('active_sessions').delete().eq('profile_id', userId);
       }
