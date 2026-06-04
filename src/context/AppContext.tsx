@@ -3,6 +3,7 @@ import { generarMarquee } from '../lib/scheduleUtils';
 import { updateVercelLicense } from '../lib/vercelSync';
 import { COURTS } from '../data';
 import { getCantinaItems, saveCantinaItems, CantinaItem } from '../lib/cantina';
+import { requestNotificationPermission, sendPushNotification } from '../lib/notifications';
 
 interface AppContextType {
   isComplexOpen: boolean;
@@ -302,7 +303,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch settings and bookings from Supabase on mount
   useEffect(() => {
-    async function loadData() {
+    let bookingsSub: any = null;
+    let settingsSub: any = null;
+    let ledgerSub: any = null;
+    let cantinaSub: any = null;
+
+    async function loadDataAndSetupRealtime() {
+      // Proactively request browser/OS notification permission
+      requestNotificationPermission();
+
       try {
         const { supabase, isSupabaseConfigured } = await import('../lib/supabase');
         if (!isSupabaseConfigured) {
@@ -310,7 +319,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         
-        // Load System Settings
+        // 1. Load Initial System Settings
         const { data: settings, error: settingsError } = await supabase
           .from('system_settings')
           .select('*')
@@ -331,7 +340,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (settings.universal_user_key) setUniversalUserKey(settings.universal_user_key);
         }
 
-        // Load Bookings
+        // 2. Load Initial Bookings
         const { data: bookings, error: bookingsError } = await supabase
           .from('bookings')
           .select('*')
@@ -341,7 +350,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setAllBookings(bookings);
         }
 
-        // Load Ledger Transactions
+        // 3. Load Initial Ledger Transactions & Compute Financial Metrics
         const { data: ledgerTxs, error: ledgerError } = await supabase
           .from('ledger_transactions')
           .select('*')
@@ -349,9 +358,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         if (ledgerTxs && !ledgerError) {
           setLedgerTransactions(ledgerTxs);
+          if (ledgerTxs.length > 0) {
+            const cash = ledgerTxs.filter((tx: any) => tx.type === 'cash').reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+            const transfer = ledgerTxs.filter((tx: any) => tx.type === 'transfer').reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+            const mp = ledgerTxs.filter((tx: any) => tx.type === 'mercadopago').reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
+            setCashTotal(cash);
+            setTransferTotal(transfer);
+            setMpTotal(mp);
+          }
         }
 
-        // Load Cantina Items
+        // 4. Load Initial Cantina Items
         const { data: cantinaDb, error: cantinaError } = await supabase
           .from('cantina_items')
           .select('*');
@@ -359,11 +376,158 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (cantinaDb && !cantinaError && cantinaDb.length > 0) {
           setCantinaItems(cantinaDb);
         }
+
+        // --- SETUP REALTIME SUBSCRIPTIONS ---
+
+        // A. Listen to system_settings updates
+        settingsSub = supabase
+          .channel('realtime_settings')
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'system_settings' },
+            (payload) => {
+              const updated = payload.new;
+              if (updated && updated.id === 1) {
+                console.log('⚡ Supabase Realtime settings update:', updated);
+                if (updated.is_complex_open !== undefined) setIsComplexOpen(updated.is_complex_open);
+                if (updated.app_license_active !== undefined) setAppLicenseActive(updated.app_license_active);
+                if (updated.web_license_active !== undefined) setWebLicenseActive(updated.web_license_active);
+                if (updated.admin_phone !== undefined) setAdminPhone(updated.admin_phone);
+                if (updated.marquee_text !== undefined) setMarqueeText(updated.marquee_text);
+                if (updated.secondary_marquee_text !== undefined) setSecondaryMarqueeText(updated.secondary_marquee_text);
+                if (updated.elite_key) setEliteKey(updated.elite_key);
+                if (updated.vip_key) setVipKey(updated.vip_key);
+                if (updated.universal_user_key) setUniversalUserKey(updated.universal_user_key);
+              }
+            }
+          )
+          .subscribe();
+
+        // B. Listen to bookings changes (inserts, updates, deletes)
+        bookingsSub = supabase
+          .channel('realtime_bookings')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'bookings' },
+            (payload) => {
+              console.log('⚡ Supabase Realtime bookings change:', payload);
+              if (payload.eventType === 'INSERT') {
+                const newBooking = payload.new;
+                setAllBookings((prev) => {
+                  if (prev.some((b) => b.id === newBooking.id)) return prev;
+                  return [newBooking, ...prev];
+                });
+
+                // Dispatch System/OS Push Notification
+                sendPushNotification(
+                  '🚨 NUEVA RESERVA RECIBIDA',
+                  `${newBooking.user} reservó la ${newBooking.field} para hoy a las ${newBooking.time} por un valor de ${newBooking.amount}.`
+                );
+
+                // Add to internal app notification list
+                const appNotif = {
+                  id: `n_rt_${Date.now()}`,
+                  title: 'NUEVA RESERVA',
+                  body: `${newBooking.user} ha reservado la ${newBooking.field} (${newBooking.amount}).`,
+                  time: 'Hace un instante',
+                  read: false
+                };
+                setNotifications((prev) => [appNotif, ...(prev || [])]);
+              } else if (payload.eventType === 'UPDATE') {
+                const updatedBooking = payload.new;
+                const oldBooking = payload.old;
+                
+                setAllBookings((prev) => prev.map((b) => (b.id === updatedBooking.id ? updatedBooking : b)));
+
+                // Trigger Notification if status changed
+                if (oldBooking && oldBooking.status !== updatedBooking.status) {
+                  sendPushNotification(
+                    '⚠️ ESTADO DE RESERVA ACTUALIZADO',
+                    `La reserva de ${updatedBooking.user} cambió a: ${updatedBooking.status.toUpperCase()}`
+                  );
+                }
+              } else if (payload.eventType === 'DELETE') {
+                const deletedId = payload.old?.id;
+                if (deletedId) {
+                  setAllBookings((prev) => prev.filter((b) => b.id !== deletedId));
+                }
+              }
+            }
+          )
+          .subscribe();
+
+        // C. Listen to ledger_transactions changes
+        ledgerSub = supabase
+          .channel('realtime_ledger')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'ledger_transactions' },
+            (payload) => {
+              console.log('⚡ Supabase Realtime ledger change:', payload);
+              if (payload.eventType === 'INSERT') {
+                const newTx = payload.new;
+                setLedgerTransactions((prev) => {
+                  if (prev.some((t) => t.id === newTx.id)) return prev;
+                  return [newTx, ...prev];
+                });
+
+                // Update financial metrics dynamically in real-time
+                if (newTx.type === 'cash') setCashTotal((prev) => prev + (newTx.amount || 0));
+                else if (newTx.type === 'transfer') setTransferTotal((prev) => prev + (newTx.amount || 0));
+                else if (newTx.type === 'mercadopago') setMpTotal((prev) => prev + (newTx.amount || 0));
+
+                // Dispatch notification of transaction
+                sendPushNotification(
+                  '💸 PAGO REGISTRADO',
+                  `Se acreditó $${(newTx.amount || 0).toLocaleString('es-AR')} ARS vía ${newTx.method} (${newTx.detail}).`
+                );
+              } else if (payload.eventType === 'DELETE') {
+                // If transactions are cleared, reset metrics
+                setLedgerTransactions([]);
+                setCashTotal(0);
+                setTransferTotal(0);
+                setMpTotal(0);
+              }
+            }
+          )
+          .subscribe();
+
+        // D. Listen to cantina_items changes
+        cantinaSub = supabase
+          .channel('realtime_cantina')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'cantina_items' },
+            (payload) => {
+              console.log('⚡ Supabase Realtime cantina change:', payload);
+              if (payload.eventType === 'INSERT') {
+                setCantinaItems((prev) => [...prev, payload.new as CantinaItem]);
+              } else if (payload.eventType === 'UPDATE') {
+                setCantinaItems((prev) => prev.map((item) => (item.id === payload.new.id ? (payload.new as CantinaItem) : item)));
+              } else if (payload.eventType === 'DELETE') {
+                const oldId = (payload.old as any)?.id;
+                if (oldId) {
+                  setCantinaItems((prev) => prev.filter((item) => item.id !== oldId));
+                }
+              }
+            }
+          )
+          .subscribe();
+
       } catch (err) {
-        console.error('Error loading data from Supabase', err);
+        console.error('Error loading initial data and setting up Realtime from Supabase:', err);
       }
     }
-    loadData();
+
+    loadDataAndSetupRealtime();
+
+    return () => {
+      // Cleanup Realtime channels on unmount
+      if (settingsSub) settingsSub.unsubscribe();
+      if (bookingsSub) bookingsSub.unsubscribe();
+      if (ledgerSub) ledgerSub.unsubscribe();
+      if (cantinaSub) cantinaSub.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {

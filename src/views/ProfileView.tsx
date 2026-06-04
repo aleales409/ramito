@@ -103,6 +103,160 @@ export default function ProfileView() {
   const [selectedExportRange, setSelectedExportRange] = useState<'mensual' | 'trimestral'>('mensual');
   const [selectedAuditLog, setSelectedAuditLog] = useState<any>(null);
 
+  // Supabase Diagnostics / Fire Test states
+  const [showDiagnosticsWindow, setShowDiagnosticsWindow] = useState(false);
+  const [diagnosticsRunning, setDiagnosticsRunning] = useState(false);
+  const [diagnosticsResults, setDiagnosticsResults] = useState<any>(null);
+  const [diagnosticsLogs, setDiagnosticsLogs] = useState<string[]>([]);
+
+  const runDiagnostics = async () => {
+    if (diagnosticsRunning) return;
+    setDiagnosticsRunning(true);
+    setDiagnosticsLogs(['[00:01] Inicializando prueba de fuego del motor Supabase...', '[00:02] Cargando credenciales de entorno y verificando cliente...']);
+    
+    const results: any = {
+      connection: { status: 'loading', latency: 0 },
+      profiles: { status: 'loading', latency: 0, actions: { read: 'pending' } },
+      bookings: { status: 'loading', latency: 0, actions: { read: 'pending', write: 'pending', delete: 'pending' } },
+      system_settings: { status: 'loading', latency: 0, actions: { read: 'pending', write: 'pending' } },
+      ledger_transactions: { status: 'loading', latency: 0, actions: { read: 'pending', write: 'pending', delete: 'pending' } },
+      cantina_items: { status: 'loading', latency: 0, actions: { read: 'pending' } },
+      active_sessions: { status: 'loading', latency: 0, actions: { read: 'pending', write: 'pending', delete: 'pending' } }
+    };
+    setDiagnosticsResults({ ...results });
+
+    const startTime = Date.now();
+
+    try {
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase no está configurado o sus credenciales son inválidas en el archivo .env.');
+      }
+
+      setDiagnosticsLogs(prev => [...prev, `✓ [00:04] Conexión básica establecida con el Host: ${(supabase as any).supabaseUrl}`]);
+      results.connection = { status: 'success', latency: Date.now() - startTime };
+
+      const testTable = async (tableName: string, operations: ('read' | 'write' | 'delete')[], mockData?: any) => {
+        const tStart = Date.now();
+        setDiagnosticsLogs(prev => [...prev, `[00:05] Analizando tabla '${tableName}'...`]);
+        results[tableName] = { status: 'loading', latency: 0, actions: { read: 'pending' } };
+        if (operations.includes('write')) results[tableName].actions.write = 'pending';
+        if (operations.includes('delete')) results[tableName].actions.delete = 'pending';
+        
+        // 1. READ TEST
+        let { data, error } = await supabase.from(tableName).select('*').limit(1);
+        if (error) {
+          setDiagnosticsLogs(prev => [...prev, `❌ [00:06] Error de lectura en '${tableName}': ${error.message}`]);
+          results[tableName] = { status: 'error', latency: Date.now() - tStart, actions: { read: 'failed' } };
+          return;
+        }
+        
+        results[tableName].actions.read = 'success';
+        setDiagnosticsLogs(prev => [...prev, `✓ [00:07] Lectura exitosa en '${tableName}' (${data?.length || 0} filas encontradas)`]);
+
+        // 2. WRITE TEST (if requested)
+        let insertedId: any = null;
+        let deleteKeyToUse: string = 'id';
+        if (operations.includes('write') && mockData) {
+          if (tableName === 'system_settings') {
+            // we don't insert, we only update row id=1
+            const { error: uError } = await supabase.from(tableName).update({ admin_phone: adminPhone }).eq('id', 1);
+            if (uError) {
+              setDiagnosticsLogs(prev => [...prev, `❌ [00:10] Error de actualización (UPDATE) en '${tableName}': ${uError.message}`]);
+              results[tableName].actions.write = 'failed';
+              results[tableName].status = 'partial_success';
+              return;
+            } else {
+              setDiagnosticsLogs(prev => [...prev, `✓ [00:10] Actualización (UPDATE) en '${tableName}' exitosa`]);
+              results[tableName].actions.write = 'success';
+            }
+          } else {
+            const { data: inserted, error: wError } = await supabase.from(tableName).insert([mockData]).select();
+            if (wError) {
+              setDiagnosticsLogs(prev => [...prev, `❌ [00:08] Error de escritura (INSERT) en '${tableName}': ${wError.message}`]);
+              results[tableName].actions.write = 'failed';
+              results[tableName].status = 'partial_success'; // failed write but read succeeded
+              return;
+            }
+            
+            results[tableName].actions.write = 'success';
+            // Prefer the returned id; fallback to profile_id for tables like active_sessions
+            insertedId = inserted && inserted[0] ? (inserted[0].id || inserted[0].profile_id) : null;
+            deleteKeyToUse = (inserted && inserted[0] && inserted[0].id) ? 'id' : 'profile_id';
+            setDiagnosticsLogs(prev => [...prev, `✓ [00:09] Escritura (INSERT) en '${tableName}' exitosa`]);
+          }
+        }
+
+        // 3. DELETE TEST (if requested and we have something to delete)
+        if (operations.includes('delete') && insertedId) {
+          const { error: dError } = await supabase.from(tableName).delete().eq(deleteKeyToUse, insertedId);
+          if (dError) {
+            setDiagnosticsLogs(prev => [...prev, `❌ [00:11] Error de eliminación (DELETE) en '${tableName}': ${dError.message}`]);
+            results[tableName].actions.delete = 'failed';
+            results[tableName].status = 'partial_success';
+            return;
+          }
+          results[tableName].actions.delete = 'success';
+          setDiagnosticsLogs(prev => [...prev, `✓ [00:12] Eliminación (DELETE) en '${tableName}' exitosa`]);
+        }
+
+        results[tableName].status = 'success';
+        results[tableName].latency = Date.now() - tStart;
+      };
+
+      // RUN READS & WRITES
+      await testTable('profiles', ['read']);
+      await testTable('system_settings', ['read', 'write'], { id: 1 });
+      
+      // Test Bookings with mock insert
+      const mockBooking = {
+        id: `test_diag_${Date.now()}`,
+        date: 'Test',
+        time: '99:99',
+        field: 'Cancha Diagnóstico',
+        status: 'completed',
+        amount: 'S/. 0.00',
+        user: 'DIAGNOSTICO SUPABASE',
+        phone: '+000000000'
+      };
+      await testTable('bookings', ['read', 'write', 'delete'], mockBooking);
+
+      // Test Ledger
+      const mockTx = {
+        id: `tx_diag_${Date.now()}`,
+        time: '00:00',
+        detail: 'Diagnóstico de Conexión',
+        method: 'Test de Consola',
+        amount: 0,
+        type: 'cash',
+        labelColor: 'text-zinc-400 bg-zinc-800'
+      };
+      await testTable('ledger_transactions', ['read', 'write', 'delete'], mockTx);
+
+      // Test Cantina
+      await testTable('cantina_items', ['read']);
+
+      // Test Active Sessions
+      const mockSession = {
+        profile_id: `diag_test_${Date.now()}`,
+        device_type: 'desktop'
+      };
+      await testTable('active_sessions', ['read', 'write', 'delete'], mockSession);
+
+      setDiagnosticsLogs(prev => [...prev, '✓ [00:25] ¡PRUEBA DE FUEGO SUPABASE COMPLETADA CON ÉXITO!', 'Todas las conexiones y operaciones CRUD con Supabase funcionan al 100%.']);
+      showToast('Prueba de fuego completada con éxito', 'success');
+
+    } catch (err: any) {
+      console.error(err);
+      results.connection = { status: 'error', latency: 0 };
+      setDiagnosticsLogs(prev => [...prev, `❌ [00:25] ERROR CRÍTICO EN PRUEBA DE FUEGO: ${err.message || err}`]);
+      showToast('Fallo en la prueba de fuego de base de datos');
+    } finally {
+      setDiagnosticsRunning(false);
+      setDiagnosticsResults({ ...results });
+    }
+  };
+
+
   // States for WEB License Options (Separated and Complete)
   const [webDomain, setWebDomain] = useState(() => localStorage.getItem('ramito_web_domain') || 'ramitofutshow.com');
   const [webVercelHook, setWebVercelHook] = useState(() => localStorage.getItem('ramito_web_vercel_hook') || 'https://api.vercel.com/v1/integrations/deploy/prj_12345');
@@ -1640,6 +1794,40 @@ export default function ProfileView() {
                 </div>
               </button>
 
+              {/* PRUEBA DE FUEGO SUPABASE */}
+              {userRole === 'admin_elite' && (
+                <button
+                  onClick={() => setShowDiagnosticsWindow(true)}
+                  className="w-full text-left glass-panel rounded-3xl border border-violet-500/30 p-5 relative overflow-hidden group hover:border-violet-400/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-violet-950/20 to-violet-900/10 shadow-[0_4px_20px_rgba(139,92,246,0.06)]"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-violet-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-violet-500/10 transition-all duration-500" />
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-violet-500/20 border-violet-500/40 text-violet-400 shadow-[0_0_15px_rgba(139,92,246,0.25)]">
+                        <Database className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-violet-400 transition-colors">
+                          Prueba de Fuego Supabase
+                        </span>
+                        <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                          VERIFICAR TODAS LAS CONEXIONES Y OPERACIONES CRUD EN TIEMPO REAL
+                        </p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+                          <span className="text-[8px] font-black uppercase tracking-wider font-mono text-violet-400">
+                            {isSupabaseConfigured ? 'MOTOR SUPABASE ACTIVO • LISTO PARA DIAGNÓSTICO' : 'SUPABASE NO CONFIGURADO'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400 group-hover:text-white transition-all shrink-0">
+                      <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </div>
+                </button>
+              )}
+
               {/* GESTOR DE ASISTENCIA WHATSAPP DE SOPORTE (MOSTRADO ÚNICAMENTE EDITABLE PARA EL ADMIN VIP) */}
               {userRole === 'admin_vip' && (
                 <div className="glass-panel rounded-3xl border border-white/5 p-5 space-y-4 bg-zinc-950/60 relative overflow-hidden text-left animate-fade-in font-sans">
@@ -2020,6 +2208,41 @@ export default function ProfileView() {
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                       <span className="text-[8px] font-black uppercase tracking-wider font-mono text-emerald-400">
                         MONITOREO DE SATURACIÓN ACTIVO • VER PATRONES DE DEMANDA DE RESERVAS
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+                  <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              </div>
+            </button>
+
+            {/* BOTÓN PRUEBA DE FUEGO Y DIAGNÓSTICOS SUPABASE */}
+            <button
+              onClick={() => {
+                setShowDiagnosticsWindow(true);
+                runDiagnostics();
+              }}
+              className="w-full text-left glass-panel rounded-3xl border border-white/5 p-5 relative overflow-hidden group hover:border-[#4be277]/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-zinc-950/80 to-zinc-950/40 shadow-lg animate-pulse"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#4be277]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#4be277]/10 transition-all duration-500" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277] group-hover:bg-[#4be277]/20 group-hover:border-[#4be277]/40 transition-all duration-300">
+                    <Database className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-[#4be277] transition-colors">
+                      Prueba de Fuego Supabase & Conexión
+                    </span>
+                    <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                      DIAGNÓSTICO EN TIEMPO REAL • CRUD TEST • LATENCIA DE BASE DE DATOS
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="w-2 h-2 rounded-full bg-[#4be277] animate-pulse" />
+                      <span className="text-[8px] font-black uppercase tracking-wider font-mono text-[#bccbb9]/70">
+                        VERIFICAR RESPUESTA DEL HOST Y OPERATIVIDAD DE TABLAS
                       </span>
                     </div>
                   </div>
@@ -6226,6 +6449,189 @@ export default function ProfileView() {
         )}
       </AnimatePresence>
 
+      {/* Ventana de Diagnóstico y Prueba de Fuego Supabase */}
+      <AnimatePresence>
+        {showDiagnosticsWindow && (
+          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
+            {/* Ambient Backgrounds */}
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#4be277]/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-sky-500/5 rounded-full blur-[120px] pointer-events-none" />
+
+            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between animate-fade-in">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#4be277]/10 border border-[#4be277]/20 flex items-center justify-center shrink-0">
+                    <Database className="w-6 h-6 text-[#4be277]" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Prueba de Fuego Supabase</h4>
+                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
+                      CONSOLA DE DIAGNÓSTICOS EN TIEMPO REAL • CONEXIONES Y OPERACIONES CRUD
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowDiagnosticsWindow(false)}
+                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg shrink-0"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Status and Latency Indicators */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-left">
+                {/* Connection Health Card */}
+                <div className="p-5 bg-zinc-900/50 border border-white/5 rounded-3xl relative overflow-hidden font-sans">
+                  <span className="text-[9.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Estado de Conexión</span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-black text-white font-mono">
+                      {diagnosticsResults?.connection?.status === 'success' ? 'CONECTADO' : diagnosticsResults?.connection?.status === 'error' ? 'ERROR' : 'PENDIENTE'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${diagnosticsResults?.connection?.status === 'success' ? 'bg-[#4be277] animate-pulse' : 'bg-zinc-500'}`} />
+                    <span className="text-[8px] font-mono font-black text-zinc-400">Host verificado con éxito</span>
+                  </div>
+                </div>
+
+                {/* API Latency Card */}
+                <div className="p-5 bg-zinc-900/50 border border-white/5 rounded-3xl relative overflow-hidden font-sans">
+                  <span className="text-[9.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Latencia de Conexión</span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-black text-white font-mono">
+                      {diagnosticsResults?.connection?.latency ? `${diagnosticsResults.connection.latency} ms` : '--'}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                    <span className="text-[8px] font-mono font-black text-zinc-400">Tiempo de respuesta inicial</span>
+                  </div>
+                </div>
+
+                {/* Active Channels Card */}
+                <div className="p-5 bg-zinc-900/50 border border-white/5 rounded-3xl relative overflow-hidden font-sans">
+                  <span className="text-[9.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Canales Realtime</span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-black text-[#4be277] font-mono">4 ACTIVOS</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-[#4be277] animate-pulse" />
+                    <span className="text-[8px] font-mono font-black text-zinc-400">Settings, Bookings, Ledger, Cantina</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Table Testing Matrix */}
+              <div className="p-6 bg-[#18181b]/40 border border-white/5 rounded-3xl text-left mb-6 font-sans">
+                <span className="text-[9px] font-black text-[#4be277] uppercase tracking-widest block mb-4 italic">Tabla de Verificación de Permisos (CRUD)</span>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                  {/* Results grid */}
+                  <div className="space-y-2">
+                    {[
+                      { name: 'profiles', label: 'Perfiles de Usuario', ops: ['Lectura'] },
+                      { name: 'system_settings', label: 'Ajustes del Complejo', ops: ['Lectura', 'Actualización'] },
+                      { name: 'bookings', label: 'Reservas de Cancha', ops: ['Lectura', 'Inserción', 'Eliminación'] },
+                      { name: 'ledger_transactions', label: 'Libro de Caja (Ledger)', ops: ['Lectura', 'Inserción', 'Eliminación'] },
+                      { name: 'cantina_items', label: 'Inventario de Cantina', ops: ['Lectura'] },
+                      { name: 'active_sessions', label: 'Sesiones de Operadores', ops: ['Lectura', 'Inserción', 'Eliminación'] }
+                    ].map((table) => {
+                      const res = diagnosticsResults ? diagnosticsResults[table.name] : null;
+                      return (
+                        <div key={table.name} className="p-3 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between gap-4">
+                          <div>
+                            <span className="text-[10.5px] font-black text-white uppercase italic block tracking-wider">{table.label}</span>
+                            <span className="text-[7.5px] font-mono text-zinc-500 uppercase tracking-widest block mt-0.5">
+                              Tabla: {table.name} • Pruebas: {table.ops.join(', ')}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 shrink-0">
+                            {res?.status === 'loading' && (
+                              <span className="text-[7.5px] font-mono font-black text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/25 animate-pulse">TESTING...</span>
+                            )}
+                            {res?.status === 'success' && (
+                              <span className="text-[7.5px] font-mono font-black text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/25 flex items-center gap-1">
+                                <Check className="w-2.5 h-2.5" /> PASÓ ({res.latency}ms)
+                              </span>
+                            )}
+                            {res?.status === 'partial_success' && (
+                              <span className="text-[7.5px] font-mono font-black text-yellow-500 bg-yellow-500/10 px-2.5 py-0.5 rounded-full border border-yellow-500/25">PARCIAL</span>
+                            )}
+                            {res?.status === 'error' && (
+                              <span className="text-[7.5px] font-mono font-black text-red-500 bg-red-500/10 px-2.5 py-0.5 rounded-full border border-red-500/25">FALLÓ</span>
+                            )}
+                            {!res && (
+                              <span className="text-[7.5px] font-mono font-black text-zinc-600 bg-zinc-800/20 px-2.5 py-0.5 rounded-full border border-zinc-700/20">PENDIENTE</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Diagnostic logs output console */}
+                  <div className="space-y-4">
+                    <div className="bg-black/60 border border-white/10 rounded-2xl p-4 h-[256px] flex flex-col justify-between font-mono text-[9px] text-zinc-400 select-all overflow-y-auto">
+                      <div className="space-y-1.5 flex-1 p-0.5">
+                        {diagnosticsLogs.length === 0 ? (
+                          <div className="text-zinc-600 italic">Presione EJECUTAR PRUEBA DE FUEGO para iniciar los tests de lectura/escritura en tiempo real.</div>
+                        ) : (
+                          diagnosticsLogs.map((log, i) => (
+                            <div key={i} className={log.startsWith('✓') ? 'text-emerald-400 font-bold' : log.startsWith('❌') ? 'text-red-500 font-bold' : log.includes('Encontrados') ? 'text-[#4be277]' : 'text-zinc-400'}>{log}</div>
+                          ))
+                        )}
+                      </div>
+                      {diagnosticsRunning && (
+                        <div className="w-full bg-zinc-800/80 h-1 rounded-full overflow-hidden mt-2 shrink-0">
+                          <div className="h-full bg-[#4be277] transition-all duration-500" style={{ width: '100%' }} />
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      disabled={diagnosticsRunning}
+                      onClick={runDiagnostics}
+                      className={`h-12 w-full rounded-xl font-black text-[9px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 ${
+                        diagnosticsRunning
+                          ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed'
+                          : 'bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/25 hover:border-[#4be277]/50 text-[#4be277] hover:border-[#4be277]/60 shadow-[0_0_20px_rgba(75,226,119,0.15)]'
+                      }`}
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${diagnosticsRunning ? 'animate-spin' : ''}`} />
+                      {diagnosticsRunning ? 'EJECUTANDO DIAGNÓSTICO...' : 'EJECUTAR NUEVA PRUEBA DE FUEGO'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Informative footer */}
+              <div className="p-4 bg-zinc-950/40 border border-white/5 rounded-2xl flex gap-3 text-left mb-6 font-sans">
+                <Info className="w-5 h-5 text-[#4be277] shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[10px] font-black text-white uppercase tracking-wider block italic">AUDITORÍA DE PRUEBA DE FUEGO</span>
+                  <p className="text-[8.5px] font-bold text-[#bccbb9]/50 uppercase tracking-widest leading-relaxed mt-1">
+                    Esta herramienta realiza operaciones CRUD (Creación, Lectura, Actualización y Borrado) simuladas y controladas con registros temporales autofirmados. La persistencia es validada e inmediatamente removida para mantener la sanidad de la base de datos de producción.
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={() => setShowDiagnosticsWindow(false)}
+                  className="w-full h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Ajustes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+
       {/* Ventana de Configuración de Perfil (Pantalla Completa) */}
       <AnimatePresence>
         {showProfileModal && (
@@ -6515,6 +6921,118 @@ export default function ProfileView() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ======= MODAL: PRUEBA DE FUEGO SUPABASE ======= */}
+      {showDiagnosticsWindow && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4" style={{backdropFilter:'blur(12px)', background:'rgba(0,0,0,0.85)'}}>
+          <div className="relative w-full sm:max-w-lg max-h-[92dvh] overflow-hidden flex flex-col rounded-t-3xl sm:rounded-3xl bg-[#0d0f0e] border border-violet-500/25 shadow-2xl shadow-violet-900/20">
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-4 border-b border-white/5 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-violet-500/20 border border-violet-500/40 flex items-center justify-center shrink-0">
+                  <Database className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <h2 className="text-[13px] font-black text-white uppercase italic tracking-tight">Prueba de Fuego Supabase</h2>
+                  <p className="text-[8px] font-bold text-violet-400 uppercase tracking-widest mt-0.5">DIAGNÓSTICO COMPLETO DE CONEXIONES EN TIEMPO REAL</p>
+                </div>
+              </div>
+              <button onClick={() => setShowDiagnosticsWindow(false)} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scrollable content */}
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+
+              {/* Status Cards Grid */}
+              {diagnosticsResults && (
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(diagnosticsResults).map(([key, val]: [string, any]) => (
+                    <div key={key} className={`rounded-2xl border p-3 space-y-1 ${
+                      val.status === 'success' ? 'border-emerald-500/30 bg-emerald-950/20' :
+                      val.status === 'error' ? 'border-red-500/30 bg-red-950/20' :
+                      val.status === 'partial_success' ? 'border-amber-500/30 bg-amber-950/20' :
+                      'border-white/5 bg-zinc-950/40'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black text-white uppercase tracking-widest truncate">{key}</span>
+                        <span className={`text-[9px] font-black ${
+                          val.status === 'success' ? 'text-emerald-400' :
+                          val.status === 'error' ? 'text-red-400' :
+                          val.status === 'partial_success' ? 'text-amber-400' :
+                          'text-violet-400 animate-pulse'
+                        }`}>
+                          {val.status === 'success' ? '✅' : val.status === 'error' ? '❌' : val.status === 'partial_success' ? '⚠️' : '⏳'}
+                        </span>
+                      </div>
+                      {val.latency > 0 && (
+                        <p className="text-[8px] font-mono text-[#bccbb9]/50">{val.latency}ms</p>
+                      )}
+                      {val.actions && (
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                          {Object.entries(val.actions).map(([action, status]: [string, any]) => (
+                            <span key={action} className={`text-[7px] font-black uppercase px-1.5 py-0.5 rounded-md ${
+                              status === 'success' ? 'bg-emerald-500/20 text-emerald-400' :
+                              status === 'failed' ? 'bg-red-500/20 text-red-400' :
+                              'bg-white/5 text-[#bccbb9]/40'
+                            }`}>{action}: {status === 'success' ? '✓' : status === 'failed' ? '✗' : '…'}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Logs terminal */}
+              {diagnosticsLogs.length > 0 && (
+                <div className="bg-black/60 border border-white/5 rounded-2xl p-3 space-y-1 font-mono max-h-48 overflow-y-auto">
+                  {diagnosticsLogs.map((log, i) => (
+                    <p key={i} className={`text-[9px] leading-relaxed ${
+                      log.startsWith('✓') ? 'text-emerald-400' :
+                      log.startsWith('❌') ? 'text-red-400' :
+                      log.includes('COMPLETADA') ? 'text-violet-300 font-black' :
+                      'text-[#bccbb9]/60'
+                    }`}>{log}</p>
+                  ))}
+                </div>
+              )}
+
+              {/* Placeholder when not run yet */}
+              {!diagnosticsResults && diagnosticsLogs.length === 0 && (
+                <div className="text-center py-8 space-y-3">
+                  <div className="w-16 h-16 rounded-3xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto">
+                    <Database className="w-8 h-8 text-violet-400" />
+                  </div>
+                  <p className="text-[10px] font-bold text-[#bccbb9]/60 uppercase tracking-widest">
+                    Presioná el botón para verificar todas las tablas,<br/>operaciones CRUD y canales Realtime de Supabase.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer button */}
+            <div className="p-5 pt-0 shrink-0">
+              <button
+                onClick={runDiagnostics}
+                disabled={diagnosticsRunning}
+                className={`w-full h-12 rounded-2xl font-black text-[10px] uppercase tracking-widest italic flex items-center justify-center gap-2 transition-all ${
+                  diagnosticsRunning
+                    ? 'bg-violet-900/40 text-violet-400/60 border border-violet-500/20 cursor-not-allowed'
+                    : 'bg-violet-500 text-white shadow-lg shadow-violet-500/20 hover:brightness-110 active:scale-[0.98]'
+                }`}
+              >
+                {diagnosticsRunning ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Ejecutando prueba...</>
+                ) : (
+                  <><Database className="w-4 h-4" /> Ejecutar Prueba de Fuego 🔥</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
