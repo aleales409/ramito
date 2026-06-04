@@ -1773,37 +1773,7 @@ export default function ProfileView() {
           <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-6 h-6 rounded-full border-2 border-purple-500/30 border-t-purple-400 animate-spin" /></div>}>
             <MarquesinaTab
               userRole={userRole}
-              marqueeText={marqueeText}
-              setMarqueeText={setMarqueeText}
-              secondaryMarqueeText={secondaryMarqueeText}
-              setSecondaryMarqueeText={setSecondaryMarqueeText}
-              stadiumName={stadiumName}
-              setStadiumName={setStadiumName}
-              newsSlots={newsSlots}
-              toggleNewsSlot={toggleNewsSlot}
-              newWeekdayOpen={newWeekdayOpen}
-              newWeekdayClose={newWeekdayClose}
-              newWeekdayOpen2={newWeekdayOpen2}
-              newWeekdayClose2={newWeekdayClose2}
-              newWeekdayUseTwoShifts={newWeekdayUseTwoShifts}
-              newWeekendOpen={newWeekendOpen}
-              newWeekendClose={newWeekendClose}
-              newWeekendOpen2={newWeekendOpen2}
-              newWeekendClose2={newWeekendClose2}
-              newWeekendUseTwoShifts={newWeekendUseTwoShifts}
-              setNewWeekdayOpen={setNewWeekdayOpen}
-              setNewWeekdayClose={setNewWeekdayClose}
-              setNewWeekdayOpen2={setNewWeekdayOpen2}
-              setNewWeekdayClose2={setNewWeekdayClose2}
-              setNewWeekdayUseTwoShifts={setNewWeekdayUseTwoShifts}
-              setNewWeekendOpen={setNewWeekendOpen}
-              setNewWeekendClose={setNewWeekendClose}
-              setNewWeekendOpen2={setNewWeekendOpen2}
-              setNewWeekendClose2={setNewWeekendClose2}
-              setNewWeekendUseTwoShifts={setNewWeekendUseTwoShifts}
-              saveSettings={saveSettings}
               addAuditLog={addAuditLog}
-              showToast={showToast}
             />
           </Suspense>
         )}
