@@ -12,7 +12,7 @@ export default function LoginView() {
   const { showToast, setUserName, setUserRole, universalUserKey } = useApp();
   
   // Local state to toggle between registering and logging in
-  const [isRegister, setIsRegister] = useState(() => (location.state?.mode || 'register') === 'register');
+  const [isRegister, setIsRegister] = useState(() => (location.state?.mode || 'login') === 'register');
   // Local state to choose login mechanism when logging in
   const [loginMethod, setLoginMethod] = useState<'credentials' | 'pin'>('credentials');
 
@@ -374,9 +374,13 @@ export default function LoginView() {
         // Trim inputs to avoid whitespace issues
         const trimmedEmail = email.trim().toLowerCase();
         const trimmedPassword = password.trim();
+        console.log('--- LoginView Submit Attempt ---');
+        console.log('Email:', trimmedEmail, 'Password length:', trimmedPassword.length);
+        console.log('isSupabaseConfigured:', isSupabaseConfigured);
 
         if (isSupabaseConfigured) {
           try {
+            console.log('Fetching user from Supabase...');
             const { data: user, error: fetchError } = await supabase
               .from('profiles')
               .select('*')
@@ -389,35 +393,45 @@ export default function LoginView() {
               const profiles = getLocalProfiles();
               const localUser = profiles.find((p: any) => p.email.toLowerCase() === trimmedEmail);
               if (!localUser || localUser.password?.trim() !== trimmedPassword) {
+                console.log('Local fallback failed: User not found or password mismatch');
                 showToast('Correo o Llave incorrectos.');
                 return;
               }
+              console.log('Local fallback successful for:', localUser.email);
               await completeLogin(localUser);
               return;
             }
 
             if (!user) {
+              console.log('User not found in Supabase, trying local...');
               // User not found in Supabase, try local
               const profiles = getLocalProfiles();
               const localUser = profiles.find((p: any) => p.email.toLowerCase() === trimmedEmail);
               if (!localUser || localUser.password?.trim() !== trimmedPassword) {
+                console.log('Local fallback failed (user not found in Supabase): User not found or password mismatch');
                 showToast('Correo o Llave incorrectos.');
                 return;
               }
+              console.log('Local fallback successful (user not found in Supabase) for:', localUser.email);
               await completeLogin(localUser);
               return;
             }
 
+            console.log('User found in Supabase. DB password:', user.password);
             const storedPassword = (user.password || '').trim();
             if (storedPassword !== trimmedPassword) {
+              console.log('Password mismatch in Supabase: Stored:', storedPassword, 'Entered:', trimmedPassword);
               showToast('Correo o Llave incorrectos.');
               return;
             }
+            console.log('Supabase login successful for:', user.email);
             await completeLogin(user);
           } catch (fetchErr: any) {
+            console.error('Connection/fetch error in LoginView:', fetchErr);
             showToast(`Error de conexión: ${fetchErr.message}`);
           }
         } else {
+          console.log('Using local profiles only...');
           const profiles = getLocalProfiles();
           const user = profiles.find((p: any) => p.email.toLowerCase() === trimmedEmail);
 
@@ -431,6 +445,8 @@ export default function LoginView() {
             if (user.role === 'admin_vip' && trimmedPassword === currentVipKey) isPasswordValid = true;
           }
 
+          console.log('Local profile found:', !!user, 'Password valid:', isPasswordValid);
+
           if (!user || !isPasswordValid) {
             showToast('Correo o Llave incorrectos.');
             return;
@@ -439,6 +455,7 @@ export default function LoginView() {
         }
       }
     } catch (err: any) {
+      console.error('Outer catch error in LoginView:', err);
       showToast(`Error: ${err.message}`);
     }
   };

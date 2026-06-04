@@ -781,8 +781,13 @@ export default function HomeView() {
     e.preventDefault();
 
     try {
+      console.log('--- Admin Login Attempt ---');
+      console.log('Method:', adminLoginMethod);
+      console.log('isSupabaseConfigured:', isSupabaseConfigured);
+
       if (adminLoginMethod === 'pin') {
         const trimmedQuickPin = adminQuickPin.trim();
+        console.log('PIN entered:', trimmedQuickPin);
         if (!trimmedQuickPin) {
           setError(true);
           setTimeout(() => setError(false), 3000);
@@ -792,21 +797,35 @@ export default function HomeView() {
         let user: any = null;
 
         if (isSupabaseConfigured) {
-          const { data, error: err } = await supabase
+          console.log('Fetching all admins from Supabase...');
+          const { data: allAdmins, error: fetchErr } = await supabase
             .from('profiles')
             .select('*')
-            .eq('pin', trimmedQuickPin)
-            .maybeSingle();
+            .in('role', ['admin_elite', 'admin_vip']);
+          
+          if (fetchErr) {
+            console.error('Supabase query error:', fetchErr);
+          }
+          console.log('Admins fetched:', allAdmins?.length || 0);
 
-          if (data && (data.role === 'admin_elite' || data.role === 'admin_vip')) {
-            user = data;
+          const found = (allAdmins || []).find((p: any) =>
+            p.pin && p.pin.trim().toLowerCase() === trimmedQuickPin.toLowerCase()
+          );
+          if (found) {
+            console.log('Match found in Supabase:', found.email);
+            user = found;
+          } else {
+            console.log('No match found in Supabase for PIN:', trimmedQuickPin);
           }
         } else {
-          // Check local profiles
+          console.log('Using local profiles fallback...');
           const profiles = getLocalProfilesForAdmin();
           const found = profiles.find((p: any) => p.pin && p.pin.trim().toLowerCase() === trimmedQuickPin.toLowerCase());
           if (found && (found.role === 'admin_elite' || found.role === 'admin_vip')) {
+            console.log('Match found in local profiles:', found.email);
             user = found;
+          } else {
+            console.log('No match found in local profiles for PIN:', trimmedQuickPin);
           }
         }
 
@@ -814,85 +833,74 @@ export default function HomeView() {
           localStorage.setItem('ramito_user_role', user.role);
           localStorage.setItem('ramito_user_name', user.name || 'Admin');
           localStorage.setItem('ramito_user_id', user.id);
-          if (user.password) {
-            localStorage.setItem('ramito_user_pw', user.password);
-          }
-          if (user.pin) {
-            localStorage.setItem('ramito_user_pin', user.pin);
-          }
-          if (user.email) {
-            localStorage.setItem('ramito_user_email', user.email);
-          }
+          if (user.password) localStorage.setItem('ramito_user_pw', user.password);
+          if (user.pin) localStorage.setItem('ramito_user_pin', user.pin);
+          if (user.email) localStorage.setItem('ramito_user_email', user.email);
           setUserName(user.name || 'Admin');
           setUserRole(user.role);
-          
           setAdminQuickPin('');
           setShowAdminLogin(false);
-          if (user.role === 'admin_elite' || user.role === 'admin_vip') {
-            navigate('/profile?view=admin_selection');
-          } else {
-            navigate('/profile');
-          }
+          navigate('/profile?view=admin_selection');
         } else {
+          console.log('Login failed: user is null');
           setError(true);
           setTimeout(() => setError(false), 3000);
         }
         return;
       }
 
-      // Standard credentials login
-      if (!adminKey) return;
-      
+      // Standard credentials login — email is optional, key/password is required
+      const trimmedKey   = adminKey.trim();
+      const trimmedEmail = adminEmail.trim().toLowerCase();
+      console.log('Credentials entered: Email:', trimmedEmail, 'Key length:', trimmedKey.length);
+      if (!trimmedKey) return;
+
       let user: any = null;
 
+      const currentEliteKey = localStorage.getItem('ramito_elite_key') || 'ELITE-9A7F-D3B8-K2C5';
+      const currentVipKey   = localStorage.getItem('ramito_vip_key')   || 'VIP-3E8F-C1A5-J7B9';
+
       if (isSupabaseConfigured) {
-        const { data, error: err } = await supabase
+        console.log('Fetching all admins from Supabase for credentials...');
+        const { data: allAdmins, error: fetchErr } = await supabase
           .from('profiles')
           .select('*')
-          .eq('email', adminEmail.toLowerCase())
-          .maybeSingle();
+          .in('role', ['admin_elite', 'admin_vip']);
 
-        const currentEliteKey = localStorage.getItem('ramito_elite_key') || 'ELITE-9A7F-D3B8-K2C5';
-        const currentVipKey = localStorage.getItem('ramito_vip_key') || 'VIP-3E8F-C1A5-J7B9';
-
-        let isPasswordValid = false;
-        if (data) {
-          isPasswordValid = data.password === adminKey;
-          if (data.role === 'admin_elite' && adminKey === currentEliteKey) {
-            isPasswordValid = true;
-          }
-          if (data.role === 'admin_vip' && adminKey === currentVipKey) {
-            isPasswordValid = true;
-          }
+        if (fetchErr) {
+          console.error('Supabase query error:', fetchErr);
         }
-        
-        if (data && isPasswordValid && (data.role === 'admin_elite' || data.role === 'admin_vip')) {
-          user = data;
+        console.log('Admins fetched:', allAdmins?.length || 0);
+
+        for (const profile of (allAdmins || [])) {
+          const emailOk = !trimmedEmail || profile.email.toLowerCase() === trimmedEmail;
+          const passOk =
+            (profile.password || '').trim() === trimmedKey ||
+            (profile.role === 'admin_elite' && trimmedKey === currentEliteKey) ||
+            (profile.role === 'admin_vip'   && trimmedKey === currentVipKey);
+          
+          console.log(`Checking profile ${profile.email}: emailOk=${emailOk}, passOk=${passOk} (DB pass: ${profile.password}, role: ${profile.role})`);
+          
+          if (emailOk && passOk) { user = profile; break; }
         }
       } else {
+        console.log('Using local profiles fallback for credentials...');
         const profiles = getLocalProfilesForAdmin();
-        const found = profiles.find((p: any) => p.email.toLowerCase() === adminEmail.toLowerCase());
-        
-        const currentEliteKey = localStorage.getItem('ramito_elite_key') || 'ELITE-9A7F-D3B8-K2C5';
-        const currentVipKey = localStorage.getItem('ramito_vip_key') || 'VIP-3E8F-C1A5-J7B9';
-
-        let isPasswordValid = false;
-        if (found) {
-          isPasswordValid = found.password === adminKey;
-          if (found.role === 'admin_elite' && adminKey === currentEliteKey) {
-            isPasswordValid = true;
-          }
-          if (found.role === 'admin_vip' && adminKey === currentVipKey) {
-            isPasswordValid = true;
-          }
-        }
-
-        if (found && isPasswordValid && (found.role === 'admin_elite' || found.role === 'admin_vip')) {
-          user = found;
+        for (const profile of profiles) {
+          if (!(profile.role === 'admin_elite' || profile.role === 'admin_vip')) continue;
+          const emailOk = !trimmedEmail || profile.email.toLowerCase() === trimmedEmail;
+          const passOk =
+            (profile.password || '').trim() === trimmedKey ||
+            (profile.role === 'admin_elite' && trimmedKey === currentEliteKey) ||
+            (profile.role === 'admin_vip'   && trimmedKey === currentVipKey);
+          
+          console.log(`Checking local profile ${profile.email}: emailOk=${emailOk}, passOk=${passOk}`);
+          if (emailOk && passOk) { user = profile; break; }
         }
       }
 
       if (user) {
+        console.log('Login successful for user:', user.email);
         localStorage.setItem('ramito_user_role', user.role);
         localStorage.setItem('ramito_user_name', user.name || 'Admin');
         localStorage.setItem('ramito_user_id', user.id);
@@ -917,10 +925,12 @@ export default function HomeView() {
           navigate('/profile');
         }
       } else {
+        console.log('Login failed: No matching user found');
         setError(true);
         setTimeout(() => setError(false), 3000);
       }
     } catch (err) {
+      console.error('Catch error in handleAdminLogin:', err);
       setError(true);
       setTimeout(() => setError(false), 3000);
     }
