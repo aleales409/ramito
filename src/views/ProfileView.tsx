@@ -326,7 +326,7 @@ export default function ProfileView() {
         time: '99:99',
         field: 'Cancha Diagnóstico',
         status: 'completed',
-        amount: 'S/. 0.00',
+        amount: '$ 0.00',
         user: 'DIAGNOSTICO SUPABASE',
         phone: '+000000000'
       };
@@ -1178,9 +1178,9 @@ export default function ProfileView() {
       try {
         const savedProfilesStr = localStorage.getItem('ramito_profiles');
         const profiles = savedProfilesStr ? JSON.parse(savedProfilesStr) : [
-          { id: 'master_access_elite', email: 'admin@ramito.com', password: 'ELITE_PASSWORD', name: 'Elite Admin', role: 'admin_elite', pin: 'ELITE26', phone: '+51 987 654 321' },
-          { id: 'master_access_vip', email: 'vip@ramito.com', password: 'VIP_PASSWORD', name: 'VIP Admin', role: 'admin_vip', pin: 'VIP26', phone: '+51 912 345 678' },
-          { id: 'player_1', email: 'agus@ramito.com', password: 'agus2026', name: 'Agus Castro', role: 'player', pin: 'agus26', phone: '+51 987 654 321' }
+          { id: 'master_access_elite', email: 'admin@ramito.com', password: 'ELITE_PASSWORD', name: 'Elite Admin', role: 'admin_elite', pin: 'ELITE26', phone: '+54 9 11 1234-5678' },
+          { id: 'master_access_vip', email: 'vip@ramito.com', password: 'VIP_PASSWORD', name: 'VIP Admin', role: 'admin_vip', pin: 'VIP26', phone: '+54 9 11 2345-6789' },
+          { id: 'player_1', email: 'agus@ramito.com', password: 'agus2026', name: 'Agus Castro', role: 'player', pin: 'agus26', phone: '+54 9 11 5678-9012' }
         ];
         const updatedProfiles = profiles.map((p: any) => {
           const isSameUser = 

@@ -177,7 +177,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [adminPhone, setAdminPhone] = useState(() => {
-    return localStorage.getItem('ramito_admin_phone') || '+51 987 654 321';
+    return localStorage.getItem('ramito_admin_phone') || '+54 9 11 1234-5678';
   });
 
   const [stadiumName, setStadiumName] = useState(() => {
@@ -203,8 +203,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<any[]>(() => {
     const saved = localStorage.getItem('ramito_notifications');
     return saved ? JSON.parse(saved) : [
-      { id: 'n1', title: 'COMPROBANTE DISPONIBLE', body: 'Carlos Mendoza ha subido una captura de Yape por S/. 120.00 para la Cancha 1 (Césped).', time: 'Hace 5 min', read: false },
-      { id: 'n2', title: 'COMPROBANTE DISPONIBLE', body: 'Sofía Rodríguez ha cargado un comprobante de Plin por S/. 100.00 para la Cancha 2 (Sin Césped).', time: 'Hace 15 min', read: false },
+      { id: 'n1', title: 'COMPROBANTE DISPONIBLE', body: 'Carlos Mendoza ha subido un comprobante de Mercado Pago por $ 12.000 para la Cancha 1 (Césped).', time: 'Hace 5 min', read: false },
+      { id: 'n2', title: 'COMPROBANTE DISPONIBLE', body: 'Sofía Rodríguez ha cargado un comprobante de Transferencia por $ 10.000 para la Cancha 2 (Sin Césped).', time: 'Hace 15 min', read: false },
       { id: 'n3', title: 'TURNO VALIDADO', body: 'Se ha verificado con éxito el pago del turno de Mateo Silva para hoy a las 22:00 hs.', time: 'Hace 45 min', read: true }
     ];
   });
@@ -218,10 +218,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         time: '20:00', 
         field: 'Cancha 1 • El Maracaná', 
         status: 'pending_approval', 
-        amount: 'S/. 150.00', 
+        amount: '$ 15.000', 
         user: 'Carlos Mendoza',
         receiptUrl: 'https://images.unsplash.com/photo-1554224155-1696413565d3?auto=format&fit=crop&q=80&w=600',
-        phone: '+51 912 345 678',
+        phone: '+54 9 11 2345-6789',
         extras: ['Pack Hidratación (2 Gatorade + 2 Aguas)']
       },
       { 
@@ -230,10 +230,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         time: '18:00', 
         field: 'Cancha 2 • La Bombonera', 
         status: 'pending_approval', 
-        amount: 'S/. 100.00', 
+        amount: '$ 10.000', 
         user: 'Sofía Rodríguez',
         receiptUrl: 'https://images.unsplash.com/photo-1628157582853-a796fa650a6a?auto=format&fit=crop&q=80&w=600',
-        phone: '+51 980 765 432'
+        phone: '+54 9 11 3456-7890'
       },
       { 
         id: 'b3', 
@@ -241,10 +241,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         time: '22:00', 
         field: 'Cancha 1 • El Maracaná', 
         status: 'upcoming', 
-        amount: 'S/. 135.00', 
+        amount: '$ 13.500', 
         user: 'Mateo Silva',
         receiptUrl: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&q=80&w=600',
-        phone: '+51 955 443 322',
+        phone: '+54 9 11 4567-8901',
         extras: ['Alquiler Pelota Profesional FIFA']
       },
       { 
@@ -253,9 +253,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         time: '21:00', 
         field: 'Cancha 1 • El Maracaná', 
         status: 'upcoming', 
-        amount: 'S/. 120.00', 
+        amount: '$ 12.000', 
         user: 'Agus Castro',
-        phone: '+51 987 654 321',
+        phone: '+54 9 11 5678-9012',
         extras: ['Pack Hidratación (2 Gatorade + 2 Aguas)']
       },
       { 
@@ -264,9 +264,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         time: '18:00', 
         field: 'Cancha 1 • El Maracaná', 
         status: 'pending_payment', 
-        amount: 'S/. 120.00', 
+        amount: '$ 12.000', 
         user: 'Camila Espinoza',
-        phone: '+51 933 221 100'
+        phone: '+54 9 11 6789-0123'
       },
       { 
         id: 'b5', 
@@ -274,10 +274,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         time: '21:00', 
         field: 'Cancha 2 • La Bombonera', 
         status: 'completed', 
-        amount: 'S/. 100.00', 
+        amount: '$ 10.000', 
         user: 'Javier Ortega',
         receiptUrl: 'https://images.unsplash.com/photo-1563013544-824ae1d704d3?auto=format&fit=crop&q=80&w=600',
-        phone: '+51 966 887 799'
+        phone: '+54 9 11 7890-1234'
       }
     ];
   });

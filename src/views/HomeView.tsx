@@ -597,9 +597,9 @@ export default function HomeView() {
           time: '21:00',
           field: 'Cancha 1 • El Maracaná',
           status: 'upcoming',
-          amount: 'S/. 120.00',
+          amount: '$ 12.000',
           user: 'Agus Castro',
-          phone: '+51 987 654 321',
+          phone: '+54 9 11 5678-9012',
           extras: ['Pack Hidratación (2 Gatorade + 2 Aguas)']
         };
       }
@@ -1178,7 +1178,7 @@ export default function HomeView() {
                       <span className="text-[22px] font-black font-display text-[#4be277] leading-none">15</span>
                       <span className="text-[8px] font-black text-white/70 uppercase tracking-widest">Días</span>
                     </div>
-                    <p className="text-[7px] font-medium font-mono text-[#bccbb9]/40 uppercase tracking-widest leading-none">Vence: 12 Jun 2026</p>
+                    <p className="text-[7px] font-medium font-mono text-[#bccbb9]/40 uppercase tracking-widest leading-none">Vence: 29 Jun 2026</p>
                   </div>
                 ) : (
                   <div className="space-y-1">
@@ -1249,7 +1249,7 @@ export default function HomeView() {
                     <span className="text-[22px] font-black font-display text-[#FF9100] leading-none">28</span>
                     <span className="text-[8px] font-black text-white/70 uppercase tracking-widest">Días</span>
                   </div>
-                  <p className="text-[7px] font-medium font-mono text-[#bccbb9]/40 uppercase tracking-widest leading-none">Vence: 25 Jun 2026</p>
+                  <p className="text-[7px] font-medium font-mono text-[#bccbb9]/40 uppercase tracking-widest leading-none">Vence: 12 Jul 2026</p>
                 </div>
               ) : (
                 <div className="space-y-1">

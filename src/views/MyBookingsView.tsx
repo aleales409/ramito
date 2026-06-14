@@ -69,13 +69,13 @@ const generateMockReceiptUrl = (user: string, amount: string, bookingId: string)
     <circle cx="200" cy="90" r="40" fill="#00E676" opacity="0.2"/>
     <circle cx="200" cy="90" r="30" fill="#00E676"/>
     <path d="M188 90 l8 8 l16 -16" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="200" y="150" fill="#00E676" font-family="sans-serif" font-weight="950" font-size="18" text-anchor="middle" letter-spacing="1.5">¡YAPE CONFIRMADO!</text>
+    <text x="200" y="150" fill="#00E676" font-family="sans-serif" font-weight="950" font-size="18" text-anchor="middle" letter-spacing="1.5">¡TRANSFERENCIA CONFIRMADA!</text>
     <text x="200" y="172" fill="#E1BEE7" font-family="sans-serif" font-weight="700" font-size="10" text-anchor="middle">TRANSFERENCIA DIRECTA EMITIDA</text>
     <rect x="25" y="195" width="350" height="350" rx="20" fill="#ffffff"/>
     <circle cx="10" cy="370" r="16" fill="#1A0033"/>
     <circle cx="390" cy="370" r="16" fill="#1A0033"/>
     <text x="200" y="235" fill="#757575" font-family="sans-serif" font-weight="bold" font-size="10" text-anchor="middle">MONTO TRANSFERIDO</text>
-    <text x="200" y="278" fill="#4A148C" font-family="sans-serif" font-weight="900" font-size="34" text-anchor="middle">S/. ${cleanAmount}</text>
+    <text x="200" y="278" fill="#4A148C" font-family="sans-serif" font-weight="900" font-size="34" text-anchor="middle">$ ${cleanAmount}</text>
     <line x1="50" y1="305" x2="350" y2="305" stroke="#EEEEEE" stroke-width="2"/>
     <line x1="50" y1="370" x2="350" y2="370" stroke="#7B1FA2" stroke-width="2" stroke-dasharray="6,6"/>
     <text x="50" y="335" fill="#9E9E9E" font-family="sans-serif" font-weight="800" font-size="8">EMITENTE (JUGADOR)</text>
@@ -83,7 +83,7 @@ const generateMockReceiptUrl = (user: string, amount: string, bookingId: string)
     <text x="50" y="410" fill="#7B1FA2" font-family="sans-serif" font-weight="900" font-size="9">DESTINATARIO OFICIAL</text>
     <text x="50" y="427" fill="#212121" font-family="sans-serif" font-weight="900" font-size="11">RAMITO FUT SHOW - COMPLEJO DEPORTIVO</text>
     <text x="50" y="465" fill="#9E9E9E" font-family="sans-serif" font-weight="bold" font-size="8">CÓDIGO DE OPERACIÓN</text>
-    <text x="50" y="482" fill="#111111" font-family="monospace, sans-serif" font-weight="900" font-size="11">OP-YAPE-${bookingId.substring(0,6).toUpperCase()}-${currentNum}</text>
+    <text x="50" y="482" fill="#111111" font-family="monospace, sans-serif" font-weight="900" font-size="11">OP-TX-${bookingId.substring(0,6).toUpperCase()}-${currentNum}</text>
     <text x="50" y="510" fill="#9E9E9E" font-family="sans-serif" font-weight="bold" font-size="8">FECHA Y HORA DEL REGISTRO</text>
     <text x="50" y="525" fill="#111111" font-family="sans-serif" font-weight="700" font-size="10">Hoy, ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</text>
     <text x="200" y="590" fill="#E1BEE7" font-family="sans-serif" font-weight="900" font-size="10" text-anchor="middle" letter-spacing="2">★ CONTROL DE CAJA COMPLEJO ★</text>
@@ -1108,7 +1108,7 @@ export default function MyBookingsView() {
                     ) : (
                       <div className="pt-3 border-t border-white/5 space-y-2.5 text-left">
                         <span className="text-[8px] font-black text-purple-400 uppercase tracking-[0.25em] block leading-none flex items-center gap-1">
-                          <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0" /> TICKET DIGITAL DE TRANSFERENCIA (YAPE / PLIN)
+                          <Zap className="w-3.5 h-3.5 text-purple-400 shrink-0" /> TICKET DIGITAL DE TRANSFERENCIA (MP / CBU)
                         </span>
                         
                         {!hasReceipt ? (
@@ -1144,15 +1144,15 @@ export default function MyBookingsView() {
                               </p>
                               <div className="space-y-1 font-mono text-[9px] text-zinc-300">
                                 <div className="flex justify-between items-center bg-black/40 px-2 py-1 rounded">
-                                  <span className="flex items-center gap-1"><Smartphone className="w-3.5 h-3.5 text-purple-400 shrink-0" /> YAPE / PLIN:</span>
-                                  <span className="text-purple-300 font-black">+51 987 654 321</span>
+                                  <span className="flex items-center gap-1"><Smartphone className="w-3.5 h-3.5 text-purple-400 shrink-0" /> ALIAS MERCADO PAGO:</span>
+                                  <span className="text-purple-300 font-black">RAMITO.FUT.SHOW</span>
                                 </div>
                                 <div className="flex justify-between items-center bg-black/40 px-2 py-1 rounded">
-                                  <span className="flex items-center gap-1"><Landmark className="w-3.5 h-3.5 text-[#009EE3] shrink-0" /> BANCO BCP:</span>
-                                  <span className="text-[#009EE3] font-black">191-98765432-0-11</span>
+                                  <span className="flex items-center gap-1"><Landmark className="w-3.5 h-3.5 text-[#009EE3] shrink-0" /> CBU (Banco Galicia):</span>
+                                  <span className="text-[#009EE3] font-black">00701234-20001234567890</span>
                                 </div>
                                 <div className="text-[7.5px] text-zinc-400 text-right uppercase">
-                                  CCI: 00219119876543201152 • RAMITO COMPLEJO DEPORTIVO
+                                  TITULAR: RAMITO COMPLEJO DEPORTIVO S.R.L.
                                 </div>
                               </div>
                             </div>
@@ -1177,7 +1177,7 @@ export default function MyBookingsView() {
                                 title="Generar comprobante digital instantáneo de prueba"
                               >
                                 <Sparkles className="w-3.5 h-3.5 text-[#FF9100] animate-pulse" />
-                                Simular Yape
+                                Simular Transferencia
                               </button>
                             </div>
                           </div>
@@ -1191,7 +1191,7 @@ export default function MyBookingsView() {
                                 <span className="text-[7px] font-black text-purple-400 uppercase tracking-widest block leading-none">TRANSFERENCIA DIGITAL MÓVIL</span>
                                 <div className="flex items-center gap-1.5 mt-1">
                                   <div className="w-1.5 h-1.5 rounded-full bg-[#4be277] animate-pulse" />
-                                  <span className="text-[10px] font-black text-white italic tracking-wide">YAPE / PLIN / TRANF.</span>
+                                  <span className="text-[10px] font-black text-white italic tracking-wide">MP / TRANF. BANCARIA</span>
                                 </div>
                               </div>
                               <span className="text-[8px] font-mono text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded leading-none">
@@ -1301,7 +1301,7 @@ export default function MyBookingsView() {
                       <div className="flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
                         <p className="text-[9px] font-bold text-[#bccbb9]/80 uppercase tracking-wide leading-relaxed">
-                          Sube tu comprobante de Yape, Plin o transferencia para completar la confirmación de tu turno.
+                          Sube tu comprobante de Mercado Pago o transferencia para completar la confirmación de tu turno.
                         </p>
                       </div>
                     </div>
@@ -1457,7 +1457,7 @@ export default function MyBookingsView() {
                                 <div className="text-right">
                                   <span className="text-[7px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block leading-none mb-1">Cuota por Jugador</span>
                                   <span className="text-xs font-black text-[#4be277] font-mono block leading-none">
-                                    S/. {Math.ceil(((() => {
+                                    $ {Math.ceil(((() => {
                                       const amt = booking.amount || '';
                                       let cleaned = amt;
                                       if (cleaned.includes('.')) {
@@ -1470,7 +1470,7 @@ export default function MyBookingsView() {
                                       const digitsOnly = cleaned.replace(/\D/g, '');
                                       const val = parseInt(digitsOnly, 10);
                                       return isNaN(val) ? 35000 : val;
-                                    })() / splitPlayerCount)).toLocaleString('es-PE')}
+                                    })() / splitPlayerCount)).toLocaleString('es-AR')}
                                   </span>
                                   <span className="text-[6px] font-bold text-[#bccbb9]/30 uppercase tracking-tight block mt-1">
                                     Neto unitario exacto
@@ -1497,10 +1497,10 @@ export default function MyBookingsView() {
                                   const totalAmountVal = isNaN(parseInt(digitsOnly, 10)) ? 35000 : parseInt(digitsOnly, 10);
                                   const perPlayerShare = Math.ceil(totalAmountVal / splitPlayerCount);
                                   
-                                  const shareAmountStr = `S/. ${perPlayerShare.toLocaleString('es-PE')}`;
-                                  const totalCostStr = `S/. ${totalAmountVal.toLocaleString('es-PE')}`;
+                                  const shareAmountStr = `$ ${perPlayerShare.toLocaleString('es-AR')}`;
+                                  const totalCostStr = `$ ${totalAmountVal.toLocaleString('es-AR')}`;
                                   
-                                  const textMsg = `¡Muchachos! Ya tenemos reservada la cancha: *${cName}* 🏟️\n🗓️ *Fecha*: ${booking.date}\n⏰ *Horario*: ${booking.time} hs\n\nSomos *${splitPlayerCount}* jugadores en total, por lo que nos toca pagar *${shareAmountStr}* a cada uno para la cancha. 💰 ¡No falten! ⚽🏆\n\n📲 *Pagar vía Yape/Plin* al número: *${adminPhone}*\n\n_(Monto total: ${totalCostStr})_\n_Enviado desde Ramito Fut Show_`;
+                                  const textMsg = `¡Muchachos! Ya tenemos reservada la cancha: *${cName}* 🏟️\n🗓️ *Fecha*: ${booking.date}\n⏰ *Horario*: ${booking.time} hs\n\nSomos *${splitPlayerCount}* jugadores en total, por lo que nos toca pagar *${shareAmountStr}* a cada uno para la cancha. 💰 ¡No falten! ⚽🏆\n\n📲 *Pagar vía Transferencia / Mercado Pago* al número: *${adminPhone}*\n\n_(Monto total: ${totalCostStr})_\n_Enviado desde Ramito Fut Show_`;
                                   
                                   if (navigator.clipboard) {
                                     navigator.clipboard.writeText(textMsg);
@@ -1935,7 +1935,7 @@ export default function MyBookingsView() {
 
                         <div>
                           <span className="text-3xl font-black text-[#4be277] italic font-display tracking-tight block">
-                            {viewingBookingReceipt.amount || 'S/. 120.00'}
+                            {viewingBookingReceipt.amount || '$ 12.000'}
                           </span>
                         </div>
                       </div>
@@ -2006,7 +2006,7 @@ export default function MyBookingsView() {
           
           let paymentMethodLabel = 'Transferencia Validada';
           let paymentSubClass = 'text-purple-600 bg-purple-50';
-          let paymentBrandDetail = 'Banco BCP / Yape / Plin';
+          let paymentBrandDetail = 'Banco / Mercado Pago / Transf.';
           if (isMP) {
             paymentMethodLabel = 'Mercado Pago On-Line';
             paymentSubClass = 'text-[#009EE3] bg-[#00a1e4]/10';
@@ -2061,10 +2061,10 @@ PROVEEDOR PAGO: ${paymentBrandDetail}
 CONSUMOS ADICIONALES: ${viewingOfficialTicket.extras && viewingOfficialTicket.extras.length > 0 ? viewingOfficialTicket.extras.join(', ') : 'Ninguno'}
 
 -----------------------------------------
-SUBTOTAL IMPORTADO: ${viewingOfficialTicket.amount || '$ 120.00'}
-TASA ADMINISTRACIÓN: S/. 0.00
+SUBTOTAL IMPORTADO: ${viewingOfficialTicket.amount || 'ARS 120.00'}
+TASA ADMINISTRACIÓN: ARS 0.00
 -----------------------------------------
-TOTAL COBRADO FÍSICO: ${viewingOfficialTicket.amount || '$ 120.00'}
+TOTAL COBRADO FÍSICO: ${viewingOfficialTicket.amount || 'ARS 120.00'}
 
 =========================================
    ¡ESTE COMPROBANTE VALIDA TU ACCESO!   
@@ -2218,7 +2218,7 @@ TOTAL COBRADO FÍSICO: ${viewingOfficialTicket.amount || '$ 120.00'}
                           <span className="text-[10px] font-black text-zinc-500 uppercase block">AUDITORÍA SIN REMANENTES</span>
                         </div>
                         <span className="text-lg font-black text-emerald-600 font-display italic">
-                          {viewingOfficialTicket.amount || 'S/. 120.00'}
+                          {viewingOfficialTicket.amount || 'ARS 12.000'}
                         </span>
                       </div>
                     </div>
