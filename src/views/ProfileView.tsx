@@ -2113,37 +2113,49 @@ export default function ProfileView() {
                   <p className="text-[11px] font-black text-white uppercase italic tracking-wider">Corte de Ingresos y Reservas por Cancha</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2">
-                  <div className="p-4 bg-zinc-900/30 rounded-2xl border border-white/5 space-y-2">
-                    <span className="text-[8px] font-mono text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Cancha 1 • El Maracaná</span>
-                    <p className="text-xl font-black text-white uppercase">62.5% <span className="text-xs text-emerald-400 font-bold">CARGA</span></p>
-                    <p className="text-[8px] font-mono font-black text-emerald-400 uppercase tracking-wider bg-emerald-500/5 py-0.5 px-1.5 rounded border border-emerald-500/10 w-max">
-                      Popularidad Alta (Césped)
-                    </p>
-                  </div>
+                {(() => {
+                  const dynamicC1Count = allBookings.filter(b => b.field?.toUpperCase().includes('CANCHA 1') || b.field?.toUpperCase().includes('MARACANÁ')).length;
+                  const dynamicC2Count = allBookings.filter(b => b.field?.toUpperCase().includes('CANCHA 2') || b.field?.toUpperCase().includes('BOMBONERA')).length;
+                  const dynamicTotal = (dynamicC1Count + dynamicC2Count) || 1;
+                  const dynamicC1Pct = Math.round((dynamicC1Count / dynamicTotal) * 100);
+                  const dynamicC2Pct = 100 - dynamicC1Pct;
 
-                  <div className="p-4 bg-zinc-900/30 rounded-2xl border border-white/5 space-y-2">
-                    <span className="text-[8px] font-mono text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Cancha 2 • La Bombonera</span>
-                    <p className="text-xl font-black text-white uppercase">37.5% <span className="text-xs text-amber-500 font-bold">CARGA</span></p>
-                    <p className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-wider bg-amber-500/5 py-0.5 px-1.5 rounded border border-amber-500/10 w-max">
-                      Popularidad Moderada (Losa)
-                    </p>
-                  </div>
-                </div>
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-2">
+                        <div className="p-4 bg-zinc-900/30 rounded-2xl border border-white/5 space-y-2">
+                          <span className="text-[8px] font-mono text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Cancha 1 • El Maracaná</span>
+                          <p className="text-xl font-black text-white uppercase">{dynamicC1Pct}% <span className="text-xs text-emerald-400 font-bold">CARGA</span></p>
+                          <p className="text-[8px] font-mono font-black text-emerald-400 uppercase tracking-wider bg-emerald-500/5 py-0.5 px-1.5 rounded border border-emerald-500/10 w-max">
+                            Popularidad Alta (Césped)
+                          </p>
+                        </div>
 
-                {/* Ring chart preview */}
-                <div className="flex items-center gap-4 bg-black/20 p-3 rounded-2xl border border-white/5">
-                  <div className="relative w-11 h-11 rounded-full border-4 border-white/5 flex items-center justify-center shrink-0">
-                    <div className="absolute inset-0 rounded-full border-4 border-emerald-500 border-r-transparent border-b-transparent animate-spin duration-3000" />
-                    <span className="text-[8px] font-mono font-black text-white">62%</span>
-                  </div>
-                  <div className="text-left space-y-0.5 font-sans">
-                    <span className="text-[9px] font-black text-white uppercase tracking-wider block italic">Preferencia de Césped Sintético</span>
-                    <p className="text-[8px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
-                      El Maracaná lidera la recaudación debido a que los equipos prefieren césped sintético sobre losa para el juego con botines de fútbol 5.
-                    </p>
-                  </div>
-                </div>
+                        <div className="p-4 bg-zinc-900/30 rounded-2xl border border-white/5 space-y-2">
+                          <span className="text-[8px] font-mono text-[#bccbb9]/40 uppercase tracking-widest block font-bold">Cancha 2 • La Bombonera</span>
+                          <p className="text-xl font-black text-white uppercase">{dynamicC2Pct}% <span className="text-xs text-amber-500 font-bold">CARGA</span></p>
+                          <p className="text-[8px] font-mono font-black text-amber-400 uppercase tracking-wider bg-amber-500/5 py-0.5 px-1.5 rounded border border-amber-500/10 w-max">
+                            Popularidad Moderada (Losa)
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Ring chart preview */}
+                      <div className="flex items-center gap-4 bg-black/20 p-3 rounded-2xl border border-white/5">
+                        <div className="relative w-11 h-11 rounded-full border-4 border-white/5 flex items-center justify-center shrink-0">
+                          <div className="absolute inset-0 rounded-full border-4 border-emerald-500 border-r-transparent border-b-transparent animate-spin duration-3000" />
+                          <span className="text-[8px] font-mono font-black text-white">{dynamicC1Pct}%</span>
+                        </div>
+                        <div className="text-left space-y-0.5 font-sans">
+                          <span className="text-[9px] font-black text-white uppercase tracking-wider block italic">Preferencia de Césped Sintético</span>
+                          <p className="text-[8px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
+                            El Maracaná lidera la recaudación debido a que los equipos prefieren césped sintético sobre losa para el juego con botines de fútbol 5.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
             </div>

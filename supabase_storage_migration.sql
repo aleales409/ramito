@@ -181,36 +181,6 @@ CREATE TRIGGER courts_updated_at
 
 
 -- ============================================================
--- DATOS INICIALES: Canchas del complejo
--- (imageUrl se actualizará cuando subas las fotos reales)
--- ============================================================
-INSERT INTO public.courts (id, name, price, rating, type, features, image_url, policy)
-VALUES
-  (
-    'court-1',
-    'Cancha con Césped',
-    120,
-    4.9,
-    'Fútbol 5',
-    ARRAY['Césped Sintético Pro', 'Techado', 'Iluminación LED'],
-    '',  -- Reemplazar con: https://[proyecto].supabase.co/storage/v1/object/public/media/canchas/cancha-1.jpg
-    'CANCELACIÓN GRATUITA HASTA 24 HORAS ANTES DEL INICIO. EL USO DE CHIMPUNES CON COCOS GRANDES ESTÁ PROHIBIDO POR CUIDADO DEL CÉSPED.'
-  ),
-  (
-    'court-2',
-    'Cancha de Tierra',
-    100,
-    4.7,
-    'Fútbol 5',
-    ARRAY['Tierra Compactada', 'Al aire libre', 'Graderías'],
-    '',  -- Reemplazar con: https://[proyecto].supabase.co/storage/v1/object/public/media/canchas/cancha-2.jpg
-    'EL USO DE CALZADO CON TAPONES O COCÓS (BOTINES) ESTÁ ABSOLUTAMENTE PROHIBIDO. SE EXIGE EL USO EXCLUSIVO DE ZAPATILLAS DE SUELA LISA DE GOMA.'
-  )
-ON CONFLICT (id) DO NOTHING;
-
-
--- ============================================================
 -- VERIFICACIÓN FINAL
 -- ============================================================
 SELECT id, name, public FROM storage.buckets WHERE id IN ('media', 'receipts');
-SELECT id, name, price, is_active FROM public.courts;
