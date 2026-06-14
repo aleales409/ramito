@@ -44,6 +44,8 @@ import { getCantinaItems, saveCantinaItems } from '../lib/cantina';
 import NotificationBell from '../components/NotificationBell';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { enqueueOperation } from '../lib/syncQueue';
+import { uploadReceipt } from '../lib/storage';
+
 
 const USER_AVATARS: Record<string, string> = {
   'CARLOS MENDOZA': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23FBBF24" stroke-width="2" stroke-opacity="0.3"/><path d="M 35,30 L 65,30 A 15,15 0 0,1 50,60 A 15,15 0 0,1 35,30 Z" fill="%23FBBF24" fill-opacity="0.1" stroke="%23FBBF24" stroke-width="2"/><path d="M 35,38 H 28 A 5,5 0 0,1 28,48 H 35" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 65,38 H 72 A 5,5 0 0,0 72,48 H 65" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,60 V 70 M 40,70 H 60" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,16 L 52,21 L 57,21 L 53,24 L 55,29 L 50,26 L 45,29 L 47,24 L 43,21 L 48,21 Z" fill="%23FBBF24" fill-opacity="0.2" stroke="%23FBBF24" stroke-width="1"/></svg>', // Mundial Oro
@@ -388,58 +390,46 @@ export default function MyBookingsView() {
     const isPdfValue = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     const targetBooking = bookings.find((b: any) => b.id === bookingIdForUpload);
 
-    // Optimistic local update so the UI is instant
+    // 1. Actualización optimista local — UI responde al instante
     const localUrl = URL.createObjectURL(file);
     setAllBookings((prev: any) => prev.map((b: any) =>
-      b.id === bookingIdForUpload ? { ...b, status: 'pending_approval', receiptUrl: localUrl, isPdf: isPdfValue, fileName: file.name } : b
+      b.id === bookingIdForUpload
+        ? { ...b, status: 'pending_approval', receiptUrl: localUrl, isPdf: isPdfValue, fileName: file.name }
+        : b
     ));
     setUploadingFor(null);
     setShowSuccessToast(true);
     setTimeout(() => setShowSuccessToast(false), 4000);
 
-    // --- SUPABASE STORAGE UPLOAD ---
-    let finalReceiptUrl = localUrl;
+    // 2. Upload real a Supabase Storage (bucket: receipts/bookings/)
     if (isSupabaseConfigured && navigator.onLine) {
-      try {
-        const ext = file.name.split('.').pop() || 'jpg';
-        const storagePath = `receipts/${bookingIdForUpload}_${Date.now()}.${ext}`;
+      const { url: storageUrl, error: storageError } = await uploadReceipt(bookingIdForUpload, file);
+      const finalReceiptUrl = storageUrl || localUrl;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('receipts')
-          .upload(storagePath, file, { upsert: true, contentType: file.type });
-
-        if (uploadError) {
-          console.error('Error uploading receipt to Supabase Storage:', uploadError);
-        } else {
-          const { data: publicUrlData } = supabase.storage.from('receipts').getPublicUrl(storagePath);
-          finalReceiptUrl = publicUrlData?.publicUrl || localUrl;
-          console.log('✅ Receipt uploaded to Supabase Storage:', finalReceiptUrl);
-        }
-      } catch (storageErr) {
-        console.error('Storage upload exception:', storageErr);
+      if (storageError) {
+        console.warn('Storage upload falló, usando URL local:', storageError);
       }
 
-      // Persist receiptUrl + status to bookings table
+      // 3. Persistir receiptUrl + status en tabla bookings
       const { error: dbError } = await supabase
         .from('bookings')
         .update({ status: 'pending_approval', receiptUrl: finalReceiptUrl })
         .eq('id', bookingIdForUpload);
 
       if (dbError) {
-        console.error('Error persisting receipt URL to bookings:', dbError);
+        console.error('Error persistiendo comprobante en bookings:', dbError);
         enqueueOperation('bookings', 'update', { status: 'pending_approval', receiptUrl: finalReceiptUrl }, { key: 'id', value: bookingIdForUpload });
       } else {
-        // Update local state with the definitive Supabase public URL
+        // Actualizar estado local con URL definitiva de Supabase
         setAllBookings((prev: any) => prev.map((b: any) =>
           b.id === bookingIdForUpload ? { ...b, receiptUrl: finalReceiptUrl } : b
         ));
-        console.log('✅ Receipt URL persisted to Supabase bookings table.');
       }
     } else if (isSupabaseConfigured && !navigator.onLine) {
       enqueueOperation('bookings', 'update', { status: 'pending_approval' }, { key: 'id', value: bookingIdForUpload });
     }
 
-    // Notificación interna
+    // 4. Notificación interna para admin
     setNotifications((prev: any) => [
       {
         title: 'Nuevo Comprobante Recibido',
@@ -450,6 +440,7 @@ export default function MyBookingsView() {
       ...prev
     ]);
   };
+
 
   const approvePayment = async (id: string) => {
     const booking = bookings.find((b: any) => b.id === id);

@@ -1,4 +1,19 @@
 import { Court, Slot, Booking } from './types';
+import { getCanchaUrl } from './lib/storage';
+
+// ─── Fallbacks de Unsplash (usados si aún no hay foto en Supabase Storage) ───
+const FALLBACK_CANCHA_1 = 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop';
+const FALLBACK_CANCHA_2 = 'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?q=80&w=800&auto=format&fit=crop';
+
+/**
+ * Resuelve la imagen de una cancha:
+ * 1. Si hay URL en Supabase Storage → la usa
+ * 2. Si no → usa la imagen hardcoded (Unsplash)
+ */
+export function resolveCourtImage(courtId: string, fallbackUrl: string): string {
+  const storageUrl = getCanchaUrl(`cancha-${courtId}.jpg`);
+  return storageUrl || fallbackUrl;
+}
 
 export const COURTS: Court[] = [
   {
@@ -9,7 +24,7 @@ export const COURTS: Court[] = [
     rating: 4.9,
     type: 'Fútbol 5',
     features: ['Césped Sintético Pro', 'Techado', 'Iluminación LED'],
-    imageUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop',
+    imageUrl: FALLBACK_CANCHA_1,  // → Reemplazar subiendo cancha-1.jpg al bucket media/canchas/
     policy: 'CANCELACIÓN GRATUITA HASTA 24 HORAS ANTES DEL INICIO. EL USO DE CHIMPUNES CON COCOS GRANDES ESTÁ PROHIBIDO POR CUIDADO DEL CÉSPED.'
   },
   {
@@ -20,7 +35,7 @@ export const COURTS: Court[] = [
     rating: 4.7,
     type: 'Fútbol 5',
     features: ['Tierra Compactada', 'Al aire libre', 'Graderías'],
-    imageUrl: 'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?q=80&w=800&auto=format&fit=crop',
+    imageUrl: FALLBACK_CANCHA_2,  // → Reemplazar subiendo cancha-2.jpg al bucket media/canchas/
     policy: 'EL USO DE CALZADO CON TAPONES O COCÓS (BOTINES) ESTÁ ABSOLUTAMENTE PROHIBIDO POR CUESTIONES DE SEGURIDAD Y CUIDADO DE LA LOSA. SE EXIGE EL USO EXCLUSIVO DE ZAPATILLAS DE SUELA LISA DE GOMA (SUELA FLAT/FUTSAL).'
   }
 ];
