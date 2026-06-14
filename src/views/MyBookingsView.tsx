@@ -340,12 +340,28 @@ export default function MyBookingsView() {
     fileInputRef.current?.click();
   };
 
-  const handleSimulateReceipt = (bookingId: string) => {
+  const handleSimulateReceipt = async (bookingId: string) => {
     const targetBooking = bookings.find((b: any) => b.id === bookingId);
     if (!targetBooking) return;
     
     const mockUrl = generateMockReceiptUrl(targetBooking.user || userName || 'Usuario', targetBooking.amount || '$ 120.00', targetBooking.id);
     
+    // Persist status + receiptUrl to Supabase
+    if (isSupabaseConfigured) {
+      if (navigator.onLine) {
+        const { error } = await supabase
+          .from('bookings')
+          .update({ status: 'pending_approval', receiptUrl: mockUrl })
+          .eq('id', bookingId);
+        if (error) {
+          console.error('Error saving simulated receipt to Supabase:', error);
+          enqueueOperation('bookings', 'update', { status: 'pending_approval', receiptUrl: mockUrl }, { key: 'id', value: bookingId });
+        }
+      } else {
+        enqueueOperation('bookings', 'update', { status: 'pending_approval', receiptUrl: mockUrl }, { key: 'id', value: bookingId });
+      }
+    }
+
     setAllBookings((prev: any) => prev.map((b: any) => 
       b.id === bookingId ? { ...b, status: 'pending_approval', receiptUrl: mockUrl } : b
     ));
@@ -364,49 +380,75 @@ export default function MyBookingsView() {
     showToast('¡Comprobante Yape/Plin simulado de forma exitosa!', 'success');
   };
 
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && uploadingFor) {
-      const isPdfValue = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-      // Intentar crear URL del archivo cargado para máxima fidelidad visual del comprobante real
-      try {
-        const localUrl = URL.createObjectURL(file);
-        setAllBookings((prev: any) => prev.map((b: any) => 
-          b.id === uploadingFor ? { 
-            ...b, 
-            status: 'pending_approval', 
-            receiptUrl: localUrl,
-            isPdf: isPdfValue,
-            fileName: file.name
-          } : b
-        ));
-        
-        // Registrar notificación interactiva en tiempo real para administración
-        const targetBooking = bookings.find((b: any) => b.id === uploadingFor);
-        setNotifications((prev: any) => [
-          {
-            title: 'Nuevo Comprobante Recibido',
-            body: `${userName || 'Usuario'} adjuntó transferencia de pago para el turno del ${targetBooking?.date || 'día programado'}.`,
-            time: 'Ahora',
-            read: false
-          },
-          ...prev
-        ]);
+    if (!file || !uploadingFor) return;
 
-        setUploadingFor(null);
-        setShowSuccessToast(true);
-        setTimeout(() => setShowSuccessToast(false), 4000);
-      } catch (err) {
-        console.error('Error generating blob URL', err);
-        // Fallback robusto
-        setAllBookings((prev: any) => prev.map((b: any) => 
-          b.id === uploadingFor ? { ...b, status: 'pending_approval', receiptUrl: 'https://images.unsplash.com/photo-1554224155-1696413565d3?auto=format&fit=crop&q=80&w=600' } : b
-        ));
-        setUploadingFor(null);
-        setShowSuccessToast(true);
-        setTimeout(() => setShowSuccessToast(false), 4000);
+    const bookingIdForUpload = uploadingFor;
+    const isPdfValue = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const targetBooking = bookings.find((b: any) => b.id === bookingIdForUpload);
+
+    // Optimistic local update so the UI is instant
+    const localUrl = URL.createObjectURL(file);
+    setAllBookings((prev: any) => prev.map((b: any) =>
+      b.id === bookingIdForUpload ? { ...b, status: 'pending_approval', receiptUrl: localUrl, isPdf: isPdfValue, fileName: file.name } : b
+    ));
+    setUploadingFor(null);
+    setShowSuccessToast(true);
+    setTimeout(() => setShowSuccessToast(false), 4000);
+
+    // --- SUPABASE STORAGE UPLOAD ---
+    let finalReceiptUrl = localUrl;
+    if (isSupabaseConfigured && navigator.onLine) {
+      try {
+        const ext = file.name.split('.').pop() || 'jpg';
+        const storagePath = `receipts/${bookingIdForUpload}_${Date.now()}.${ext}`;
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('receipts')
+          .upload(storagePath, file, { upsert: true, contentType: file.type });
+
+        if (uploadError) {
+          console.error('Error uploading receipt to Supabase Storage:', uploadError);
+        } else {
+          const { data: publicUrlData } = supabase.storage.from('receipts').getPublicUrl(storagePath);
+          finalReceiptUrl = publicUrlData?.publicUrl || localUrl;
+          console.log('✅ Receipt uploaded to Supabase Storage:', finalReceiptUrl);
+        }
+      } catch (storageErr) {
+        console.error('Storage upload exception:', storageErr);
       }
+
+      // Persist receiptUrl + status to bookings table
+      const { error: dbError } = await supabase
+        .from('bookings')
+        .update({ status: 'pending_approval', receiptUrl: finalReceiptUrl })
+        .eq('id', bookingIdForUpload);
+
+      if (dbError) {
+        console.error('Error persisting receipt URL to bookings:', dbError);
+        enqueueOperation('bookings', 'update', { status: 'pending_approval', receiptUrl: finalReceiptUrl }, { key: 'id', value: bookingIdForUpload });
+      } else {
+        // Update local state with the definitive Supabase public URL
+        setAllBookings((prev: any) => prev.map((b: any) =>
+          b.id === bookingIdForUpload ? { ...b, receiptUrl: finalReceiptUrl } : b
+        ));
+        console.log('✅ Receipt URL persisted to Supabase bookings table.');
+      }
+    } else if (isSupabaseConfigured && !navigator.onLine) {
+      enqueueOperation('bookings', 'update', { status: 'pending_approval' }, { key: 'id', value: bookingIdForUpload });
     }
+
+    // Notificación interna
+    setNotifications((prev: any) => [
+      {
+        title: 'Nuevo Comprobante Recibido',
+        body: `${userName || 'Usuario'} adjuntó comprobante de pago para el turno del ${targetBooking?.date || 'día programado'}.`,
+        time: 'Ahora',
+        read: false
+      },
+      ...prev
+    ]);
   };
 
   const approvePayment = async (id: string) => {
