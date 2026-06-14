@@ -6,6 +6,7 @@ import { getTransferAccounts } from '../lib/transferRotation';
 import { useApp } from '../context/AppContext';
 import { getCantinaItems } from '../lib/cantina';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { enqueueOperation } from '../lib/syncQueue';
 
 export default function ConfirmationView() {
   const navigate = useNavigate();
@@ -13,10 +14,8 @@ export default function ConfirmationView() {
   const role = localStorage.getItem('ramito_user_role');
   const isAdmin = role === 'admin_vip' || role === 'admin_elite';
   const { setAllBookings, setNotifications, showToast } = useApp();
-  const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'cash' | 'mercadopago'>(isAdmin ? 'cash' : 'transfer');
+  const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'cash'>(isAdmin ? 'cash' : 'transfer');
   const [paymentPlan, setPaymentPlan] = useState<'full' | 'deposit'>('full');
-  const [showMPSandbox, setShowMPSandbox] = useState(false);
-  const [isProcessingMP, setIsProcessingMP] = useState(false);
   const { activeAccount } = getTransferAccounts();
   const [clientName, setClientName] = useState(isAdmin ? 'Reserva Directa' : '');
   const [selectedExtras, setSelectedExtras] = useState<any[]>([]);
@@ -50,6 +49,12 @@ export default function ConfirmationView() {
       } else if (item.iconId === 'bbq') {
         icon = Sparkles;
         color = 'text-red-400 bg-red-500/10 border-red-500/20';
+      } else if (item.iconId === 'dishwashing') {
+        icon = Droplet;
+        color = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+      } else if (item.iconId === 'birthday_deco') {
+        icon = Sparkles;
+        color = 'text-purple-400 bg-purple-500/10 border-purple-500/20';
       }
 
       return {
@@ -90,12 +95,7 @@ export default function ConfirmationView() {
   };
 
   const handleConfirm = async () => {
-    if (paymentMethod === 'mercadopago') {
-      setShowMPSandbox(true);
-      return;
-    }
-
-    const status = (paymentMethod === 'transfer' || paymentMethod === 'cash') ? 'pending_payment' : 'upcoming';
+    const status = 'pending_payment';
     const userName = isAdmin ? (clientName || 'Administrador') : (localStorage.getItem('ramito_user_name') || 'Anónimo');
     
     const isDeposit = paymentMethod === 'transfer' && paymentPlan === 'deposit';
@@ -112,7 +112,7 @@ export default function ConfirmationView() {
       date: slotDate,
       time: slotTime,
       field: courtName,
-      amount: `$ ${totalPrice.toFixed(2)}`,
+      amount: `S/. ${totalPrice.toFixed(2)}`,
       user: userName,
       status: status,
       payment_method: paymentMethod,
@@ -148,22 +148,35 @@ export default function ConfirmationView() {
       }
     ]);
 
+    let syncNeeded = false;
     try {
       if (isSupabaseConfigured) {
-        const { error } = await supabase.from('bookings').insert([{
+        const insertData = {
           id: bookingId,
           date: slotDate,
           time: slotTime,
           field: formattedFieldName,
-          amount: `$ ${totalPrice.toFixed(2)}`,
+          amount: `S/. ${totalPrice.toFixed(2)}`,
           user: userName,
           status: status,
           payment_method: paymentMethod,
           extras_delivered: false,
           created_at: bookingData.created_at
-        }]);
+        };
 
-        if (error) throw error;
+        if (navigator.onLine) {
+          const { error } = await supabase.from('bookings').insert([insertData]);
+          if (error) {
+            console.error('Error saving booking to Supabase:', error);
+            syncNeeded = true;
+          }
+        } else {
+          syncNeeded = true;
+        }
+
+        if (syncNeeded) {
+          enqueueOperation('bookings', 'insert', insertData);
+        }
       }
     } catch (err) {
       console.error('Error saving booking to Supabase:', err);
@@ -190,7 +203,7 @@ export default function ConfirmationView() {
           date: slotDate,
           time: slotTime,
           field: courtName,
-          amount: `$ ${totalPrice.toLocaleString('es-AR')}`,
+          amount: `S/. ${totalPrice.toLocaleString('es-PE')}`,
           status: status,
           payment_method: paymentMethod,
           payment_plan: plan,
@@ -201,98 +214,7 @@ export default function ConfirmationView() {
     });
   };
 
-  const completeWithMercadoPago = async (simulatedCardBrand: string) => {
-    const status = 'upcoming'; 
-    const userName = isAdmin ? (clientName || 'Administrador') : (localStorage.getItem('ramito_user_name') || 'Anónimo');
-    
-    const isDeposit = paymentPlan === 'deposit';
-    const plan = isDeposit ? 'deposit' : 'full';
-    const paid = isDeposit ? depositAmount : totalPrice;
-    const balance = isDeposit ? (totalPrice - depositAmount) : 0;
 
-    const bookingId = Math.random().toString(36).substr(2, 9);
-    const extrasListNames = effectiveExtras.map(e => e.name);
-    const formattedFieldName = courtName + (effectiveExtras.length > 0 ? ` (+${effectiveExtras.map(e => e.short).join(', ')})` : '');
-    
-    const bookingData = {
-      id: bookingId,
-      date: slotDate,
-      time: slotTime,
-      field: courtName,
-      amount: `$ ${totalPrice.toFixed(2)}`,
-      user: userName,
-      status: status,
-      payment_method: 'mercadopago',
-      payment_plan: plan,
-      paid_amount: paid,
-      pending_balance: balance,
-      mp_payment_id: `mp_${Math.floor(Math.random() * 1000000000)}`,
-      mp_card_brand: simulatedCardBrand,
-      extras: extrasListNames,
-      extras_delivered: false,
-      created_at: new Date().toISOString()
-    };
-
-    setAllBookings((prev: any) => [...prev, bookingData]);
-
-    setNotifications((prev: any) => [
-      ...prev,
-      {
-        title: 'Pago Mercado Pago Aprobado',
-        body: `Tu pago de la reserva para el ${slotDate} ha sido aprobado al instante por Mercado Pago. ¡Tu turno está CONFIRMADO en el sistema!`,
-        time: 'Ahora',
-        read: false
-      },
-      {
-        title: 'Nuevo Pago Online Confirmado',
-        body: `El jugador ${userName} pagó vía Mercado Pago por su turno del ${slotDate} (${courtName}).`,
-        time: 'Ahora',
-        read: false
-      }
-    ]);
-
-    try {
-      if (isSupabaseConfigured) {
-        await supabase.from('bookings').insert([{
-          id: bookingId,
-          date: slotDate,
-          time: slotTime,
-          field: formattedFieldName,
-          amount: `$ ${totalPrice.toFixed(2)}`,
-          user: userName,
-          status: status,
-          payment_method: 'mercadopago',
-          extras_delivered: false,
-          created_at: bookingData.created_at
-        }]);
-      }
-    } catch (err) {
-      console.error('Error saving MP booking to Supabase:', err);
-    }
-
-    localStorage.setItem('last_booking_status', status);
-    localStorage.setItem('last_payment_method', 'mercadopago');
-    showToast(`¡Pago electrónico exitoso con Mercado Pago (${simulatedCardBrand})! Turno CONFIRMADO de forma inmediata.`, 'success');
-    
-    // Redirigir a la pantalla de éxito con los datos para Fútbol Split
-    navigate('/success', {
-      state: {
-        bookingData: {
-          id: bookingId,
-          date: slotDate,
-          time: slotTime,
-          field: courtName,
-          amount: `$ ${totalPrice.toLocaleString('es-AR')}`,
-          status: status,
-          payment_method: 'mercadopago',
-          payment_plan: plan,
-          paid_amount: paid,
-          pending_balance: balance,
-          mp_card_brand: simulatedCardBrand
-        }
-      }
-    });
-  };
 
   return (
     <main className="pt-24 pb-32 px-5 w-full max-w-5xl md:max-w-6xl mx-auto min-h-screen">
@@ -563,46 +485,7 @@ export default function ConfirmationView() {
             </motion.div>
           )}
 
-          {/* OPCIÓN: MERCADO PAGO INTEGRACIÓN PREPARADA */}
-          <label 
-            onClick={() => setPaymentMethod('mercadopago')}
-            className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer ${
-              paymentMethod === 'mercadopago' ? 'border-[#009EE3] bg-[#009EE3]/5' : 'border-white/10 bg-[#1a1c1c]'
-            }`}
-          >
-            <div className="flex items-center gap-4">
-              <CreditCard className={`w-5 h-5 ${paymentMethod === 'mercadopago' ? 'text-[#009EE3]' : 'text-[#bccbb9]'}`} />
-              <div className="text-left">
-                <span className="text-xs font-bold uppercase tracking-wide block">Mercado Pago</span>
-                <span className="text-[8px] bg-[#009EE3]/10 text-[#009EE3] px-2 py-0.5 rounded font-mono font-black italic uppercase">Automático online</span>
-              </div>
-            </div>
-            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-              paymentMethod === 'mercadopago' ? 'border-[#009EE3]' : 'border-white/20'
-            }`}>
-              {paymentMethod === 'mercadopago' && <Check className="w-3.2 h-3.2 text-[#009EE3]" strokeWidth={3} />}
-            </div>
-          </label>
 
-          {paymentMethod === 'mercadopago' && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="p-5 rounded-2xl border border-[#009EE3]/20 bg-[#009EE3]/5 space-y-4 overflow-hidden text-left"
-            >
-              <div className="flex items-center gap-1.5 p-2 rounded-xl bg-[#009EE3]/10 border border-[#009EE3]/25 text-[8.5px] font-black text-[#009EE3] uppercase tracking-wider font-sans">
-                <Activity className="w-3.5 h-3.5 shrink-0 animate-pulse" />
-                <span>INTEGRACIÓN MERCADO PAGO SDK DETECTADA</span>
-              </div>
-              <p className="text-[10px] font-bold text-[#bccbb9]/80 uppercase tracking-wide leading-relaxed">
-                ¡Olvídate de verificar comprobantes! Con Mercado Pago, los jugadores pagan con <strong className="text-white">Tarjeta de Crédito, Débito o Saldo MP</strong>. El turno se <strong className="text-[#4be277]">valida automáticamente al instante</strong> mediante nuestro Webhook IPN de producción, sin intervención del staff.
-              </p>
-              <div className="bg-[#009EE3]/15 text-white font-black text-[9px] uppercase tracking-wider px-3 py-2 rounded-lg border border-[#009EE3]/30 flex items-center justify-center gap-2">
-                <Shield className="w-3.5 h-3.5 text-[#009EE3] shrink-0" />
-                Certificado Sandbox Activo • Listo para Simular
-              </div>
-            </motion.div>
-          )}
 
           <label 
             onClick={() => {
@@ -648,6 +531,33 @@ export default function ConfirmationView() {
               ) : (
                 <span><strong>SE PERMITEN BOTINES O ZAPATILLAS</strong>. PROHIBIDO TAPONES METÁLICOS EN ESTA CANCHA DE TIERRA.</span>
               )}
+            </p>
+          </div>
+        </div>
+
+        {/* Políticas de la Cancha específicas configuradas por el Admin */}
+        {court?.policy && (
+          <div className="bg-[#FF9100]/5 p-3.5 rounded-xl border border-[#FF9100]/25 flex gap-3 text-left">
+            <Info className="w-4 h-4 text-[#FF9100] flex-shrink-0 mt-0.5" />
+            <div className="space-y-1 w-full">
+              <span className="text-[9px] font-black text-[#FF9100] uppercase tracking-wider block">⚠️ NORMATIVA Y CUIDADO ESPECIAL DEL CAMPO</span>
+              <p className="text-[9.5px] text-zinc-200 font-bold uppercase tracking-wide leading-normal font-sans">
+                {court.policy}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Equipamiento de Cortesía */}
+        <div className="bg-[#4be277]/5 p-3.5 rounded-xl border border-[#4be277]/20 flex gap-3 text-left">
+          <Sparkles className="w-4 h-4 text-[#4be277] flex-shrink-0 mt-0.5" />
+          <div className="space-y-1.5 w-full">
+            <span className="text-[9px] font-black text-[#4be277] uppercase tracking-wider block">⚽ EQUIPAMIENTO GENERAL INCLUIDO</span>
+            <p className="text-[9.5px] text-zinc-300 font-bold uppercase tracking-wide leading-normal">
+              La <strong className="text-white">Pelota Profesional</strong> y <strong className="text-white">6 Chaquetas (Chalecos)</strong> para diferenciar los equipos están <strong className="text-[#4be277]">Totalmente Incluidos</strong> con el pago total de la reserva confirmada.
+            </p>
+            <p className="text-[9px] text-[#4be277]/90 font-bold uppercase tracking-wide leading-normal border-t border-white/5 pt-1.5">
+              💡 <span className="text-zinc-300">Nota de Compromiso:</span> Se les agradecería de corazón que al finalizar su partido regresen la pelota y las 6 chaquetas a la recepción, en las mismas condiciones en las que les fueron entregadas en mano.
             </p>
           </div>
         </div>
@@ -768,163 +678,9 @@ export default function ConfirmationView() {
           className="flex-[2] h-14 bg-gradient-to-r from-[#FF9100] via-[#4be277] to-[#D32F2F] text-[#121414] font-black text-sm rounded-2xl shadow-[0_0_20px_rgba(255,145,0,0.3)] flex items-center justify-center gap-2 uppercase tracking-[0.2em]"
         >
           <Check className="w-5 h-5" />
-          {paymentMethod === 'mercadopago' ? 'PAGAR CON MERCADO PAGO' : 'CONFIRMAR RESERVA'}
+          CONFIRMAR RESERVA
         </motion.button>
       </div>
-
-      {/* Mercado Pago Sandbox Simulator Modal */}
-      <AnimatePresence>
-        {showMPSandbox && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[150] bg-zinc-950/95 backdrop-blur-md flex items-center justify-center p-4"
-          >
-            <motion.div 
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="w-full max-w-md bg-[#161819] border border-[#009EE3]/35 rounded-[2.5rem] overflow-hidden shadow-[0_0_50px_rgba(0,158,227,0.15)] flex flex-col"
-            >
-              {/* Mercado Pago Branded Top Bar */}
-              <div className="bg-[#009EE3] p-5 text-white relative">
-                <button 
-                  onClick={() => setShowMPSandbox(false)}
-                  className="absolute right-4 top-4 w-8 h-8 rounded-full bg-black/10 hover:bg-black/25 flex items-center justify-center text-white transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center font-black text-[#009EE3] text-lg select-none shadow">
-                    mp
-                  </div>
-                  <div className="text-left leading-none">
-                    <span className="text-[8px] font-black tracking-widest text-[#FFF] uppercase bg-[#FFF]/15 px-2 py-0.5 rounded italic">SANDBOX SIMULATOR</span>
-                    <h3 className="text-sm font-black uppercase tracking-wider text-white mt-1">MERCADO PAGO PASS</h3>
-                  </div>
-                </div>
-              </div>
-
-              {/* Checkout details */}
-              <div className="p-6 space-y-6">
-                
-                {/* Real-time Order Summary Row */}
-                <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-2.5 text-left">
-                  <span className="text-[8px] font-black text-[#bccbb9]/40 tracking-widest uppercase block mb-1">DETALLES DE LA RESERVA</span>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-black text-white uppercase italic">{courtName}</span>
-                    <span className="text-xs font-black text-[#009EE3] italic">{slotDate}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px] text-[#bccbb9]/80 uppercase">
-                    <span>Horario seleccionado:</span>
-                    <span className="font-bold text-white">{slotTime} Hs</span>
-                  </div>
-                  {effectiveExtras.length > 0 && (
-                    <div className="text-[9px] text-amber-400 font-bold uppercase leading-relaxed">
-                      Extras: {effectiveExtras.map(e => e.name).join(', ')}
-                    </div>
-                  )}
-                  <div className="pt-2 border-t border-white/5 flex justify-between items-center">
-                    <span className="text-[10px] font-black text-white/50 uppercase">TOTAL A ABONAR:</span>
-                    <span className="text-base font-black text-[#4be277] italic font-display">$ {totalPrice.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {isProcessingMP ? (
-                  /* Loading SSL simulated state */
-                  <div className="py-8 flex flex-col items-center justify-center text-center space-y-4">
-                    <div className="w-12 h-12 border-4 border-t-[#009EE3] border-white/10 rounded-full animate-spin"></div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-black text-white uppercase italic tracking-wider animate-pulse">Estableciendo enlace SSL protegido...</p>
-                      <p className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest">PROCESANDO TRANSACCIÓN EN GATEWAY SEGURO</p>
-                    </div>
-                  </div>
-                ) : (
-                  /* Choosing credit card template state */
-                  <div className="space-y-4 text-left">
-                    <span className="text-[9.2px] font-black text-[#009EE3] uppercase tracking-wider block">💳 ELIGE TU TARJETA DE PRUEBA (SANDBOX)</span>
-                    
-                    <div className="space-y-2">
-                      <button 
-                        onClick={() => {
-                          setIsProcessingMP(true);
-                          setTimeout(() => {
-                            completeWithMercadoPago('Visa **** 8295');
-                          }, 1600);
-                        }}
-                        className="w-full p-4 bg-white/[0.02] hover:bg-[#009EE3]/5 border border-white/5 hover:border-[#009EE3]/40 rounded-2xl flex items-center justify-between group transition-all"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-6 bg-gradient-to-r from-blue-600 to-indigo-700 rounded flex items-center justify-center text-[8px] text-white font-black italic shadow">VISA</div>
-                          <div>
-                            <span className="text-xs font-bold text-white block">VISA CREDITO DIRECTO</span>
-                            <span className="text-[8px] text-zinc-500 font-mono block">Terminada en 8295 • Simulador</span>
-                          </div>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-[#009EE3] transition-colors" />
-                      </button>
-
-                      <button 
-                        onClick={() => {
-                          setIsProcessingMP(true);
-                          setTimeout(() => {
-                            completeWithMercadoPago('Mastercard **** 4103');
-                          }, 1600);
-                        }}
-                        className="w-full p-4 bg-white/[0.02] hover:bg-[#009EE3]/5 border border-white/5 hover:border-[#009EE3]/40 rounded-2xl flex items-center justify-between group transition-all"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-6 bg-gradient-to-r from-red-500 to-amber-500 rounded flex items-center justify-center text-[8px] text-white font-black italic shadow">MC</div>
-                          <div>
-                            <span className="text-xs font-bold text-white block">MASTERCARD DÉBITO</span>
-                            <span className="text-[8px] text-zinc-500 font-mono block">Terminada en 4103 • Simulador</span>
-                          </div>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-[#009EE3] transition-colors" />
-                      </button>
-
-                      <button 
-                        onClick={() => {
-                          setIsProcessingMP(true);
-                          setTimeout(() => {
-                            completeWithMercadoPago('Saldo Mercado Pago');
-                          }, 1600);
-                        }}
-                        className="w-full p-4 bg-white/[0.02] hover:bg-[#009EE3]/5 border border-white/5 hover:border-[#009EE3]/40 rounded-2xl flex items-center justify-between group transition-all"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-6 bg-[#002F6C] rounded flex items-center justify-center text-[8px] text-white font-black italic shadow">BALANCE</div>
-                          <div>
-                            <span className="text-xs font-bold text-white block">DINERO EN CUENTA MP</span>
-                            <span className="text-[8px] text-zinc-500 font-mono block">Conector de saldo instantáneo</span>
-                          </div>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-[#009EE3] transition-colors" />
-                      </button>
-                    </div>
-
-                    <div className="p-3.5 bg-zinc-900 border border-white/5 rounded-2xl text-left flex gap-2.5 items-start">
-                      <Shield className="w-4 h-4 text-[#009EE3] shrink-0 mt-0.5" />
-                      <p className="text-[8px] text-[#bccbb9]/60 uppercase tracking-wide leading-normal">
-                        Al seleccionar un método de prueba, el simulador emitirá un token exitoso a nuestra API simulada. El turno quedará CONFIRMADO de forma inmediata y automática en el panel general.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-
-              {/* Secure Footer message */}
-              <div className="bg-black/30 p-4 border-t border-white/5 text-center flex items-center justify-center gap-1.5 text-[8.5px] font-bold text-white/40 uppercase tracking-widest">
-                <Shield className="w-3.5 h-3.5 text-white/30" />
-                PAGO PROTEGIDO POR LA RED DE MERCADO PAGO S.A.
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </main>
   );
 }

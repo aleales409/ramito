@@ -5,6 +5,7 @@ import { COURTS } from '../data';
 import { getCantinaItems, saveCantinaItems, CantinaItem } from '../lib/cantina';
 import { requestNotificationPermission, sendPushNotification } from '../lib/notifications';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { enqueueOperation, getPendingOperations, syncPendingOperations } from '../lib/syncQueue';
 
 interface AppContextType {
   isComplexOpen: boolean;
@@ -61,12 +62,15 @@ interface AppContextType {
   setCashTotal: React.Dispatch<React.SetStateAction<number>>;
   transferTotal: number;
   setTransferTotal: React.Dispatch<React.SetStateAction<number>>;
-  mpTotal: number;
-  setMpTotal: React.Dispatch<React.SetStateAction<number>>;
+
   ledgerTransactions: any[];
   setLedgerTransactions: React.Dispatch<React.SetStateAction<any[]>>;
   cantinaItems: CantinaItem[];
   setCantinaItems: React.Dispatch<React.SetStateAction<CantinaItem[]>>;
+
+  isOnline: boolean;
+  pendingSyncCount: number;
+  triggerManualSync: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -104,6 +108,66 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('ramito_user_role', role);
     } else {
       localStorage.removeItem('ramito_user_role');
+    }
+  };
+
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  useEffect(() => {
+    const handleOnline = async () => {
+      setIsOnline(true);
+      showToast('¡Conexión de red recuperada! Iniciando sincronización...', 'success');
+      const { success, syncedCount } = await syncPendingOperations();
+      if (syncedCount > 0) {
+        if (success) {
+          showToast(`¡Sincronización completada! ${syncedCount} operaciones subidas con éxito.`, 'success');
+        } else {
+          showToast(`Sincronización parcial: ${syncedCount} operaciones subidas.`, 'error');
+        }
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast('Sin conexión a Internet. Operando en modo local.', 'error');
+    };
+
+    const handleQueueChange = (e: Event) => {
+      const count = (e as CustomEvent).detail;
+      setPendingSyncCount(count);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('ramito_sync_queue_changed', handleQueueChange);
+
+    // Initial check
+    const ops = getPendingOperations();
+    setPendingSyncCount(ops.length);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('ramito_sync_queue_changed', handleQueueChange);
+    };
+  }, []);
+
+  const triggerManualSync = async () => {
+    if (!navigator.onLine) {
+      showToast('No es posible sincronizar sin conexión a Internet.', 'error');
+      return;
+    }
+    showToast('Sincronizando operaciones pendientes...', 'success');
+    const { success, syncedCount } = await syncPendingOperations();
+    if (syncedCount > 0) {
+      if (success) {
+        showToast(`Sincronización exitosa: ${syncedCount} operaciones actualizadas.`, 'success');
+      } else {
+        showToast(`Error: algunas operaciones no pudieron sincronizarse.`, 'error');
+      }
+    } else {
+      showToast('No hay operaciones pendientes de sincronización.', 'success');
     }
   };
 
@@ -275,9 +339,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [transferTotal, setTransferTotal] = useState<number>(() => {
     return parseInt(localStorage.getItem('ramito_audit_transfer') || '18000', 10);
   });
-  const [mpTotal, setMpTotal] = useState<number>(() => {
-    return parseInt(localStorage.getItem('ramito_audit_mp') || '12000', 10);
-  });
+
 
   const [ledgerTransactions, setLedgerTransactions] = useState<any[]>(() => {
     const saved = localStorage.getItem('ramito_ledger_txs');
@@ -361,10 +423,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (ledgerTxs.length > 0) {
             const cash = ledgerTxs.filter((tx: any) => tx.type === 'cash').reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
             const transfer = ledgerTxs.filter((tx: any) => tx.type === 'transfer').reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
-            const mp = ledgerTxs.filter((tx: any) => tx.type === 'mercadopago').reduce((sum: number, tx: any) => sum + (tx.amount || 0), 0);
             setCashTotal(cash);
             setTransferTotal(transfer);
-            setMpTotal(mp);
           }
         }
 
@@ -418,6 +478,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                   return [newBooking, ...prev];
                 });
 
+                // Trigger in-app visual toast
+                showToast(`🚨 Nueva reserva de ${newBooking.user} (${newBooking.field})`, 'success');
+
                 // Dispatch System/OS Push Notification
                 sendPushNotification(
                   '🚨 NUEVA RESERVA RECIBIDA',
@@ -438,6 +501,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 const oldBooking = payload.old;
                 
                 setAllBookings((prev) => prev.map((b) => (b.id === updatedBooking.id ? updatedBooking : b)));
+
+                // Trigger in-app visual toast
+                showToast(`⚠️ Reserva de ${updatedBooking.user} actualizada a: ${updatedBooking.status.toUpperCase()}`, 'success');
 
                 // Trigger Notification if status changed
                 if (oldBooking && oldBooking.status !== updatedBooking.status) {
@@ -474,7 +540,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 // Update financial metrics dynamically in real-time
                 if (newTx.type === 'cash') setCashTotal((prev) => prev + (newTx.amount || 0));
                 else if (newTx.type === 'transfer') setTransferTotal((prev) => prev + (newTx.amount || 0));
-                else if (newTx.type === 'mercadopago') setMpTotal((prev) => prev + (newTx.amount || 0));
+
 
                 // Dispatch notification of transaction
                 sendPushNotification(
@@ -486,7 +552,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 setLedgerTransactions([]);
                 setCashTotal(0);
                 setTransferTotal(0);
-                setMpTotal(0);
               }
             }
           )
@@ -611,9 +676,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('ramito_audit_transfer', String(transferTotal));
   }, [transferTotal]);
 
-  useEffect(() => {
-    localStorage.setItem('ramito_audit_mp', String(mpTotal));
-  }, [mpTotal]);
+
 
   useEffect(() => {
     localStorage.setItem('ramito_ledger_txs', JSON.stringify(ledgerTransactions));
@@ -651,6 +714,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (newSettings.schedule_days !== undefined) setScheduleDays(newSettings.schedule_days);
 
     try {
+      let syncNeeded = false;
       if (isSupabaseConfigured) {
         let updateData = { ...newSettings };
         if (newSettings.schedule_days !== undefined) {
@@ -659,19 +723,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           updateData.marquee_text = generated;
         }
 
-        const { error } = await supabase
-          .from('system_settings')
-          .update(updateData)
-          .eq('id', 1);
+        if (navigator.onLine) {
+          const { error } = await supabase
+            .from('system_settings')
+            .update(updateData)
+            .eq('id', 1);
 
-        if (error) {
-          console.warn('Supabase sync warning (algunas columnas podrían no existir):', error);
+          if (error) {
+            console.warn('Supabase sync warning (algunas columnas podrían no existir):', error);
+            syncNeeded = true;
+          }
+        } else {
+          syncNeeded = true;
         }
+
+        if (syncNeeded) {
+          enqueueOperation('system_settings', 'update', updateData, { key: 'id', value: 1 });
+          showToast('Configuración guardada localmente (Modo Offline)', 'success');
+        } else {
+          showToast('Configuración Guardada en la nube', 'success');
+        }
+      } else {
+        showToast('Configuración Guardada (Simulado)', 'success');
       }
-      showToast('Configuración Guardada', 'success');
     } catch (err) {
       console.error('Error saving settings', err);
-      showToast('Error al guardar en la nube');
+      showToast('Error al guardar configuración');
     }
   };
 
@@ -731,12 +808,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCashTotal,
       transferTotal,
       setTransferTotal,
-      mpTotal,
-      setMpTotal,
+
       ledgerTransactions,
       setLedgerTransactions,
       cantinaItems,
-      setCantinaItems
+      setCantinaItems,
+
+      isOnline,
+      pendingSyncCount,
+      triggerManualSync
     }}>
       {children}
     </AppContext.Provider>

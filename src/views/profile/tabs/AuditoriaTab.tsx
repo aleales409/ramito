@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
   CreditCard, Check, Smartphone, RefreshCw, FileText, Database, 
-  User, Settings, AlertTriangle, MessageCircle, ExternalLink 
+  User, Settings, AlertTriangle, MessageCircle, ExternalLink, BookOpen 
 } from 'lucide-react';
 import { useApp } from '../../../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../../../lib/supabase';
@@ -33,7 +33,7 @@ export default function AuditoriaTab({
   const {
     cashTotal, setCashTotal,
     transferTotal, setTransferTotal,
-    mpTotal, setMpTotal,
+
     ledgerTransactions, setLedgerTransactions,
     setNotifications, showToast, stadiumName, adminPhone
   } = useApp();
@@ -46,10 +46,9 @@ export default function AuditoriaTab({
     const logsQty = range === 'mensual' ? Math.min(25, auditLogs.length) : auditLogs.length;
     const reportedLogs = auditLogs.slice(0, logsQty);
 
-    const totalCaja = cashTotal + transferTotal + mpTotal;
+    const totalCaja = cashTotal + transferTotal;
     const cashPercentage = ((cashTotal / (totalCaja || 1)) * 100).toFixed(1);
     const transferPercentage = ((transferTotal / (totalCaja || 1)) * 100).toFixed(1);
-    const mpPercentage = ((mpTotal / (totalCaja || 1)) * 100).toFixed(1);
 
     const reportWindow = window.open('', '_blank');
     if (!reportWindow) {
@@ -89,7 +88,7 @@ export default function AuditoriaTab({
             }
             .grid-totals {
               display: grid;
-              grid-template-columns: repeat(3, 1fr);
+              grid-template-columns: repeat(2, 1fr);
               gap: 20px;
               margin-bottom: 35px;
             }
@@ -196,11 +195,6 @@ export default function AuditoriaTab({
               <div class="total-val">$${transferTotal.toLocaleString('es-AR')}</div>
               <div class="percentage">Participación: ${transferPercentage}%</div>
             </div>
-            <div class="total-card" style="border-color: #009EE3;">
-              <div class="total-title" style="color: #009EE3;">Total Mercado Pago</div>
-              <div class="total-val" style="color: #009EE3;">$${mpTotal.toLocaleString('es-AR')}</div>
-              <div class="percentage">Participación: ${mpPercentage}%</div>
-            </div>
           </div>
 
           <div class="total-card" style="margin-bottom: 35px; border-color: #10B981; background-color: #f0fdf4;">
@@ -263,14 +257,13 @@ export default function AuditoriaTab({
   };
 
   const exportToExcelReport = (range: 'mensual' | 'trimestral') => {
-    const totalCaja = cashTotal + transferTotal + mpTotal;
+    const totalCaja = cashTotal + transferTotal;
     let csvContent = "\uFEFF";
     csvContent += "=== REPORTE DE AUDITORÍA Y ARQUEO DE CAJA ===\n";
     csvContent += `Complejo Lunático:;${stadiumName || 'Complejo Deportivo Ramito'}\n`;
     csvContent += `Rango del Reporte:;${range.toUpperCase()}\n`;
     csvContent += `Total Efectivo:;${cashTotal}\n`;
     csvContent += `Total Transferencias:;${transferTotal}\n`;
-    csvContent += `Total Mercado Pago:;${mpTotal}\n`;
     csvContent += `Caja Bruta General:;${totalCaja}\n`;
     csvContent += "=========================================\n\n";
     csvContent += "TIMESTAMP;OPERADOR;ACCION;TIPO;DETALLE\n";
@@ -360,10 +353,10 @@ export default function AuditoriaTab({
 
             {/* Grande de Caja del Día */}
             <div className="text-center py-5 bg-black/50 border border-white/5 rounded-2xl relative overflow-hidden">
-              <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#009EE3]/40 to-transparent" />
+              <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#4be277]/40 to-transparent" />
               <span className="text-[8px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">Monto Reconciliado Total de Hoy (Semaforizado)</span>
               <span className="font-mono text-3xl font-black text-white block tracking-tighter mt-1">
-                ${(cashTotal + transferTotal + mpTotal).toLocaleString('es-AR')}
+                ${(cashTotal + transferTotal).toLocaleString('es-AR')}
                 <span className="text-xs font-bold text-[#4be277] ml-1 font-sans">ARS</span>
               </span>
               <div className="mt-2.5 flex flex-wrap justify-center gap-2">
@@ -375,7 +368,6 @@ export default function AuditoriaTab({
                   onClick={async () => {
                     setCashTotal(0);
                     setTransferTotal(0);
-                    setMpTotal(0);
                     setLedgerTransactions([]);
                     showToast('Valores de caja restablecidos', 'success');
                     if (isSupabaseConfigured) {
@@ -389,14 +381,14 @@ export default function AuditoriaTab({
               </div>
             </div>
 
-            {/* Columnas de Efectivo, Transferencia y Mercado Pago */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Columnas de Efectivo y Transferencia */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Efectivo */}
               <div className="p-4 bg-zinc-900/60 border border-white/5 rounded-2xl space-y-2 relative group">
                 <div className="flex justify-between items-center">
                   <span className="text-[8.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest font-bold flex items-center gap-1">💸 Efectivo</span>
                   <span className="text-[7.5px] font-mono text-zinc-400 bg-white/5 px-1.5 py-0.5 rounded">
-                    {((cashTotal / (cashTotal + transferTotal + mpTotal || 1)) * 100).toFixed(1)}%
+                    {((cashTotal / (cashTotal + transferTotal || 1)) * 100).toFixed(1)}%
                   </span>
                 </div>
                 <span className="font-mono text-lg font-black text-white block">${cashTotal.toLocaleString('es-AR')}</span>
@@ -438,7 +430,7 @@ export default function AuditoriaTab({
                 <div className="flex justify-between items-center">
                   <span className="text-[8.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest font-bold flex items-center gap-1">🏦 Transferencia</span>
                   <span className="text-[7.5px] font-mono text-[#4be277] bg-[#4be277]/10 px-1.5 py-0.5 rounded border border-[#4be277]/10">
-                    {((transferTotal / (cashTotal + transferTotal + mpTotal || 1)) * 100).toFixed(1)}%
+                    {((transferTotal / (cashTotal + transferTotal || 1)) * 100).toFixed(1)}%
                   </span>
                 </div>
                 <span className="font-mono text-lg font-black text-white block">${transferTotal.toLocaleString('es-AR')}</span>
@@ -474,163 +466,70 @@ export default function AuditoriaTab({
                   </div>
                 </div>
               </div>
-
-              {/* Mercado Pago */}
-              <div className="p-4 bg-zinc-900/60 border border-[#009EE3]/15 rounded-2xl space-y-2 relative group">
-                <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[#009EE3] animate-pulse" />
-                <div className="flex justify-between items-center">
-                  <span className="text-[8.5px] font-black text-[#009EE3] uppercase tracking-widest font-bold flex items-center gap-1">💙 Mercado Pago</span>
-                  <span className="text-[7.5px] font-mono text-[#009EE3] bg-[#009EE3]/10 px-1.5 py-0.5 rounded border border-[#009EE3]/15">
-                    {((mpTotal / (cashTotal + transferTotal + mpTotal || 1)) * 100).toFixed(1)}%
-                  </span>
-                </div>
-                <span className="font-mono text-lg font-black text-[#009EE3] block">${mpTotal.toLocaleString('es-AR')}</span>
-                <div className="flex items-center justify-between gap-1 pt-1">
-                  <span className="text-[7px] font-black text-[#009EE3]/75 uppercase tracking-widest block">Cobros Digitales</span>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setMpTotal(prev => prev + 5000);
-                        showToast('+5.000 ARS Mercado Pago añadido', 'success');
-                        const newTx = { id: `tx_${Date.now()}`, time: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}), detail: 'Ajuste Mercado Pago (+)', method: 'Mercado Pago', amount: 5000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' };
-                        setLedgerTransactions(prev => [newTx, ...prev]);
-                        if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
-                      }}
-                      className="text-[7px] font-black text-white bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-[#009EE3]/25 transition-all"
-                    >
-                      +5k
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        setMpTotal(prev => Math.max(0, prev - 5000));
-                        showToast('-5.000 ARS Mercado Pago ajustado', 'success');
-                        const newTx = { id: `tx_${Date.now()}`, time: new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}), detail: 'Ajuste Mercado Pago (-)', method: 'Mercado Pago', amount: -5000, type: 'mercadopago', labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20' };
-                        setLedgerTransactions(prev => [newTx, ...prev]);
-                        if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
-                      }}
-                      className="text-[7px] font-black text-zinc-400 bg-white/5 hover:bg-white/10 px-1 py-0.5 rounded border border-white/10 transition-all"
-                    >
-                      -5k
-                    </button>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Barra de Distribución Visual Semáforo/Categorizada */}
             {(() => {
-              const total = cashTotal + transferTotal + mpTotal || 1;
+              const total = cashTotal + transferTotal || 1;
               const cp = (cashTotal / total) * 100;
               const tp = (transferTotal / total) * 100;
-              const mpPercentageVal = (mpTotal / total) * 100;
               return (
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap justify-between text-[7px] font-extrabold text-[#bccbb9]/55 uppercase tracking-wider gap-x-3">
                     <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-zinc-500 rounded-full" /> Efectivo ({cp.toFixed(0)}%)</span>
                     <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 bg-[#4be277] rounded-full" /> Transferencia ({tp.toFixed(0)}%)</span>
-                    <span className="flex items-center gap-1 text-[#009EE3]"><span className="w-1.5 h-1.5 bg-[#009EE3] rounded-full" /> Mercado Pago ({mpPercentageVal.toFixed(0)}%)</span>
                   </div>
                   <div className="h-2.5 w-full bg-zinc-950 rounded-full flex overflow-hidden border border-white/5 p-[1.5px]">
                     <div className="h-full bg-zinc-600/70 rounded-l-full transition-all duration-500" style={{ width: `${cp}%` }} />
-                    <div className="h-full bg-[#4be277] transition-all duration-500" style={{ width: `${tp}%` }} />
-                    <div className="h-full bg-[#009EE3] rounded-r-full transition-all duration-500" style={{ width: `${mpPercentageVal}%` }} />
+                    <div className="h-full bg-[#4be277] rounded-r-full transition-all duration-500" style={{ width: `${tp}%` }} />
                   </div>
                 </div>
               );
             })()}
           </div>
 
-          {/* SIMULADOR DE COBROS DIGITALES MERCADO PAGO EN TIEMPO REAL */}
-          <div className="glass-panel rounded-3xl border border-[#009EE3]/15 p-5 bg-gradient-to-br from-zinc-950 via-zinc-950 to-[#009EE3]/5 space-y-4">
+          {/* GUÍA DE VERIFICACIÓN MANUAL DE INGRESOS */}
+          <div className="glass-panel rounded-3xl border border-emerald-500/15 p-5 bg-gradient-to-br from-zinc-950 via-zinc-950 to-emerald-500/5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#009EE3]/15 flex items-center justify-center border border-[#009EE3]/30 shrink-0">
-                  <Smartphone className="w-4 h-4 text-[#009EE3]" />
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center border border-emerald-500/30 shrink-0">
+                  <BookOpen className="w-4 h-4 text-emerald-400" />
                 </div>
                 <div>
-                  <span className="text-[9px] font-black text-[#009EE3] uppercase tracking-widest block font-sans">Pasarela y Simulador IPN / Checkout</span>
-                  <p className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block">Simula cobros en línea automáticos y valida acreditaciones</p>
+                  <span className="text-[9px] font-black text-emerald-400 uppercase tracking-widest block font-sans">Guía de Auditoría & Conciliación Manual</span>
+                  <p className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block">Verificación de transferencias bancarias y cobros físicos en puerta</p>
                 </div>
               </div>
-              <span className="text-[7.5px] text-[#009EE3] bg-[#009EE3]/10 border border-[#009EE3]/25 font-black uppercase px-2 py-0.5 rounded-lg tracking-widest">
-                GATEWAY: SANDBOX SIMULATOR
+              <span className="text-[7.5px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 font-black uppercase px-2 py-0.5 rounded-lg tracking-widest">
+                PROCEDIMIENTO MANUAL ACTIVO
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="text-[8px] font-black text-[#bccbb9]/50 uppercase tracking-wider block mb-1">Nombre Jugador (Abonante)</label>
-                <input 
-                  type="text" 
-                  id="sim_player_name"
-                  defaultValue="Juan Gómez"
-                  className="w-full h-9 bg-black/40 border border-white/10 rounded-xl px-3 text-[10.5px] font-black uppercase tracking-wider text-white outline-none focus:border-[#009EE3]"
-                  placeholder="Juan Gómez"
-                />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-3 bg-white/[0.02] border border-white/5 rounded-2xl space-y-1 text-left">
+                <span className="text-[7.5px] font-black text-emerald-400 uppercase tracking-widest block">1. IMPORTES Y SALDOS</span>
+                <p className="text-[9px] font-semibold text-[#bccbb9]/70 uppercase tracking-wide leading-relaxed">
+                  Confirme que el monto que figura en la captura de pantalla o captura PDF coincida exactamente con el precio estipulado por el turno.
+                </p>
               </div>
-              <div>
-                <label className="text-[8px] font-black text-[#bccbb9]/50 uppercase tracking-wider block mb-1">Monto de Cobro (ARS)</label>
-                <select 
-                  id="sim_charge_amount"
-                  defaultValue="12000"
-                  className="w-full h-9 bg-black/40 border border-white/10 rounded-xl px-3 text-[10.5px] font-black uppercase tracking-wider text-white outline-none focus:border-[#009EE3]"
-                >
-                  <option value="6000" className="bg-zinc-950">Mínimo: $6.000 ARS</option>
-                  <option value="8000" className="bg-zinc-950">Intermedio: $8.000 ARS</option>
-                  <option value="12000" className="bg-zinc-950">Sintética: $12.000 ARS</option>
-                  <option value="15000" className="bg-zinc-950">Premium Turf: $15.000 ARS</option>
-                  <option value="25000" className="bg-zinc-950">Pack Complejo: $25.000 ARS</option>
-                </select>
+
+              <div className="p-3 bg-white/[0.02] border border-white/5 rounded-2xl space-y-1 text-left">
+                <span className="text-[7.5px] font-black text-emerald-500 uppercase tracking-widest block">2. FECHA Y HORA</span>
+                <p className="text-[9px] font-semibold text-[#bccbb9]/70 uppercase tracking-wide leading-relaxed">
+                  Verifique que la transacción se haya realizado dentro de la ventana de tiempo del turno para prevenir el uso de capturas o comprobantes antiguos.
+                </p>
               </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const pInput = document.getElementById('sim_player_name') as HTMLInputElement;
-                    const aInput = document.getElementById('sim_charge_amount') as HTMLSelectElement;
-                    const player = (pInput?.value || 'Juan Gómez').trim().toUpperCase();
-                    const amount = parseInt(aInput?.value || '12000', 10);
-                    
-                    setMpTotal(prev => prev + amount);
-                    
-                    const now = new Date();
-                    const timeStr = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-                    const newTx = {
-                      id: `tx_sim_${Date.now()}`,
-                      time: timeStr,
-                      detail: `${player} • Cancha Sintética (Pago On-Line)`,
-                      method: 'Mercado Pago (Aprobado)',
-                      amount: amount,
-                      type: 'mercadopago',
-                      labelColor: 'text-[#009EE3] bg-[#009EE3]/10 border-[#009EE3]/20 animate-pulse'
-                    };
-                    setLedgerTransactions(prev => [newTx, ...prev]);
-                    if (isSupabaseConfigured) await supabase.from('ledger_transactions').insert([newTx]);
 
-                    const systemWebNotification = {
-                      id: `mp_notkey_${Date.now()}`,
-                      title: 'PAGO AUTOMÁTICO MERCADO PAGO',
-                      body: `Aprobado con Éxito: El jugador ${player} abonó S/. ${(amount / 100).toFixed(2)} (${amount} ARS equivalente) vía la pasarela digital y su reserva fue AUTO-CONFIRMADA inmediatamente en Base de Datos. No requiere validación manual.`,
-                      time: 'Hace un instante',
-                      read: false
-                    };
-                    
-                    if (setNotifications) {
-                      setNotifications((prev: any[]) => [systemWebNotification, ...(prev || [])]);
-                    }
-
-                    showToast(`¡Simulación MP Exitosa! +$${amount.toLocaleString('es-AR')} acreditado.`, 'success');
-                  }}
-                  className="w-full h-9 bg-[#009EE3] hover:bg-sky-500 text-white font-black rounded-xl text-[8.5px] uppercase tracking-widest flex items-center justify-center gap-1.5 transition-all shadow-md shadow-[#009EE3]/15 active:scale-[0.98]"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '4s' }} /> Simular Recibir Pago Mercado Pago
-                </button>
+              <div className="p-3 bg-white/[0.02] border border-white/5 rounded-2xl space-y-1 text-left">
+                <span className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block">3. EMISIÓN DE TICKET</span>
+                <p className="text-[9px] font-semibold text-[#bccbb9]/70 uppercase tracking-wide leading-relaxed">
+                  Presione 'Validar Turno' en la consola para confirmar el pago. Esto envía una alerta push y actualiza la base de datos de manera inmediata.
+                </p>
               </div>
             </div>
-            <div className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest pt-1 flex items-center gap-1.5 leading-relaxed">
-              <span>💡 <strong>PRO TIP:</strong> Tras simular un cobro, se sumará instantáneamente al total recaudado con su respectiva visualización en semáforos, actualizará el ledger inferior, e inyectará una notificación de alerta crítica en el Panel General.</span>
+
+            <div className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest pt-1 flex items-center gap-1.5 leading-relaxed text-left">
+              <span>💡 <strong>AUDITORÍA DE SEGURIDAD:</strong> Todo reajuste de efectivo o transferencia impacta directamente en el arqueo diario consolidado del día y queda registrado en la bitácora criptográfica del sistema.</span>
             </div>
           </div>
 

@@ -52,7 +52,7 @@ const DEFAULT_ITEMS: CantinaItem[] = [
     stock: 3,
     type: 'equipment',
     iconId: 'ball',
-    showInBooking: true
+    showInBooking: false
   },
   {
     id: 'bbq',
@@ -62,6 +62,24 @@ const DEFAULT_ITEMS: CantinaItem[] = [
     type: 'extra',
     iconId: 'bbq',
     showInBooking: true
+  },
+  {
+    id: 'dishwashing',
+    name: 'Servicio de Vajilla y Lavavajilla Completa',
+    price: 20,
+    stock: 5,
+    type: 'extra',
+    iconId: 'dishwashing',
+    showInBooking: true
+  },
+  {
+    id: 'birthday_deco',
+    name: 'Servicio de Cumpleaños / Decoración Especial',
+    price: 50,
+    stock: 5,
+    type: 'extra',
+    iconId: 'birthday_deco',
+    showInBooking: true
   }
 ];
 
@@ -69,14 +87,45 @@ export function getCantinaItems(): CantinaItem[] {
   const stored = localStorage.getItem('ramito_cantina_items');
   if (stored) {
     try {
-      const parsed = JSON.parse(stored);
+      let parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Enforce removal of vests (chalecos no van) as requested
-        const filtered = parsed.filter((item: any) => item.id !== 'vests');
-        if (filtered.length !== parsed.length) {
-          localStorage.setItem('ramito_cantina_items', JSON.stringify(filtered));
+        parsed = parsed.filter((item: any) => item.id !== 'vests');
+        
+        // Ensure new extra items (dishwashing, birthday_deco) exist in stored items
+        const hasDishwashing = parsed.some((item: any) => item.id === 'dishwashing');
+        const hasBirthdayDeco = parsed.some((item: any) => item.id === 'birthday_deco');
+        
+        let changed = false;
+        if (!hasDishwashing) {
+          parsed.push({
+            id: 'dishwashing',
+            name: 'Servicio de Vajilla y Lavavajilla Completa',
+            price: 20,
+            stock: 5,
+            type: 'extra',
+            iconId: 'dishwashing',
+            showInBooking: true
+          });
+          changed = true;
         }
-        return filtered;
+        if (!hasBirthdayDeco) {
+          parsed.push({
+            id: 'birthday_deco',
+            name: 'Servicio de Cumpleaños / Decoración Especial',
+            price: 50,
+            stock: 5,
+            type: 'extra',
+            iconId: 'birthday_deco',
+            showInBooking: true
+          });
+          changed = true;
+        }
+        
+        if (changed || parsed.length !== JSON.parse(stored).length) {
+          localStorage.setItem('ramito_cantina_items', JSON.stringify(parsed));
+        }
+        return parsed;
       }
     } catch {
       // Fallback
@@ -128,7 +177,7 @@ export function getCantinaItems(): CantinaItem[] {
       stock: parseInt(localStorage.getItem('ramito_cantina_stock_ball') || '3', 10),
       type: 'equipment',
       iconId: 'ball',
-      showInBooking: true
+      showInBooking: false
     },
     {
       id: 'bbq',
@@ -137,6 +186,24 @@ export function getCantinaItems(): CantinaItem[] {
       stock: parseInt(localStorage.getItem('ramito_cantina_stock_bbq') || '2', 10),
       type: 'extra',
       iconId: 'bbq',
+      showInBooking: true
+    },
+    {
+      id: 'dishwashing',
+      name: localStorage.getItem('ramito_cantina_name_dishwashing') || 'Servicio de Vajilla y Lavavajilla Completa',
+      price: parseFloat(localStorage.getItem('ramito_cantina_price_dishwashing') || '20'),
+      stock: parseInt(localStorage.getItem('ramito_cantina_stock_dishwashing') || '5', 10),
+      type: 'extra',
+      iconId: 'dishwashing',
+      showInBooking: true
+    },
+    {
+      id: 'birthday_deco',
+      name: localStorage.getItem('ramito_cantina_name_birthday_deco') || 'Servicio de Cumpleaños / Decoración Especial',
+      price: parseFloat(localStorage.getItem('ramito_cantina_price_birthday_deco') || '50'),
+      stock: parseInt(localStorage.getItem('ramito_cantina_stock_birthday_deco') || '5', 10),
+      type: 'extra',
+      iconId: 'birthday_deco',
       showInBooking: true
     }
   ];

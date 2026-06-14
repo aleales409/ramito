@@ -7,6 +7,7 @@ export interface Court {
   type: string;
   features: string[];
   imageUrl: string;
+  policy?: string;
 }
 
 export interface Slot {

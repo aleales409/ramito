@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn, Calendar, Clock, PlayCircle, DollarSign, Power, Globe, Smartphone, Newspaper, Database, HardDrive, Activity, Info, RefreshCw, Sparkles, GlassWater, Flame, Trophy, Shirt, Search, Plus, Minus, ShoppingBag, Check, CloudSun, Footprints } from 'lucide-react';
+import { ShieldCheck, ChevronRight, X, Lock, User, AlertTriangle, UserPlus, Zap, MessageCircle, Key, LogIn, Calendar, Clock, PlayCircle, DollarSign, Power, Globe, Smartphone, Newspaper, Database, HardDrive, Activity, Info, RefreshCw, Sparkles, GlassWater, Flame, Trophy, Shirt, Search, Plus, Minus, ShoppingBag, Check, CloudSun, Footprints, BarChart3, Download } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getCantinaItems } from '../lib/cantina';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -517,8 +517,8 @@ export default function HomeView() {
   const navigate = useNavigate();
   const { 
     eliteKey, vipKey, adminPhone, showToast, webLicenseActive, appLicenseActive, saveSettings, 
-    stadiumName, courts, allBookings, userName, userRole: role, userAvatar, setUserName, setUserRole,
-    cashTotal, transferTotal, mpTotal, cantinaItems 
+    stadiumName, courts, allBookings, setAllBookings, userName, userRole: role, userAvatar, setUserName, setUserRole,
+    cashTotal, transferTotal, cantinaItems 
   } = useApp();
 
   const renderIconById = (iconId?: string) => {
@@ -697,6 +697,21 @@ export default function HomeView() {
   const [quickTeamCancha2, setQuickTeamCancha2] = useState('');
   const [quickTimeCancha2, setQuickTimeCancha2] = useState('60');
 
+  // Estados Alquiler Complejo / Eventos
+  const [showComplexRentalModal, setShowComplexRentalModal] = useState(false);
+  const [eventName, setEventName] = useState('');
+  const [eventType, setEventType] = useState<'torneo' | 'cumple' | 'corporativo' | 'entrenamiento'>('torneo');
+  const [eventDate, setEventDate] = useState('Hoy');
+  const [customDate, setCustomDate] = useState('');
+  const [useCustomDate, setUseCustomDate] = useState(false);
+  const [eventStartSlot, setEventStartSlot] = useState('18:00');
+  const [eventEndSlot, setEventEndSlot] = useState('22:00');
+  const [eventOrganiser, setEventOrganiser] = useState('Administración');
+  const [eventTotalPrice, setEventTotalPrice] = useState('15000');
+  const [eventPaidAmount, setEventPaidAmount] = useState('3000');
+  const [eventPaymentMethod, setEventPaymentMethod] = useState<'cash' | 'transfer'>('cash');
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+
   // Live countdown timer para ambas canchas (Césped vs Sin Césped)
   React.useEffect(() => {
     const timer = setInterval(() => {
@@ -744,9 +759,168 @@ export default function HomeView() {
   const isAdmin = role === 'admin_vip' || role === 'admin_elite';
   const vercelPlan = localStorage.getItem('ramito_vercel_plan') || 'free';
 
-  const totalCaja = cashTotal + transferTotal + mpTotal;
+  const totalCaja = cashTotal + transferTotal;
 
   const formattedCaja = totalCaja > 0 ? `$ ${totalCaja.toLocaleString('es-AR')}` : '$ 0';
+
+  const calculateTotals = () => {
+    let totalBase = 0;
+    let totalExtras = 0;
+    let totalOverall = 0;
+    
+    (allBookings || []).forEach((b: any) => {
+      const cleanAmtStr = (b.amount || '$ 0.00').replace(/[^0-9.]/g, '');
+      const totalVal = parseFloat(cleanAmtStr) || 0;
+      
+      let extrasVal = 0;
+      if (b.extras && Array.isArray(b.extras)) {
+        b.extras.forEach((exName: string) => {
+          if (exName.includes('Hidratación') || exName.includes('Gatorade')) extrasVal += 25;
+          else if (exName.includes('Chalecos')) extrasVal += 15;
+          else if (exName.includes('Pelota') || exName.includes('Balón')) extrasVal += 10;
+          else if (exName.includes('Parrilla')) extrasVal += 30;
+        });
+      } else {
+        const fieldStr = b.field || '';
+        if (fieldStr.includes('HydraPack')) extrasVal += 25;
+        if (fieldStr.includes('Chalecos')) extrasVal += 15;
+        if (fieldStr.includes('Balón')) extrasVal += 10;
+        if (fieldStr.includes('Parrilla')) extrasVal += 30;
+      }
+      
+      totalExtras += extrasVal;
+      totalOverall += totalVal;
+      totalBase += Math.max(0, totalVal - extrasVal - 5); // Base court price
+    });
+    
+    return { totalBase, totalExtras, totalOverall };
+  };
+
+  const { totalBase, totalExtras, totalOverall } = calculateTotals();
+
+  const exportConsolidatedCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "ID,Fecha,Hora,Cancha,Monto,Contratante,Metodo Pago,Consumos Extra,Estado,Creado En\n";
+    
+    (allBookings || []).forEach((b: any) => {
+      const extrasStr = b.extras ? b.extras.join(" | ") : "-";
+      const row = [
+        b.id,
+        `"${b.date}"`,
+        `"${b.time}"`,
+        `"${b.field}"`,
+        `"${b.amount}"`,
+        `"${b.user}"`,
+        b.payment_method === 'cash' ? "Efectivo" : "Transferencia",
+        `"${extrasStr}"`,
+        b.status === 'upcoming' ? "Confirmado" : (b.status === 'pending_approval' ? "Por Validar" : "Pago Pendiente"),
+        b.created_at
+      ].join(",");
+      csvContent += row + "\n";
+    });
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `consolidado_caja_ramito_${new Date().toLocaleDateString().replace(/\//g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    if (showToast) showToast("Consolidado reportivo descargado en CSV", "success");
+  };
+
+  const handleCreateComplexEvent = async () => {
+    if (!eventName.trim()) {
+      if (showToast) showToast('Por favor, ingresa el nombre del evento', 'error');
+      return;
+    }
+
+    setIsCreatingEvent(true);
+
+    try {
+      // Determine date format
+      const finalDate = useCustomDate && customDate 
+        ? customDate 
+        : eventDate;
+
+      // Generate slots to block from start hour to end hour
+      const slotList = ['15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+      const startIndex = slotList.indexOf(eventStartSlot);
+      const endIndex = slotList.indexOf(eventEndSlot);
+      let slotsToBlock: string[] = [];
+
+      if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+        slotsToBlock = slotList.slice(startIndex, endIndex);
+      } else {
+        slotsToBlock = [eventStartSlot];
+      }
+
+      const newBookings: any[] = [];
+      let itemIndex = 0;
+
+      for (const slot of slotsToBlock) {
+        // Cancha 1 • El Maracaná
+        const booking1Id = `evt_c1_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const booking1 = {
+          id: booking1Id,
+          date: finalDate,
+          time: slot,
+          field: 'Cancha 1 • El Maracaná',
+          // Only the first slot's first court carries the amount to prevent duplicate revenues
+          amount: itemIndex === 0 ? `$ ${parseFloat(eventTotalPrice).toFixed(2)}` : '$ 0.00',
+          user: `EVENTO: ${eventName.toUpperCase()} (Org: ${eventOrganiser})`,
+          status: 'upcoming',
+          payment_method: eventPaymentMethod,
+          extras: ['Complejo Alquilado'],
+          extras_delivered: true,
+          created_at: new Date().toISOString()
+        };
+        newBookings.push(booking1);
+        itemIndex++;
+
+        // Cancha 2 • La Bombonera
+        const booking2Id = `evt_c2_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const booking2 = {
+          id: booking2Id,
+          date: finalDate,
+          time: slot,
+          field: 'Cancha 2 • La Bombonera',
+          amount: '$ 0.00',
+          user: `EVENTO: ${eventName.toUpperCase()} (Org: ${eventOrganiser})`,
+          status: 'upcoming',
+          payment_method: eventPaymentMethod,
+          extras: ['Complejo Alquilado'],
+          extras_delivered: true,
+          created_at: new Date().toISOString()
+        };
+        newBookings.push(booking2);
+      }
+
+      // Safe Supabase insert
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.from('bookings').insert(newBookings);
+        if (error) {
+          console.error("Error inserting event bookings to Supabase:", error);
+        }
+      }
+
+      setAllBookings((prev: any[]) => [...prev, ...newBookings]);
+
+      if (showToast) showToast(`¡Complejo alquilado con éxito para "${eventName}"!`, 'success');
+
+      // RESET
+      setEventName('');
+      setEventOrganiser('Administración');
+      setEventTotalPrice('15000');
+      setEventPaidAmount('3000');
+      setShowComplexRentalModal(false);
+    } catch (err) {
+      console.error(err);
+      if (showToast) showToast('Error al procesar el alquiler', 'error');
+    } finally {
+      setIsCreatingEvent(false);
+    }
+  };
 
   // Auto-Login for Master Keys
   React.useEffect(() => {
@@ -1340,70 +1514,122 @@ export default function HomeView() {
             </motion.div>
           </div>
 
-          {/* Caja del día & Cierre emergencia */}
+          {/* Caja del día & Cierre de emergencia */}
           <div className="flex flex-col gap-3">
-            {/* Redesigned Premium "Caja del Día" Bento Card */}
-            <button
-              onClick={() => {
-                navigate('/profile?tab=seguridad');
-                if (showToast) showToast('Redirigiendo a Auditoría de Ingresos...', 'success');
-              }}
-              className="w-full relative overflow-hidden glass-panel p-5 rounded-3xl border border-amber-500/10 bg-gradient-to-br from-white/[0.01] to-white/[0.04] text-left hover:bg-amber-500/[0.03] hover:border-amber-500/30 transition-all duration-300 group outline-none shadow-2xl flex flex-col gap-4"
-            >
-              <div className="absolute -right-10 -bottom-10 w-32 h-32 rounded-full bg-amber-500/5 blur-3xl group-hover:bg-amber-500/10 transition-colors pointer-events-none" />
+            {/* Redesigned Premium "Caja del Día & Extras" Compact Bento Card */}
+            <div className="w-full relative overflow-hidden glass-panel p-4.5 rounded-3xl border border-amber-500/15 bg-gradient-to-br from-white/[0.01] to-white/[0.04] text-left shadow-2xl flex flex-col gap-3.5">
+              <div className="absolute -right-10 -bottom-10 w-32 h-32 rounded-full bg-amber-500/5 blur-3xl pointer-events-none" />
               
-              <div className="flex justify-between items-start w-full">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-center group-hover:scale-105 group-hover:border-amber-500/40 transition-all duration-300">
-                    <DollarSign className="w-5 h-5 text-amber-400 stroke-[1.5]" />
+              <div className="flex justify-between items-center w-full">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl border border-amber-500/20 bg-amber-500/5 flex items-center justify-center">
+                    <DollarSign className="w-4 h-4 text-amber-400 stroke-[1.5]" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.14em] leading-none mb-1">
+                    <span className="text-[9px] font-black text-white/50 uppercase tracking-[0.14em] leading-none mb-0.5">
                       Caja del Día
                     </span>
-                    <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest leading-none">
-                      Métrica consolidada
+                    <span className="text-[7.5px] font-bold text-[#bccbb9]/40 uppercase tracking-widest leading-none">
+                      Métrica consolidada • En Tiempo Real
                     </span>
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/15 px-2.5 py-1 rounded-full">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-[7.5px] font-black text-emerald-400 uppercase tracking-widest font-mono">
-                    En Tiempo Real
-                  </span>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={exportConsolidatedCSV}
+                    className="px-2.5 py-1.5 bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/25 hover:border-[#4be277]/50 text-[#4be277] text-[8px] font-black uppercase tracking-widest rounded-lg flex items-center justify-center gap-1 transition-all active:scale-[0.97] cursor-pointer"
+                    title="Exportar Excel (CSV)"
+                  >
+                    <Download className="w-3 h-3" />
+                    CSV
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate('/profile?tab=seguridad');
+                      if (showToast) showToast('Redirigiendo a Auditoría de Ingresos...', 'success');
+                    }}
+                    className="flex items-center justify-center gap-1 text-amber-400 hover:text-white text-[8px] font-black uppercase tracking-widest transition-all cursor-pointer bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1.5 rounded-lg border border-amber-500/20 hover:border-amber-500/40"
+                  >
+                    Auditar
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-baseline justify-between w-full pt-1">
+              <div className="flex items-baseline justify-between w-full">
                 <div className="flex flex-col">
-                  <span className="text-3xl font-mono font-black text-white tracking-widest leading-none block drop-shadow-[0_2px_10px_rgba(255,255,255,0.05)]">
+                  <span className="text-2xl font-mono font-black text-white tracking-widest leading-none block drop-shadow-[0_2px_10px_rgba(255,255,255,0.05)]">
                     {formattedCaja}
                   </span>
-                  <span className="text-[8px] font-bold text-[#bccbb9]/30 uppercase tracking-wider block mt-1.5">
+                  <span className="text-[7.5px] font-bold text-[#bccbb9]/30 uppercase tracking-wider block mt-1">
                     Pesos Argentinos (ARS)
                   </span>
                 </div>
+                
+                <span className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest font-mono text-right">
+                  Hoy: {allBookings?.filter(b => b.status === 'completed' || b.status === 'upcoming').length || 0} Reservas
+                </span>
+              </div>
 
-                <div className="flex items-center gap-1 text-[#bccbb9]/60 group-hover:text-amber-400 text-[9px] font-black uppercase tracking-widest transition-colors">
-                  Auditar Caja
-                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              {/* CONSOLIDADO DE RECAUDACIÓN POR RESERVAS - MINI GRID */}
+              <div className="border-t border-white/[0.04] pt-3 mt-0.5 space-y-2.5">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-black/25 p-2 rounded-xl border border-white/5 text-left">
+                    <span className="text-[6.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block mb-1">Alquiler</span>
+                    <span className="text-xs font-black text-white font-mono">$ {totalBase.toFixed(2)}</span>
+                  </div>
+                  
+                  <div className="bg-black/25 p-2 rounded-xl border border-white/5 text-left">
+                    <span className="text-[6.5px] font-black text-[#FF9100] uppercase tracking-widest block mb-1">Extras</span>
+                    <span className="text-xs font-black text-[#FF9100] font-mono">+$ {totalExtras.toFixed(2)}</span>
+                  </div>
+
+                  <div className="bg-black/25 p-2 rounded-xl border border-[#4be277]/20 text-left bg-gradient-to-br from-green-500/5 to-transparent">
+                    <span className="text-[6.5px] font-black text-[#4be277] uppercase tracking-widest block mb-1">Bruta Total</span>
+                    <span className="text-xs font-black text-[#4be277] font-mono">$ {totalOverall.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-1">
+                  <Info className="w-3 h-3 text-[#FF9100] shrink-0 mt-0.5 animate-pulse" />
+                  <span className="text-[7px] font-bold uppercase tracking-wider text-[#bccbb9]/40 leading-normal block">
+                    Caja bruta incluye alquiler de canchas, consumos extras, y cargos de servicio ($5 por reserva) sincronizados ({allBookings?.length || 0} de total).
+                  </span>
                 </div>
               </div>
+            </div>
 
-              <div className="w-full border-t border-white/[0.04] pt-3.5 flex flex-wrap justify-between items-center gap-2">
-                <span className="text-[8px] font-bold text-[#bccbb9]/50 uppercase tracking-wider flex items-center gap-1">
-                  <Calendar className="w-3 h-3 text-white/30" />
-                  {allBookings?.filter(b => b.status === 'completed' || b.status === 'upcoming').length || 0} Reservas Hoy
-                </span>
-                <span className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block font-mono">
-                  Complejo Abierto • Turnos Registrados
-                </span>
+            {/* CARD: Alquiler del Complejo / Eventos */}
+            <div 
+              onClick={() => setShowComplexRentalModal(true)}
+              className="w-full glass-panel p-4 rounded-2xl border border-purple-500/25 bg-white/[0.01] hover:bg-purple-500/5 hover:border-purple-500/40 transition-all group cursor-pointer text-left relative overflow-hidden"
+            >
+              {/* Purple radial ambient glow */}
+              <div className="absolute -right-6 -bottom-6 w-20 h-20 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
+              
+              <div className="flex flex-row items-center justify-between w-full">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                    <Trophy className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <div className="flex items-center gap-1.5 leading-none">
+                      <span className="text-[10px] font-black text-[#bccbb9] uppercase tracking-wider leading-none">Alquilar Complejo & Eventos</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse shrink-0" />
+                    </div>
+                    <p className="text-[7.5px] font-bold text-purple-400/75 uppercase tracking-widest mt-1.5">
+                      Bloquear canchas, torneos, cumpleaños y corporativos
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0 pl-2">
+                  <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest block font-mono bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md">
+                    GESTIONAR
+                  </span>
+                </div>
               </div>
-            </button>
+            </div>
 
             <button
               onClick={() => {
@@ -1757,6 +1983,242 @@ export default function HomeView() {
                       className="flex-1 h-9 rounded-xl bg-[#4be277] text-black font-black text-[9px] uppercase tracking-widest hover:opacity-90 transition-all shadow-[0_0_15px_rgba(75,226,119,0.3)]"
                     >
                       Confirmar
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Modal Alquiler de Complejo / Eventos Setup */}
+        <AnimatePresence>
+          {showComplexRentalModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 overflow-y-auto">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowComplexRentalModal(false)}
+                className="absolute inset-0 bg-black/95 backdrop-blur-md"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative w-full max-w-sm glass-panel rounded-3xl p-5 border border-purple-500/30 bg-zinc-950/90 shadow-2xl z-10 my-8 max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h3 className="text-sm font-black text-white uppercase italic tracking-wider mb-4 flex items-center gap-2 border-b border-white/5 pb-2">
+                  <Trophy className="w-4 h-4 text-purple-400" />
+                  <span>Alquilar Complejo / Evento</span>
+                </h3>
+                
+                <div className="space-y-3.5 text-left">
+                  {/* Nombre del Evento */}
+                  <div>
+                    <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Nombre del Evento</label>
+                    <input 
+                      type="text" 
+                      value={eventName} 
+                      onChange={(e) => setEventName(e.target.value)}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white uppercase font-bold focus:border-purple-400 transition-all outline-none"
+                      placeholder="Ej. COPA RAMITO FUT SHOW, CUMPLEAÑOS"
+                    />
+                  </div>
+
+                  {/* Organizador */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Responsable / Org</label>
+                      <input 
+                        type="text" 
+                        value={eventOrganiser} 
+                        onChange={(e) => setEventOrganiser(e.target.value)}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white uppercase font-bold focus:border-purple-400 transition-all outline-none"
+                        placeholder="Ej. Diego"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Tipo de Evento</label>
+                      <select
+                        value={eventType}
+                        onChange={(e) => setEventType(e.target.value as any)}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-2 text-xs text-white font-bold focus:border-purple-400 transition-all outline-none"
+                      >
+                        <option value="torneo" className="bg-zinc-950">Torneo / Campeonato</option>
+                        <option value="cumple" className="bg-zinc-950">Cumpleaños / Fiesta</option>
+                        <option value="corporativo" className="bg-zinc-950">Corporativo / Evento Co</option>
+                        <option value="entrenamiento" className="bg-zinc-950">Entrenamiento Especial</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Programación de Fecha */}
+                  <div>
+                    <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Fecha de Reserva</label>
+                    <div className="flex gap-2">
+                       <button
+                        type="button"
+                        onClick={() => { setUseCustomDate(false); setEventDate('Hoy'); }}
+                        className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                          !useCustomDate && eventDate === 'Hoy'
+                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/35 shadow-inner'
+                            : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                        }`}
+                      >
+                        Hoy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setUseCustomDate(false); setEventDate('Mañana'); }}
+                        className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                          !useCustomDate && eventDate === 'Mañana'
+                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/35 shadow-inner'
+                            : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                        }`}
+                      >
+                        Mañana
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setUseCustomDate(true); }}
+                        className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                          useCustomDate
+                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/35 shadow-inner'
+                            : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                        }`}
+                      >
+                        Calendario
+                      </button>
+                    </div>
+
+                    {useCustomDate && (
+                      <div className="mt-2.5">
+                        <input
+                          type="date"
+                          onChange={(e) => {
+                            const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                            const dateStr = e.target.value; // YYYY-MM-DD
+                            if (dateStr) {
+                              const parts = dateStr.split('-');
+                              if (parts.length === 3) {
+                                const mIdx = parseInt(parts[1], 10) - 1;
+                                const day = parseInt(parts[2], 10);
+                                setCustomDate(`${months[mIdx]} ${day}`);
+                              } else {
+                                setCustomDate(dateStr);
+                              }
+                            }
+                          }}
+                          className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white focus:border-purple-400 transition-all outline-none"
+                        />
+                        {customDate && (
+                          <span className="text-[7.5px] font-bold text-purple-400 uppercase tracking-widest mt-1 block pl-1">
+                            Seleccionado: {customDate}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Horario Bloque */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Hora de Inicio</label>
+                      <select
+                        value={eventStartSlot}
+                        onChange={(e) => setEventStartSlot(e.target.value)}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-2 text-xs text-white font-bold focus:border-purple-400 transition-all outline-none"
+                      >
+                        {['15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'].map(t => (
+                          <option key={t} value={t} className="bg-zinc-950">{t} hs</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Hora de Fin</label>
+                      <select
+                        value={eventEndSlot}
+                        onChange={(e) => setEventEndSlot(e.target.value)}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-2 text-xs text-white font-bold focus:border-purple-400 transition-all outline-none"
+                      >
+                        {['16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'].map(t => (
+                          <option key={t} value={t} className="bg-zinc-950">{t} hs</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Finances */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Precio Alquiler (ARS)</label>
+                      <input 
+                        type="number" 
+                        value={eventTotalPrice} 
+                        onChange={(e) => setEventTotalPrice(e.target.value)}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white font-mono focus:border-purple-400 transition-all outline-none"
+                        placeholder="Monto total"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Seña/Abono (ARS)</label>
+                      <input 
+                        type="number" 
+                        value={eventPaidAmount} 
+                        onChange={(e) => setEventPaidAmount(e.target.value)}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white font-mono focus:border-purple-400 transition-all outline-none"
+                        placeholder="Ej. Pago a cuenta"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Método de captación de seña */}
+                  <div>
+                    <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Canal de Cobro</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEventPaymentMethod('cash')}
+                        className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                          eventPaymentMethod === 'cash'
+                            ? 'bg-[#4be277]/20 text-[#4be277] border-[#4be277]/35'
+                            : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                        }`}
+                      >
+                        Efectivo / Caja
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEventPaymentMethod('transfer')}
+                        className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                          eventPaymentMethod === 'transfer'
+                            ? 'bg-blue-500/20 text-blue-300 border-blue-500/35'
+                            : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                        }`}
+                      >
+                        Transferencia
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => setShowComplexRentalModal(false)}
+                      className="flex-1 h-9 rounded-xl border border-white/10 text-white font-black text-[9px] uppercase tracking-widest hover:bg-white/5 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="button"
+                      disabled={isCreatingEvent}
+                      onClick={handleCreateComplexEvent}
+                      className="flex-1 h-9 rounded-xl bg-purple-500 text-white font-black text-[9px] uppercase tracking-widest hover:opacity-90 transition-all shadow-[0_0_15px_rgba(168,85,247,0.4)] flex items-center justify-center gap-1.5 disabled:opacity-40"
+                    >
+                      {isCreatingEvent ? 'Procesando...' : 'Bloquear Complejo'}
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
                     </button>
                   </div>
                 </div>

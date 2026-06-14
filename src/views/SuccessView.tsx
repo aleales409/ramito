@@ -7,7 +7,7 @@ import { useApp } from '../context/AppContext';
 export default function SuccessView() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setNotifications, setAllBookings, showToast } = useApp();
+  const { setNotifications, setAllBookings, showToast, adminPhone } = useApp();
   
   const bookingStatus = localStorage.getItem('last_booking_status') || 'upcoming';
   const paymentMethod = localStorage.getItem('last_payment_method') || 'cash';
@@ -58,10 +58,10 @@ export default function SuccessView() {
   const handleShareSplitMsg = () => {
     const isCancha1 = bookingData.field?.toUpperCase().includes('CANCHA 1') || bookingData.field?.toUpperCase().includes('MARACANÁ') || !bookingData.field?.toUpperCase().includes('CANCHA 2');
     const courtName = isCancha1 ? 'Cancha 1 • El Maracaná 🏟️' : 'Cancha 2 • La Bombonera 🏟️';
-    const totalCostStr = `$ ${totalCost.toLocaleString('es-AR')}`;
-    const shareAmountStr = `$ ${shareAmount.toLocaleString('es-AR')}`;
+    const totalCostStr = `S/. ${totalCost.toLocaleString('es-PE')}`;
+    const shareAmountStr = `S/. ${shareAmount.toLocaleString('es-PE')}`;
     
-    const textMsg = `¡Muchachos! Ya tenemos reservada la cancha: *${courtName}* 🏟️\n🗓️ *Fecha*: ${bookingData.date}\n⏰ *Horario*: ${bookingData.time} hs\n\nSomos *${playerCount}* jugadores en total, por lo que nos toca pagar *${shareAmountStr}* a cada uno para la cancha. 💰 ¡No falten! ⚽🏆\n\n_(Monto total: ${totalCostStr})_\n_Enviado desde Ramito Fut Show_`;
+    const textMsg = `¡Muchachos! Ya tenemos reservada la cancha: *${courtName}* 🏟️\n🗓️ *Fecha*: ${bookingData.date}\n⏰ *Horario*: ${bookingData.time} hs\n\nSomos *${playerCount}* jugadores en total, por lo que nos toca pagar *${shareAmountStr}* a cada uno para la cancha. 💰 ¡No falten! ⚽🏆\n\n📲 *Pagar vía Yape/Plin* al número: *${adminPhone}*\n\n_(Monto total: ${totalCostStr})_\n_Enviado desde Ramito Fut Show_`;
     
     if (navigator.clipboard) {
       navigator.clipboard.writeText(textMsg);
@@ -191,7 +191,7 @@ export default function SuccessView() {
             <div className="text-right flex flex-col justify-center">
               <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block leading-none mb-1">Cuota por Jugador</span>
               <span className="text-xl font-black text-[#4be277] font-mono block leading-none mt-1">
-                $ {shareAmount.toLocaleString('es-AR')}
+                S/. {shareAmount.toLocaleString('es-PE')}
               </span>
               <span className="text-[7px] font-bold text-[#bccbb9]/30 uppercase tracking-wide block mt-1.5">
                 Neto unitario exacto

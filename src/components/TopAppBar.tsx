@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export default function TopAppBar() {
-  const { marqueeText, secondaryMarqueeText, schedule, showToast, userName, userRole: role, setUserName, setUserRole, setUserAvatar, emergencyMode, emergencyMessage } = useApp();
+  const { marqueeText, secondaryMarqueeText, schedule, showToast, userName, userRole: role, setUserName, setUserRole, setUserAvatar, emergencyMode, emergencyMessage, isOnline, pendingSyncCount, triggerManualSync } = useApp();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [autoMarquee, setAutoMarquee] = useState(marqueeText);
@@ -177,6 +177,38 @@ export default function TopAppBar() {
           )}
         </div>
         <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+          {/* Badge de Conectividad / Sincronización */}
+          {!isOnline ? (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full border bg-amber-500/10 border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.1)] animate-pulse">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-amber-500"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-[0.05em] text-amber-500">
+                Offline
+              </span>
+            </div>
+          ) : pendingSyncCount > 0 ? (
+            <button 
+              onClick={triggerManualSync}
+              className="flex items-center gap-2 px-3 py-1 rounded-full border bg-sky-500/15 border-sky-500/30 hover:bg-sky-500/25 shadow-[0_0_10px_rgba(14,165,233,0.1)] transition-all cursor-pointer group"
+            >
+              <RefreshCw className="w-3 h-3 text-sky-400 animate-spin group-hover:scale-105 transition-transform" />
+              <span className="text-[9px] font-black uppercase tracking-[0.05em] text-sky-400">
+                Sync ({pendingSyncCount})
+              </span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-white/5 bg-white/[0.02] text-zinc-500">
+              <span className="relative flex h-1 w-1">
+                <span className="relative inline-flex rounded-full h-1 w-1 bg-zinc-600"></span>
+              </span>
+              <span className="text-[8px] font-bold uppercase tracking-[0.05em]">
+                Online
+              </span>
+            </div>
+          )}
+
           <div className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-colors ${
             displayIsOpen ? 'bg-[#4be277]/10 border-[#4be277]/20 shadow-[0_0_10px_rgba(75,226,119,0.1)]' : 'bg-red-500/10 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.1)] animate-pulse'
           }`}>

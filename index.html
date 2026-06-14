@@ -1,31 +1,13 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#121414" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="icon" type="image/png" href="/logo-ramito.png" />
-    <link rel="apple-touch-icon" href="/logo-ramito.png" />
-    <title>Ramito Fut Show</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
   </head>
   <body>
-    <script>
-      window.addEventListener('error', function(event) {
-        var rootEl = document.getElementById('root');
-        if (rootEl && (!rootEl.innerHTML || rootEl.innerHTML === '')) {
-          rootEl.innerHTML = '<div style="background:#0c0e0e;color:#ef4444;font-family:monospace;padding:2rem;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:left;max-width:600px;margin:0 auto;box-sizing:border-box;"><h1 style="color:#fff;font-size:1.5rem;margin-bottom:1rem;font-weight:bold">⚠️ Error de Carga Inicial</h1><p style="color:#bccbb9;font-size:0.85rem;margin-bottom:1.5rem">Falló la carga inicial del código de la aplicación. Esto suele ocurrir cuando hay un error en tiempo de ejecución o una variable no definida en el navegador.</p><div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:0.75rem;padding:1rem;width:100%;overflow-x:auto;font-size:0.8rem;line-height:1.5;box-sizing:border-box;"><strong>Mensaje:</strong> ' + event.message + '<br><strong>Origen:</strong> ' + event.filename + ':' + event.lineno + ':' + event.colno + '</div></div>';
-        }
-      });
-      window.addEventListener('unhandledrejection', function(event) {
-        var rootEl = document.getElementById('root');
-        if (rootEl && (!rootEl.innerHTML || rootEl.innerHTML === '')) {
-          rootEl.innerHTML = '<div style="background:#0c0e0e;color:#ef4444;font-family:monospace;padding:2rem;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:left;max-width:600px;margin:0 auto;box-sizing:border-box;"><h1 style="color:#fff;font-size:1.5rem;margin-bottom:1rem;font-weight:bold">⚠️ Error de Promesa No Controlada</h1><p style="color:#bccbb9;font-size:0.85rem;margin-bottom:1.5rem">Se produjo un error de promesa asíncrona no controlada durante el arranque.</p><div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:0.75rem;padding:1rem;width:100%;overflow-x:auto;font-size:0.8rem;line-height:1.5;box-sizing:border-box;"><strong>Motivo:</strong> ' + (event.reason ? (event.reason.message || String(event.reason)) : 'Desconocido') + '</div></div>';
-        }
-      });
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+

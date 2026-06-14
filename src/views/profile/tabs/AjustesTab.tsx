@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { 
   Settings, Power, ChevronRight, RefreshCw, Database, 
-  Info, GlassWater, Activity 
+  Info, GlassWater, Activity, Trophy 
 } from 'lucide-react';
 import { getActiveAccountIndex } from '../../../lib/transferRotation';
 
@@ -10,36 +10,30 @@ interface AjustesTabProps {
   emergencyMode: boolean;
   transferAlias1: string;
   transferAlias2: string;
-  court1Policy: string;
-  court2Policy: string;
   cantinaItemsCount: number;
   setShowEmergencyWindow: (show: boolean) => void;
   setShowTransferWindow: (show: boolean) => void;
   setShowStorageBackupWindow: (show: boolean) => void;
-  setShowCourt1PolicyWindow: (show: boolean) => void;
-  setShowCourt2PolicyWindow: (show: boolean) => void;
   setShowCantinaWindow: (show: boolean) => void;
   setShowAnalyticsWindow: (show: boolean) => void;
   setShowDiagnosticsWindow: (show: boolean) => void;
   runDiagnostics: () => void;
+  setShowComplexRentalModal?: (show: boolean) => void;
 }
 
 export default function AjustesTab({
   emergencyMode,
   transferAlias1,
   transferAlias2,
-  court1Policy,
-  court2Policy,
   cantinaItemsCount,
   setShowEmergencyWindow,
   setShowTransferWindow,
   setShowStorageBackupWindow,
-  setShowCourt1PolicyWindow,
-  setShowCourt2PolicyWindow,
   setShowCantinaWindow,
   setShowAnalyticsWindow,
   setShowDiagnosticsWindow,
-  runDiagnostics
+  runDiagnostics,
+  setShowComplexRentalModal
 }: AjustesTabProps) {
   return (
     <motion.div
@@ -163,69 +157,7 @@ export default function AjustesTab({
         </div>
       </button>
 
-      {/* BOTÓN RESTRICCIONES Y POLÍTICAS DE CANCHA 1 (CÉSPED) */}
-      <button
-        onClick={() => setShowCourt1PolicyWindow(true)}
-        className="w-full text-left glass-panel rounded-3xl border border-white/5 p-5 relative overflow-hidden group hover:border-[#4be277]/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-zinc-950/80 to-zinc-950/40 shadow-lg"
-      >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-[#4be277]/5 rounded-full blur-3xl pointer-events-none group-hover:bg-[#4be277]/10 transition-all duration-500" />
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-[#4be277]/10 border-[#4be277]/20 text-[#4be277] group-hover:bg-[#4be277]/20 group-hover:border-[#4be277]/40 transition-all duration-300">
-              <Info className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-[#4be277] transition-colors">
-                Políticas de Reglas - Cancha 1 (Césped)
-              </span>
-              <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
-                RESTRICCIONES DE BOTINES • REGULATION WARNINGS • MENSAJE PERSISTIDO EN RESERVAS
-              </p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="w-2 h-2 rounded-full bg-[#4be277] animate-pulse" />
-                <span className="text-[8px] font-black uppercase tracking-wider font-mono text-[#bccbb9]/70 truncate max-w-[200px] sm:max-w-md block select-none">
-                  {court1Policy}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
-            <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-        </div>
-      </button>
 
-      {/* BOTÓN RESTRICCIONES Y POLÍTICAS DE CANCHA 2 (SIN CÉSPED) */}
-      <button
-        onClick={() => setShowCourt2PolicyWindow(true)}
-        className="w-full text-left glass-panel rounded-3xl border border-white/5 p-5 relative overflow-hidden group hover:border-amber-500/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-zinc-950/80 to-zinc-950/40 shadow-lg"
-      >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/10 transition-all duration-500" />
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-amber-500/10 border-amber-500/20 text-amber-500 group-hover:bg-amber-500/20 group-hover:border-amber-500/40 transition-all duration-300">
-              <Info className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-amber-500 transition-colors">
-                Políticas de Reglas - Cancha 2 (Sin Césped)
-              </span>
-              <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
-                CALZADO DE SUELA LISA • LOSA DEPORTIVA • RESTRICCIONES DE BOTINES CON COCÓS
-              </p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[8px] font-black uppercase tracking-wider font-mono text-[#bccbb9]/70 truncate max-w-[200px] sm:max-w-md block select-none">
-                  {court2Policy}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
-            <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-        </div>
-      </button>
 
       {/* BOTÓN CONFIGURACIÓN DE CANTINA & MINI-SHOP */}
       <button
@@ -281,6 +213,38 @@ export default function AjustesTab({
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-[8px] font-black uppercase tracking-wider font-mono text-emerald-400">
                   MONITOREO DE SATURACIÓN ACTIVO • VER PATRONES DE DEMANDA DE RESERVAS
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="w-9 h-9 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[#bccbb9] group-hover:text-white transition-all shrink-0">
+            <ChevronRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+          </div>
+        </div>
+      </button>
+
+      {/* BOTÓN ALQUILER DE COMPLEJO / EVENTOS */}
+      <button
+        onClick={() => setShowComplexRentalModal?.(true)}
+        className="w-full text-left glass-panel rounded-3xl border border-white/5 p-5 relative overflow-hidden group hover:border-purple-500/60 active:scale-[0.98] transition-all duration-300 bg-gradient-to-r from-zinc-950/80 to-zinc-950/40 shadow-lg"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none group-hover:bg-purple-500/10 transition-all duration-500" />
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border bg-purple-500/10 border-purple-500/20 text-purple-400 group-hover:bg-purple-500/20 group-hover:border-purple-500/40 transition-all duration-300">
+              <Trophy className="w-6 h-6 animate-pulse" />
+            </div>
+            <div>
+              <span className="text-[12px] font-black text-white uppercase tracking-wider block italic group-hover:text-purple-400 transition-colors">
+                Alquilar Complejo / Evento Especial
+              </span>
+              <p className="text-[8.5px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-1 leading-relaxed">
+                BLOQUEO MASIVO DE HORARIOS • GESTIONAR TORNEOS, CUMPLEAÑOS Y CORPORATIVOS
+              </p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                <span className="text-[8px] font-black uppercase tracking-wider font-mono text-purple-400">
+                  CRONOGRAMA DE BLOQUEOS ACTIVO • EVITAR RESERVAS SUPERPUESTAS
                 </span>
               </div>
             </div>

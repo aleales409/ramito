@@ -30,8 +30,8 @@ export default function ProfileView() {
     emergencyType, setEmergencyType,
     emergencyMessage, setEmergencyMessage, notifications, setNotifications, stadiumName, setStadiumName, 
     marqueeText, setMarqueeText, secondaryMarqueeText, setSecondaryMarqueeText, setUserAvatar, 
-    setUserName, setUserRole, allBookings, 
-    cashTotal, setCashTotal, transferTotal, setTransferTotal, mpTotal, setMpTotal, 
+    setUserName, setUserRole, allBookings, setAllBookings, 
+    cashTotal, setCashTotal, transferTotal, setTransferTotal, 
     ledgerTransactions, setLedgerTransactions, cantinaItems, setCantinaItems 
   } = useApp();
   
@@ -63,6 +63,113 @@ export default function ProfileView() {
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Estados Alquiler Complejo / Eventos
+  const [showComplexRentalModal, setShowComplexRentalModal] = useState(false);
+  const [eventName, setEventName] = useState('');
+  const [eventType, setEventType] = useState<'torneo' | 'cumple' | 'corporativo' | 'entrenamiento'>('torneo');
+  const [eventDate, setEventDate] = useState('Hoy');
+  const [customDate, setCustomDate] = useState('');
+  const [useCustomDate, setUseCustomDate] = useState(false);
+  const [eventStartSlot, setEventStartSlot] = useState('18:00');
+  const [eventEndSlot, setEventEndSlot] = useState('22:00');
+  const [eventOrganiser, setEventOrganiser] = useState('Administración');
+  const [eventTotalPrice, setEventTotalPrice] = useState('15000');
+  const [eventPaidAmount, setEventPaidAmount] = useState('3000');
+  const [eventPaymentMethod, setEventPaymentMethod] = useState<'cash' | 'transfer'>('cash');
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+
+  const handleCreateComplexEvent = async () => {
+    if (!eventName.trim()) {
+      if (showToast) showToast('Por favor, ingresa el nombre del evento', 'error');
+      return;
+    }
+
+    setIsCreatingEvent(true);
+
+    try {
+      // Determine date format
+      const finalDate = useCustomDate && customDate 
+        ? customDate 
+        : eventDate;
+
+      // Generate slots to block from start hour to end hour
+      const slotList = ['15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'];
+      const startIndex = slotList.indexOf(eventStartSlot);
+      const endIndex = slotList.indexOf(eventEndSlot);
+      let slotsToBlock: string[] = [];
+
+      if (startIndex !== -1 && endIndex !== -1 && startIndex < endIndex) {
+        slotsToBlock = slotList.slice(startIndex, endIndex);
+      } else {
+        slotsToBlock = [eventStartSlot];
+      }
+
+      const newBookings: any[] = [];
+      let itemIndex = 0;
+
+      for (const slot of slotsToBlock) {
+        // Cancha 1 • El Maracaná
+        const booking1Id = `evt_c1_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const booking1 = {
+          id: booking1Id,
+          date: finalDate,
+          time: slot,
+          field: 'Cancha 1 • El Maracaná',
+          amount: itemIndex === 0 ? `$ ${parseFloat(eventTotalPrice).toFixed(2)}` : '$ 0.00',
+          user: `EVENTO: ${eventName.toUpperCase()} (Org: ${eventOrganiser})`,
+          status: 'upcoming',
+          payment_method: eventPaymentMethod,
+          extras: ['Complejo Alquilado'],
+          extras_delivered: true,
+          created_at: new Date().toISOString()
+        };
+        newBookings.push(booking1);
+        itemIndex++;
+
+        // Cancha 2 • La Bombonera
+        const booking2Id = `evt_c2_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const booking2 = {
+          id: booking2Id,
+          date: finalDate,
+          time: slot,
+          field: 'Cancha 2 • La Bombonera',
+          amount: '$ 0.00',
+          user: `EVENTO: ${eventName.toUpperCase()} (Org: ${eventOrganiser})`,
+          status: 'upcoming',
+          payment_method: eventPaymentMethod,
+          extras: ['Complejo Alquilado'],
+          extras_delivered: true,
+          created_at: new Date().toISOString()
+        };
+        newBookings.push(booking2);
+      }
+
+      // Safe Supabase insert
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.from('bookings').insert(newBookings);
+        if (error) {
+          console.error("Error inserting event bookings to Supabase:", error);
+        }
+      }
+
+      setAllBookings((prev: any[]) => [...prev, ...newBookings]);
+
+      if (showToast) showToast(`¡Complejo alquilado con éxito para "${eventName}"!`, 'success');
+
+      // RESET
+      setEventName('');
+      setEventOrganiser('Administración');
+      setEventTotalPrice('15000');
+      setEventPaidAmount('3000');
+      setShowComplexRentalModal(false);
+    } catch (err) {
+      console.error(err);
+      if (showToast) showToast('Error al procesar el alquiler', 'error');
+    } finally {
+      setIsCreatingEvent(false);
+    }
+  };
 
   // Separate Windows (Ventanas) for each Admin and License
   const [showWebWindow, setShowWebWindow] = useState(() => {
@@ -476,7 +583,7 @@ export default function ProfileView() {
   };
 
   const exportToExcelReport = (range: 'mensual' | 'trimestral') => {
-    const totalCaja = cashTotal + transferTotal + mpTotal;
+    const totalCaja = cashTotal + transferTotal;
     
     let csvContent = "\uFEFF"; // Add UTF-8 BOM so Excel opens accented characters flawlessly
     
@@ -489,7 +596,6 @@ export default function ProfileView() {
     csvContent += "Medio de Pago;Monto Registrado;Porcentaje\n";
     csvContent += `Efectivo (Cash);$ ${cashTotal.toLocaleString('es-AR')};${((cashTotal / (totalCaja || 1)) * 100).toFixed(1)}%\n`;
     csvContent += `Transferencias Bancarias;$ ${transferTotal.toLocaleString('es-AR')};${((transferTotal / (totalCaja || 1)) * 100).toFixed(1)}%\n`;
-    csvContent += `Mercado Pago;$ ${mpTotal.toLocaleString('es-AR')};${((mpTotal / (totalCaja || 1)) * 100).toFixed(1)}%\n`;
     csvContent += `TOTAL CONSOLIDADO CAJA;$ ${totalCaja.toLocaleString('es-AR')};100%\n\n`;
 
     csvContent += "=== HISTORIAL CRONOLÓGICO DE AUDITORÍA ===\n";
@@ -526,10 +632,9 @@ export default function ProfileView() {
     const reportedLogs = auditLogs.slice(0, logsQty);
 
     // Dynamic totals
-    const totalCaja = cashTotal + transferTotal + mpTotal;
+    const totalCaja = cashTotal + transferTotal;
     const cashPercentage = ((cashTotal / (totalCaja || 1)) * 100).toFixed(1);
     const transferPercentage = ((transferTotal / (totalCaja || 1)) * 100).toFixed(1);
-    const mpPercentage = ((mpTotal / (totalCaja || 1)) * 100).toFixed(1);
 
     const reportWindow = window.open('', '_blank');
     if (!reportWindow) {
@@ -550,7 +655,7 @@ export default function ProfileView() {
               line-height: 1.4;
             }
             .header-container {
-              border-bottom: 3px solid #009EE3;
+              border-bottom: 3px solid #10b981;
               padding-bottom: 20px;
               margin-bottom: 30px;
               display: flex;
@@ -568,7 +673,7 @@ export default function ProfileView() {
             .main-subtitle {
               font-size: 11px;
               font-weight: bold;
-              color: #009EE3;
+              color: #10b981;
               text-transform: uppercase;
               letter-spacing: 2px;
               margin-top: 4px;
@@ -588,12 +693,12 @@ export default function ProfileView() {
               color: #0f172a;
               margin-top: 30px;
               margin-bottom: 12px;
-              border-left: 4px solid #009EE3;
+              border-left: 4px solid #10b981;
               padding-left: 10px;
             }
             .stats-grid {
               display: grid;
-              grid-template-columns: repeat(4, 1fr);
+              grid-template-columns: repeat(3, 1fr);
               gap: 15px;
               margin-bottom: 25px;
             }
@@ -604,8 +709,8 @@ export default function ProfileView() {
               background-color: #f8fafc;
             }
             .stat-box.highlight {
-              border: 1px solid #009EE3;
-              background-color: #f0f9ff;
+              border: 1px solid #10b981;
+              background-color: #f0fdf4;
             }
             .stat-label {
               font-size: 9px;
@@ -621,7 +726,7 @@ export default function ProfileView() {
               margin-top: 5px;
             }
             .stat-value.highlight-text {
-              color: #009EE3;
+              color: #10b981;
             }
             table {
               width: 100%;
@@ -727,7 +832,7 @@ export default function ProfileView() {
             <div class="meta-info">
               <div>Rango: Reporte Histórico de ${daysFiltered} Días</div>
               <div>Emisión: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
-              <div>ID Operación: MP-AUDIT-TX-${Date.now()}</div>
+              <div>ID Operación: AUDIT-TX-${Date.now()}</div>
             </div>
           </div>
 
@@ -738,9 +843,9 @@ export default function ProfileView() {
               <p>Móvil PWA: ${appOfflineCache}</p>
             </div>
             <div class="meta-column">
-              <h5>Pasarela Homologada</h5>
-              <p>Servicio: Mercado Pago SDK v2 (Producción)</p>
-              <p>Gateway IPN Callback: HTTPS POST webhook_ok</p>
+              <h5>Sistemas de Pago Directo</h5>
+              <p>Modalidades adm.: Efectivo y Transferencia Directa</p>
+              <p>Validación: Conciliación de cuentas manual</p>
             </div>
             <div class="meta-column">
               <h5>Estado de Caja</h5>
@@ -762,10 +867,6 @@ export default function ProfileView() {
             <div class="stat-box">
               <div class="stat-label">Bancos Directo</div>
               <div class="stat-value">$${transferTotal.toLocaleString('es-AR')} (${transferPercentage}%)</div>
-            </div>
-            <div class="stat-box">
-              <div class="stat-label">Cobros Mercado Pago</div>
-              <div class="stat-value">$${mpTotal.toLocaleString('es-AR')} (${mpPercentage}%)</div>
             </div>
           </div>
 
@@ -1612,17 +1713,6 @@ export default function ProfileView() {
                   <Settings className="w-3 h-3 animate-spin duration-3000" />
                   Configurar Cuenta
                 </button>
-                
-                {!(userRole === 'admin_elite' || userRole === 'admin_vip') && (
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 hover:border-red-500/40 rounded-xl text-[8.5px] font-black uppercase tracking-widest italic font-sans transition-all active:scale-[0.97]"
-                  >
-                    <LogOut className="w-3 h-3" />
-                    Cerrar Sesión
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -1733,18 +1823,15 @@ export default function ProfileView() {
               emergencyMode={emergencyMode}
               transferAlias1={transferAlias1}
               transferAlias2={transferAlias2}
-              court1Policy={court1Policy}
-              court2Policy={court2Policy}
               cantinaItemsCount={cantinaItems?.length ?? 0}
               setShowEmergencyWindow={setShowEmergencyWindow}
               setShowTransferWindow={setShowTransferWindow}
               setShowStorageBackupWindow={setShowStorageBackupWindow}
-              setShowCourt1PolicyWindow={setShowCourt1PolicyWindow}
-              setShowCourt2PolicyWindow={setShowCourt2PolicyWindow}
               setShowCantinaWindow={setShowCantinaWindow}
               setShowAnalyticsWindow={setShowAnalyticsWindow}
               setShowDiagnosticsWindow={setShowDiagnosticsWindow}
               runDiagnostics={runDiagnostics}
+              setShowComplexRentalModal={setShowComplexRentalModal}
             />
           </Suspense>
         )}
@@ -4496,249 +4583,6 @@ export default function ProfileView() {
                   <Save className="w-4 h-4" /> Guardar y Sincronizar Tienda
                 </button>
               </div>
-
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Ventana de Políticas y Advertencias de Cancha 1 */}
-      <AnimatePresence>
-        {showCourt1PolicyWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
-            {/* Background elements */}
-            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#4be277]/5 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-emerald-600/5 rounded-full blur-[120px] pointer-events-none" />
-
-            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-[#4be277]/10 border border-[#4be277]/20 flex items-center justify-center shrink-0">
-                    <Info className="w-6 h-6 text-[#4be277] animate-pulse" />
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Políticas de Reglas - Cancha 1 (Césped)</h4>
-                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
-                      CONFIGURACIÓN DE ADVERTENCIAS PARA EL USO ADECUADO DE LOS BOTINES Y CUALQUIER DIRECTRIZ DE CÉSPED
-                    </span>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setShowCourt1PolicyWindow(false)}
-                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {isReadOnly && (
-                <div className="p-5 mb-8 bg-zinc-950/60 w-full rounded-3xl border border-red-500/20 space-y-4 text-left shadow-lg relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl pointer-events-none" />
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
-                      <AlertTriangle className="w-5 h-5 text-red-500" />
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-black text-red-500 tracking-wider flex items-center gap-1.5 italic uppercase">
-                        <Crown className="w-3.5 h-3.5 text-red-500 inline shrink-0" strokeWidth={2.5} />
-                        MODO DE SÓLO LECTURA (VIP ADMIN)
-                      </span>
-                      <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
-                        No posees permisos de Élite para modificar el mensaje o normativa de la Cancha 1 en producción. Contacta al Administrador Principal para solicitar delegación de cambios.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Form Container */}
-              <div className="space-y-6 flex-1 text-left animate-fade-in">
-                <div className="glass-panel p-6 rounded-3xl border border-white/5 space-y-4 bg-zinc-900/20">
-                  <span className="text-[10px] font-black text-[#4be277] uppercase tracking-wider block italic">Mensaje de Advertencia Activo</span>
-                  <p className="text-[9.5px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
-                    Este mensaje se mostrará a todos los usuarios antes de confirmar su turno de reserva para la Cancha 1 (Césped). Se utiliza principalmente para detallar las normas como calzado prohibido (v.g. botines con tapones o chimpunes de cocos grandes), cancelaciones y cuidados.
-                  </p>
-
-                  <div className="space-y-2 pt-2 font-sans">
-                    <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block font-sans">Mensaje de la Normativa</label>
-                    <textarea
-                      rows={4}
-                      disabled={isReadOnly}
-                      value={court1Policy}
-                      onChange={(e) => setCourt1Policy(e.target.value)}
-                      placeholder="Escribe la política o advertencia aquí..."
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-white focus:border-[#4be277] transition-all outline-none font-bold placeholder-zinc-700 hover:border-[#4be277]/30 uppercase leading-relaxed font-sans"
-                    />
-                  </div>
-                  
-                  {/* Vista Previa en Tiempo Real */}
-                  <div className="pt-4 border-t border-white/5 font-sans">
-                    <span className="text-[9px] font-black text-[#bccbb9]/40 uppercase tracking-wider block mb-2 font-sans">Vista Previa Visual del Mensaje en Reserva de Cancha 1</span>
-                    <div className="bg-[#1e2020] rounded-2xl p-4 flex gap-4 border border-white/5">
-                      <Info className="w-5 h-5 text-[#4be277] flex-shrink-0" />
-                      <div>
-                        <p className="text-[10px] font-semibold text-[#bccbb9] leading-relaxed uppercase tracking-wider font-sans">
-                          {court1Policy || 'SIN CONTENIDO CONFIGURADO'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form Footer Buttons */}
-              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3 mt-8">
-                <button 
-                  onClick={() => setShowCourt1PolicyWindow(false)}
-                  className="flex-1 h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
-                >
-                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Consola Principal
-                </button>
-                <button 
-                  disabled={isReadOnly}
-                  onClick={() => {
-                    localStorage.setItem('ramito_court1_policy', court1Policy);
-                    
-                    addAuditLog(
-                      'ACTUALIZACIÓN POLÍTICAS DE CANCHA 1', 
-                      `El operador actualizó la normativa de Cancha 1: "${court1Policy.substring(0, 100)}...".`, 
-                      'success'
-                    );
-                    
-                    if (showToast) showToast('Normativa de Cancha 1 guardada con éxito', 'success');
-                    setShowCourt1PolicyWindow(false);
-                  }}
-                  className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 ${
-                    isReadOnly 
-                      ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
-                      : 'bg-[#4be277] text-black hover:opacity-90 shadow-[0_0_20px_rgba(75,226,119,0.3)]'
-                  }`}
-                >
-                  <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Reglas'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Ventana de Políticas y Advertencias de Cancha 2 */}
-      <AnimatePresence>
-        {showCourt2PolicyWindow && (
-          <div className="fixed inset-0 z-[100] flex flex-col bg-zinc-950 overflow-y-auto overflow-x-hidden w-full h-full no-scrollbar">
-            {/* Background elements */}
-            <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-yellow-600/5 rounded-full blur-[120px] pointer-events-none" />
-
-            <div className="relative w-full max-w-4xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-1 justify-between">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                    <Info className="w-6 h-6 text-amber-500 animate-pulse" />
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">Políticas de Reglas - Cancha 2 (Sin Césped)</h4>
-                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
-                      CONFIGURACIÓN DE ADVERTENCIAS PARA EL USO ADECUADO DE LA LOSA DEPORTIVA (FUTSAL / MULTIUSO)
-                    </span>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setShowCourt2PolicyWindow(false)}
-                  className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-lg shrink-0"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {isReadOnly && (
-                <div className="p-5 mb-8 bg-zinc-950/60 w-full rounded-3xl border border-red-500/20 space-y-4 text-left shadow-lg relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full blur-2xl pointer-events-none" />
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
-                      <AlertTriangle className="w-5 h-5 text-red-500" />
-                    </div>
-                    <div>
-                      <span className="text-[11px] font-black text-red-500 tracking-wider flex items-center gap-1.5 italic uppercase">
-                        <Crown className="w-3.5 h-3.5 text-red-500 inline shrink-0" strokeWidth={2.5} />
-                        MODO DE SÓLO LECTURA (VIP ADMIN)
-                      </span>
-                      <p className="text-[9px] font-bold text-[#bccbb9]/60 uppercase tracking-widest mt-0.5 leading-relaxed">
-                        No posees permisos de Élite para modificar el mensaje o normativa de la Cancha 2 en producción. Contacta al Administrador Principal para solicitar delegación de cambios.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Form Container */}
-              <div className="space-y-6 flex-1 text-left animate-fade-in">
-                <div className="glass-panel p-6 rounded-3xl border border-white/5 space-y-4 bg-zinc-900/20">
-                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-wider block italic">Mensaje de Advertencia Activo</span>
-                  <p className="text-[9.5px] font-bold text-[#bccbb9]/50 uppercase tracking-wide leading-relaxed">
-                    Este mensaje se mostrará a todos los usuarios antes de confirmar su turno de reserva para la Cancha 2 (Sin Césped / Losa). Se utiliza principalmente para detallar las normas como exigir calzado con suela lisa de goma (futsal / zapatillas comunes), prohibición rigurosa de botines con cocós o tapones, cancelaciones y cuidados.
-                  </p>
-
-                  <div className="space-y-2 pt-2 font-sans">
-                    <label className="text-[9px] font-black text-[#bccbb9]/60 uppercase tracking-wider block font-sans">Mensaje de la Normativa</label>
-                    <textarea
-                      rows={4}
-                      disabled={isReadOnly}
-                      value={court2Policy}
-                      onChange={(e) => setCourt2Policy(e.target.value)}
-                      placeholder="Escribe la política o advertencia aquí..."
-                      className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-xs text-white focus:border-amber-500 transition-all outline-none font-bold placeholder-zinc-700 hover:border-amber-500/30 uppercase leading-relaxed font-sans"
-                    />
-                  </div>
-                  
-                  {/* Vista Previa en Tiempo Real */}
-                  <div className="pt-4 border-t border-white/5 font-sans">
-                    <span className="text-[9px] font-black text-[#bccbb9]/40 uppercase tracking-wider block mb-2 font-sans">Vista Previa Visual del Mensaje en Reserva de Cancha 2</span>
-                    <div className="bg-[#1e2020] rounded-2xl p-4 flex gap-4 border border-white/5">
-                      <Info className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                      <div>
-                        <p className="text-[10px] font-semibold text-[#bccbb9] leading-relaxed uppercase tracking-wider font-sans">
-                          {court2Policy || 'SIN CONTENIDO CONFIGURADO'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form Footer Buttons */}
-              <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row gap-3 mt-8">
-                <button 
-                  onClick={() => setShowCourt2PolicyWindow(false)}
-                  className="flex-1 h-14 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 font-black text-[10px] uppercase tracking-widest transition-all text-center italic flex items-center justify-center gap-2"
-                >
-                  <ArrowRight className="w-4 h-4 rotate-180" /> Regresar a Consola Principal
-                </button>
-                <button 
-                  disabled={isReadOnly}
-                  onClick={() => {
-                    localStorage.setItem('ramito_court2_policy', court2Policy);
-                    
-                    addAuditLog(
-                      'ACTUALIZACIÓN POLÍTICAS DE CANCHA 2', 
-                      `El operador actualizó la normativa de Cancha 2: "${court2Policy.substring(0, 100)}...".`, 
-                      'success'
-                    );
-                    
-                    if (showToast) showToast('Normativa de Cancha 2 guardada con éxito', 'success');
-                    setShowCourt2PolicyWindow(false);
-                  }}
-                  className={`flex-1 h-14 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 ${
-                    isReadOnly 
-                      ? 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 cursor-not-allowed shadow-none' 
-                      : 'bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/25 hover:border-[#4be277]/50 text-[#4be277] hover:border-[#4be277]/60 shadow-[0_0_20px_rgba(75,226,119,0.15)]'
-                  }`}
-                >
-                  <Save className="w-4 h-4" /> {isReadOnly ? 'Guardar Desactivado (Lectura VIP)' : 'Guardar y Sincronizar Reglas'}
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -5599,6 +5443,242 @@ export default function ProfileView() {
           </div>
         </div>
       )}
+
+      {/* Modal Alquiler de Complejo / Eventos Setup */}
+      <AnimatePresence>
+        {showComplexRentalModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowComplexRentalModal(false)}
+              className="absolute inset-0 bg-black/95 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-sm glass-panel rounded-3xl p-5 border border-purple-500/30 bg-zinc-950/90 shadow-2xl z-10 my-8 max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-black text-white uppercase italic tracking-wider mb-4 flex items-center gap-2 border-b border-white/5 pb-2">
+                <Trophy className="w-4 h-4 text-purple-400" />
+                <span>Alquilar Complejo / Evento</span>
+              </h3>
+              
+              <div className="space-y-3.5 text-left">
+                {/* Nombre del Evento */}
+                <div>
+                  <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Nombre del Evento</label>
+                  <input 
+                    type="text" 
+                    value={eventName} 
+                    onChange={(e) => setEventName(e.target.value)}
+                    className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white uppercase font-bold focus:border-purple-400 transition-all outline-none"
+                    placeholder="Ej. COPA RAMITO FUT SHOW, CUMPLEAÑOS"
+                  />
+                </div>
+
+                {/* Organizador */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Responsable / Org</label>
+                    <input 
+                      type="text" 
+                      value={eventOrganiser} 
+                      onChange={(e) => setEventOrganiser(e.target.value)}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white uppercase font-bold focus:border-purple-400 transition-all outline-none"
+                      placeholder="Ej. Diego"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Tipo de Evento</label>
+                    <select
+                      value={eventType}
+                      onChange={(e) => setEventType(e.target.value as any)}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-2 text-xs text-white font-bold focus:border-purple-400 transition-all outline-none"
+                    >
+                      <option value="torneo" className="bg-zinc-950">Torneo / Campeonato</option>
+                      <option value="cumple" className="bg-zinc-950">Cumpleaños / Fiesta</option>
+                      <option value="corporativo" className="bg-zinc-950">Corporativo / Evento Co</option>
+                      <option value="entrenamiento" className="bg-zinc-950">Entrenamiento Especial</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Programación de Fecha */}
+                <div>
+                  <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Fecha de Reserva</label>
+                  <div className="flex gap-2">
+                     <button
+                      type="button"
+                      onClick={() => { setUseCustomDate(false); setEventDate('Hoy'); }}
+                      className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                        !useCustomDate && eventDate === 'Hoy'
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/35 shadow-inner'
+                          : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                      }`}
+                    >
+                      Hoy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setUseCustomDate(false); setEventDate('Mañana'); }}
+                      className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                        !useCustomDate && eventDate === 'Mañana'
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/35 shadow-inner'
+                          : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                      }`}
+                    >
+                      Mañana
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setUseCustomDate(true); }}
+                      className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                        useCustomDate
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/35 shadow-inner'
+                          : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                      }`}
+                    >
+                      Calendario
+                    </button>
+                  </div>
+
+                  {useCustomDate && (
+                    <div className="mt-2.5">
+                      <input
+                        type="date"
+                        onChange={(e) => {
+                          const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                          const dateStr = e.target.value; // YYYY-MM-DD
+                          if (dateStr) {
+                            const parts = dateStr.split('-');
+                            if (parts.length === 3) {
+                              const mIdx = parseInt(parts[1], 10) - 1;
+                              const day = parseInt(parts[2], 10);
+                              setCustomDate(`${months[mIdx]} ${day}`);
+                            } else {
+                              setCustomDate(dateStr);
+                            }
+                          }
+                        }}
+                        className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white focus:border-purple-400 transition-all outline-none"
+                      />
+                      {customDate && (
+                        <span className="text-[7.5px] font-bold text-purple-400 uppercase tracking-widest mt-1 block pl-1">
+                          Seleccionado: {customDate}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Horario Bloque */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Hora de Inicio</label>
+                    <select
+                      value={eventStartSlot}
+                      onChange={(e) => setEventStartSlot(e.target.value)}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-2 text-xs text-white font-bold focus:border-purple-400 transition-all outline-none"
+                    >
+                      {['15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'].map(t => (
+                        <option key={t} value={t} className="bg-zinc-950">{t} hs</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Hora de Fin</label>
+                    <select
+                      value={eventEndSlot}
+                      onChange={(e) => setEventEndSlot(e.target.value)}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-2 text-xs text-white font-bold focus:border-purple-400 transition-all outline-none"
+                    >
+                      {['16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00', '23:00'].map(t => (
+                        <option key={t} value={t} className="bg-zinc-950">{t} hs</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Finances */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Precio Alquiler (ARS)</label>
+                    <input 
+                      type="number" 
+                      value={eventTotalPrice} 
+                      onChange={(e) => setEventTotalPrice(e.target.value)}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white font-mono focus:border-purple-400 transition-all outline-none"
+                      placeholder="Monto total"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Seña/Abono (ARS)</label>
+                    <input 
+                      type="number" 
+                      value={eventPaidAmount} 
+                      onChange={(e) => setEventPaidAmount(e.target.value)}
+                      className="w-full bg-black/60 border border-white/10 rounded-xl h-9 px-3 text-xs text-white font-mono focus:border-purple-400 transition-all outline-none"
+                      placeholder="Ej. Pago a cuenta"
+                    />
+                  </div>
+                </div>
+
+                {/* Método de captación de seña */}
+                <div>
+                  <label className="text-[8px] font-black text-[#bccbb9]/60 uppercase tracking-widest mb-1 block">Canal de Cobro</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEventPaymentMethod('cash')}
+                      className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                        eventPaymentMethod === 'cash'
+                          ? 'bg-[#4be277]/20 text-[#4be277] border-[#4be277]/35'
+                          : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                      }`}
+                    >
+                      Efectivo / Caja
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEventPaymentMethod('transfer')}
+                      className={`flex-1 h-8 text-[9px] font-black uppercase tracking-wider rounded-lg border transition-all ${
+                        eventPaymentMethod === 'transfer'
+                          ? 'bg-blue-500/20 text-blue-300 border-blue-500/35'
+                          : 'bg-black/40 border-white/5 text-[#bccbb9]/50 hover:bg-black/60'
+                      }`}
+                    >
+                      Transferencia
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => setShowComplexRentalModal(false)}
+                    className="flex-1 h-9 rounded-xl border border-white/10 text-white font-black text-[9px] uppercase tracking-widest hover:bg-white/5 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="button"
+                    disabled={isCreatingEvent}
+                    onClick={handleCreateComplexEvent}
+                    className="flex-1 h-9 rounded-xl bg-purple-500 text-white font-black text-[9px] uppercase tracking-widest hover:opacity-90 transition-all shadow-[0_0_15px_rgba(168,85,247,0.4)] flex items-center justify-center gap-1.5 disabled:opacity-40"
+                  >
+                    {isCreatingEvent ? 'Procesando...' : 'Bloquear Complejo'}
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

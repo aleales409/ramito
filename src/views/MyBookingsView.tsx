@@ -43,6 +43,7 @@ import { useApp } from '../context/AppContext';
 import { getCantinaItems, saveCantinaItems } from '../lib/cantina';
 import NotificationBell from '../components/NotificationBell';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { enqueueOperation } from '../lib/syncQueue';
 
 const USER_AVATARS: Record<string, string> = {
   'CARLOS MENDOZA': 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="2" y="2" width="96" height="96" rx="28" fill="%23141616" fill-opacity="0.8" stroke="%23FBBF24" stroke-width="2" stroke-opacity="0.3"/><path d="M 35,30 L 65,30 A 15,15 0 0,1 50,60 A 15,15 0 0,1 35,30 Z" fill="%23FBBF24" fill-opacity="0.1" stroke="%23FBBF24" stroke-width="2"/><path d="M 35,38 H 28 A 5,5 0 0,1 28,48 H 35" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 65,38 H 72 A 5,5 0 0,0 72,48 H 65" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,60 V 70 M 40,70 H 60" fill="none" stroke="%23FBBF24" stroke-width="2"/><path d="M 50,16 L 52,21 L 57,21 L 53,24 L 55,29 L 50,26 L 45,29 L 47,24 L 43,21 L 48,21 Z" fill="%23FBBF24" fill-opacity="0.2" stroke="%23FBBF24" stroke-width="1"/></svg>', // Mundial Oro
@@ -91,7 +92,7 @@ const generateMockReceiptUrl = (user: string, amount: string, bookingId: string)
 
 export default function MyBookingsView() {
   const navigate = useNavigate();
-  const { allBookings, setAllBookings, notifications, setNotifications, showToast, userName, userRole: role, userAvatar, emergencyMode } = useApp();
+  const { allBookings, setAllBookings, notifications, setNotifications, showToast, userName, userRole: role, userAvatar, emergencyMode, adminPhone } = useApp();
   
   const isAdmin = role === 'admin_elite' || role === 'admin_vip';
 
@@ -106,75 +107,8 @@ export default function MyBookingsView() {
     return USER_AVATARS[cleanName] || null;
   };
 
-  const [showConsolidation, setShowConsolidation] = useState(false);
   const [activeSplitBookingId, setActiveSplitBookingId] = useState<string | null>(null);
   const [splitPlayerCount, setSplitPlayerCount] = useState<number>(10);
-
-  const calculateTotals = () => {
-    let totalBase = 0;
-    let totalExtras = 0;
-    let totalOverall = 0;
-    
-    (allBookings || []).forEach((b: any) => {
-      const cleanAmtStr = (b.amount || '$ 0.00').replace(/[^0-9.]/g, '');
-      const totalVal = parseFloat(cleanAmtStr) || 0;
-      
-      let extrasVal = 0;
-      if (b.extras && Array.isArray(b.extras)) {
-        b.extras.forEach((exName: string) => {
-          if (exName.includes('Hidratación') || exName.includes('Gatorade')) extrasVal += 25;
-          else if (exName.includes('Chalecos')) extrasVal += 15;
-          else if (exName.includes('Pelota') || exName.includes('Balón')) extrasVal += 10;
-          else if (exName.includes('Parrilla')) extrasVal += 30;
-        });
-      } else {
-        const fieldStr = b.field || '';
-        if (fieldStr.includes('HydraPack')) extrasVal += 25;
-        if (fieldStr.includes('Chalecos')) extrasVal += 15;
-        if (fieldStr.includes('Balón')) extrasVal += 10;
-        if (fieldStr.includes('Parrilla')) extrasVal += 30;
-      }
-      
-      totalExtras += extrasVal;
-      totalOverall += totalVal;
-      totalBase += Math.max(0, totalVal - extrasVal - 5); // Base court price
-    });
-    
-    return { totalBase, totalExtras, totalOverall };
-  };
-
-  const { totalBase, totalExtras, totalOverall } = calculateTotals();
-
-  const exportConsolidatedCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "ID,Fecha,Hora,Cancha,Monto,Contratante,Metodo Pago,Consumos Extra,Estado,Creado En\n";
-    
-    (allBookings || []).forEach((b: any) => {
-      const extrasStr = b.extras ? b.extras.join(" | ") : "-";
-      const row = [
-        b.id,
-        `"${b.date}"`,
-        `"${b.time}"`,
-        `"${b.field}"`,
-        `"${b.amount}"`,
-        `"${b.user}"`,
-        b.payment_method === 'cash' ? "Efectivo" : "Transferencia",
-        `"${extrasStr}"`,
-        b.status === 'upcoming' ? "Confirmado" : (b.status === 'pending_approval' ? "Por Validar" : "Pago Pendiente"),
-        b.created_at
-      ].join(",");
-      csvContent += row + "\n";
-    });
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `consolidado_caja_ramito_${new Date().toLocaleDateString().replace(/\//g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast("Consolidado reportivo descargado en CSV", "success");
-  };
 
   // Synchronize notifications on mount to show pending receipt alerts in the bell
   useEffect(() => {
@@ -478,14 +412,27 @@ export default function MyBookingsView() {
   const approvePayment = async (id: string) => {
     const booking = bookings.find((b: any) => b.id === id);
     
+    let syncNeeded = false;
     try {
       if (isSupabaseConfigured) {
-        const { error } = await supabase
-          .from('bookings')
-          .update({ status: 'upcoming' })
-          .eq('id', id);
+        if (navigator.onLine) {
+          const { error } = await supabase
+            .from('bookings')
+            .update({ status: 'upcoming' })
+            .eq('id', id);
 
-        if (error) throw error;
+          if (error) {
+            console.error('Error approving payment on Supabase:', error);
+            syncNeeded = true;
+          }
+        } else {
+          syncNeeded = true;
+        }
+
+        if (syncNeeded) {
+          enqueueOperation('bookings', 'update', { status: 'upcoming' }, { key: 'id', value: id });
+          showToast('Pago aprobado localmente (pendiente de sincronización)', 'success');
+        }
       }
 
       setAllBookings((prev: any) => prev.map((b: any) => 
@@ -503,10 +450,12 @@ export default function MyBookingsView() {
         ...prev
       ]);
       
-      showToast('¡Reserva aprobada y confirmada con éxito!', 'success');
+      if (!syncNeeded) {
+        showToast('¡Reserva aprobada y confirmada con éxito!', 'success');
+      }
     } catch (err) {
       console.error('Error approving payment:', err);
-      showToast('Error al actualizar en la base de datos', 'error');
+      showToast('Error al actualizar la reserva', 'error');
     }
   };
 
@@ -587,72 +536,7 @@ export default function MyBookingsView() {
         </div>
       </div>
 
-      {/* CORRELATION & BOX CONSOLIDATION (Only Admins) */}
-      {isAdmin && (
-        <section className="bg-[#1a1c1c]/40 border border-white/5 p-4 sm:p-5 rounded-3xl space-y-4 mb-4 text-left">
-          <div className="flex justify-between items-center">
-            <button
-              onClick={() => setShowConsolidation(!showConsolidation)}
-              className="flex items-center gap-2 text-white hover:text-[#FF9100] transition-colors focus:outline-none"
-            >
-              <BarChart3 className="w-5 h-5 text-[#FF9100]" />
-              <div className="text-left">
-                <span className="text-xs font-black uppercase italic tracking-wider block">Consolidado de Caja & Extras</span>
-                <span className="text-[8px] font-bold uppercase tracking-widest text-[#bccbb9]/50 font-mono">
-                  HISTORIAL & METRICAS DE FACTURACIÓN
-                </span>
-              </div>
-              {showConsolidation ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-            </button>
 
-            <button
-              onClick={exportConsolidatedCSV}
-              className="px-3.5 py-1.5 bg-[#4be277]/10 hover:bg-[#4be277]/20 border border-[#4be277]/25 hover:border-[#4be277]/50 text-[#4be277] text-[8.5px] font-black uppercase tracking-widest rounded-xl italic flex items-center gap-1.5 transition-all active:scale-[0.97]"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Exportar Excel (CSV)
-            </button>
-          </div>
-
-          {showConsolidation && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="space-y-4 pt-3 border-t border-white/5 overflow-hidden"
-            >
-              <div className="grid grid-cols-2 xs:grid-cols-3 gap-3">
-                <div className="bg-black/35 p-3.5 rounded-2xl border border-white/5 text-left">
-                  <span className="text-[7.5px] font-black text-[#bccbb9]/40 uppercase tracking-widest block mb-0.5">ALQUILER CANCHAS</span>
-                  <span className="text-base font-black text-white font-mono">$ {totalBase.toFixed(2)}</span>
-                </div>
-                
-                <div className="bg-black/35 p-3.5 rounded-2xl border border-white/5 text-left">
-                  <span className="text-[7.5px] font-black text-[#FF9100] uppercase tracking-widest block mb-0.5">INGRESOS EXTRAS</span>
-                  <span className="text-base font-black text-[#FF9100] font-mono">+$ {totalExtras.toFixed(2)}</span>
-                </div>
-
-                <div className="bg-black/35 p-3.5 rounded-2xl border border-[#4be277]/20 text-left col-span-2 xs:col-span-1 bg-gradient-to-br from-green-500/5 to-transparent">
-                  <span className="text-[7.5px] font-black text-[#4be277] uppercase tracking-widest block mb-0.5">CAJA BRUTA TOTAL</span>
-                  <span className="text-base font-black text-[#4be277] font-mono">$ {totalOverall.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="p-3 bg-white/[0.02] border border-white/5 rounded-2xl flex flex-col xs:flex-row justify-between items-start xs:items-center gap-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Info className="w-3.5 h-3.5 text-[#FF9100] shrink-0 animate-pulse" />
-                  <span className="text-[8px] font-bold uppercase tracking-wider text-[#bccbb9]/60 leading-normal">
-                    La caja bruta incluye Alquileres, Consumos Extras cargados, y cargos por servicio ($5.00) por reserva.
-                  </span>
-                </div>
-                <span className="text-[8px] font-mono font-bold text-white uppercase bg-white/5 px-2 py-1 border border-white/5 rounded shrink-0 leading-none">
-                  Sincronizado {allBookings.length} Reservas
-                </span>
-              </div>
-            </motion.div>
-          )}
-        </section>
-      )}
 
       {/* CONTROL DE ENTREGAS & CANTINA (Only Admins) */}
       {isAdmin && (
@@ -997,6 +881,16 @@ export default function MyBookingsView() {
                       <p className="text-[9px] text-[#bccbb9]/85 font-medium uppercase tracking-wide leading-relaxed">
                         {courtDetail.rules}
                       </p>
+                      
+                      <div className="mt-2.5 pt-2 border-t border-white/5 space-y-1 text-left">
+                        <span className="text-[7.5px] font-black text-[#4be277] uppercase tracking-wider block">⚽ EQUIPAMIENTO INCLUIDO EN EL TURNO</span>
+                        <p className="text-[8.5px] text-zinc-300 font-bold uppercase tracking-wide leading-snug">
+                          La pelota oficial de juego y 6 chaquetas distintivas están incluidas con el pago total de tu reserva confirmada.
+                        </p>
+                        <p className="text-[7.5px] text-[#4be277]/95 font-semibold uppercase tracking-wide leading-snug">
+                          ⚠️ Se agradece retornar la pelota y las chaquetas a la recepción al finalizar el partido tal como fueron entregadas en mano.
+                        </p>
+                      </div>
                     </div>
                   </div>
 
@@ -1530,7 +1424,7 @@ export default function MyBookingsView() {
                                 <div className="text-right">
                                   <span className="text-[7px] font-bold text-[#bccbb9]/40 uppercase tracking-widest block leading-none mb-1">Cuota por Jugador</span>
                                   <span className="text-xs font-black text-[#4be277] font-mono block leading-none">
-                                    $ {Math.ceil(((() => {
+                                    S/. {Math.ceil(((() => {
                                       const amt = booking.amount || '';
                                       let cleaned = amt;
                                       if (cleaned.includes('.')) {
@@ -1543,7 +1437,7 @@ export default function MyBookingsView() {
                                       const digitsOnly = cleaned.replace(/\D/g, '');
                                       const val = parseInt(digitsOnly, 10);
                                       return isNaN(val) ? 35000 : val;
-                                    })() / splitPlayerCount)).toLocaleString('es-AR')}
+                                    })() / splitPlayerCount)).toLocaleString('es-PE')}
                                   </span>
                                   <span className="text-[6px] font-bold text-[#bccbb9]/30 uppercase tracking-tight block mt-1">
                                     Neto unitario exacto
@@ -1570,10 +1464,10 @@ export default function MyBookingsView() {
                                   const totalAmountVal = isNaN(parseInt(digitsOnly, 10)) ? 35000 : parseInt(digitsOnly, 10);
                                   const perPlayerShare = Math.ceil(totalAmountVal / splitPlayerCount);
                                   
-                                  const shareAmountStr = `$ ${perPlayerShare.toLocaleString('es-AR')}`;
-                                  const totalCostStr = `$ ${totalAmountVal.toLocaleString('es-AR')}`;
+                                  const shareAmountStr = `S/. ${perPlayerShare.toLocaleString('es-PE')}`;
+                                  const totalCostStr = `S/. ${totalAmountVal.toLocaleString('es-PE')}`;
                                   
-                                  const textMsg = `¡Muchachos! Ya tenemos reservada la cancha: *${cName}* 🏟️\n🗓️ *Fecha*: ${booking.date}\n⏰ *Horario*: ${booking.time} hs\n\nSomos *${splitPlayerCount}* jugadores en total, por lo que nos toca pagar *${shareAmountStr}* a cada uno para la cancha. 💰 ¡No falten! ⚽🏆\n\n_(Monto total: ${totalCostStr})_\n_Enviado desde Ramito Fut Show_`;
+                                  const textMsg = `¡Muchachos! Ya tenemos reservada la cancha: *${cName}* 🏟️\n🗓️ *Fecha*: ${booking.date}\n⏰ *Horario*: ${booking.time} hs\n\nSomos *${splitPlayerCount}* jugadores en total, por lo que nos toca pagar *${shareAmountStr}* a cada uno para la cancha. 💰 ¡No falten! ⚽🏆\n\n📲 *Pagar vía Yape/Plin* al número: *${adminPhone}*\n\n_(Monto total: ${totalCostStr})_\n_Enviado desde Ramito Fut Show_`;
                                   
                                   if (navigator.clipboard) {
                                     navigator.clipboard.writeText(textMsg);
@@ -1837,24 +1731,26 @@ export default function MyBookingsView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[250] bg-zinc-950 flex flex-col w-full h-full overflow-y-auto select-none"
+            className="fixed inset-0 z-[250] bg-zinc-950 flex flex-col w-full h-screen max-h-screen overflow-hidden select-none"
           >
             {/* Ambient glows behind fullscreen content */}
             <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-amber-500/5 rounded-full blur-[150px] pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-[150px] pointer-events-none" />
 
-            <div className="relative w-full max-w-7xl mx-auto flex flex-col pt-16 pb-6 px-6 md:pt-20 md:pb-10 md:px-10 flex-grow min-h-screen justify-between">
+            <div className="relative w-full max-w-7xl mx-auto flex flex-col pt-3 pb-3 px-4 md:pt-4 md:pb-4 md:px-8 h-full max-h-screen flex-grow justify-between min-h-0 overflow-hidden">
               
               {/* Header block */}
-              <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
+              <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-3">
                 <div className="flex items-center gap-4 text-left">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-                    <CreditCard className="w-6 h-6 text-amber-500 animate-pulse" />
+                  <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                    <CreditCard className="w-5 h-5 text-amber-500 animate-pulse" />
                   </div>
                   <div>
-                    <h4 className="text-lg font-black text-white uppercase tracking-wider italic">CONSOLA DE VALIDACIÓN DE COMPROBANTES</h4>
-                    <span className="text-[9px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
-                      OPERACIONES DE REVISIÓN Y REGISTRO EN TIEMPO REAL - SISTEMA ELITE
+                    <h4 className="text-base font-black text-white uppercase tracking-wider italic">
+                      {isAdmin ? "CONSOLA DE VALIDACIÓN DE COMPROBANTES" : "DETALLE DEL COMPROBANTE CARGADO"}
+                    </h4>
+                    <span className="text-[8px] font-bold text-[#bccbb9]/40 uppercase tracking-widest mt-0.5 block">
+                      {isAdmin ? "OPERACIONES DE REVISIÓN Y REGISTRO EN TIEMPO REAL - SISTEMA ELITE" : "ESTADO DE REVISIÓN Y COORDINACIÓN DE TURNO"}
                     </span>
                   </div>
                 </div>
@@ -1862,25 +1758,25 @@ export default function MyBookingsView() {
                 {/* Safe Close X Button */}
                 <button 
                   onClick={() => setViewingBookingReceipt(null)}
-                  className="w-12 h-12 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-all active:scale-95"
+                  className="w-11 h-11 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-[#bccbb9] hover:text-white transition-all border border-white/5 shadow-all active:scale-95"
                   title="Regresar a reservas"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Central split layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch flex-grow mb-8">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-stretch flex-grow min-h-0 mb-3 h-[calc(100vh-140px)] overflow-hidden">
                 
                 {/* Left: Beautiful large scaled receipt preview */}
-                <div className="lg:col-span-7 flex flex-col bg-black/40 border border-white/5 p-6 rounded-[2.5rem] justify-center items-center relative overflow-hidden">
+                <div className="lg:col-span-7 flex flex-col bg-black/40 border border-white/5 p-4 rounded-[2rem] justify-center items-center relative overflow-hidden h-[45vh] lg:h-full">
                   <div className="absolute top-3 left-6">
                     <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block italic">
                       {viewingBookingReceipt.isPdf ? '📄 DOCUMENTO PDF INTERACTIVO' : '📸 CAPTURA ORIGINAL CARGADA POR JUGADOR'}
                     </span>
                   </div>
                   
-                  <div className="w-full flex-grow flex items-center justify-center py-6">
+                  <div className="w-full flex-grow flex items-center justify-center py-4 min-h-0 overflow-hidden">
                     {viewingBookingReceipt.isPdf ? (
                       <div className="flex flex-col items-center justify-center p-8 bg-zinc-955/65 rounded-[2rem] border border-red-500/15 max-w-sm text-center space-y-5 shadow-2xl">
                         <div className="w-20 h-20 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.15)] animate-bounce">
@@ -1906,72 +1802,74 @@ export default function MyBookingsView() {
                       <img 
                         src={viewingBookingReceipt.receiptUrl || 'https://images.unsplash.com/photo-1554224155-1696413565d3?auto=format&fit=crop&q=80&w=600'} 
                         alt="Comprobante original" 
-                        className="max-w-full max-h-[60vh] rounded-2xl object-contain border border-white/10 shadow-3xl select-all hover:scale-[1.02] transition-transform duration-300 pointer-events-auto"
+                        className="max-w-full max-h-[35vh] lg:max-h-[62vh] rounded-2xl object-contain border border-white/10 shadow-3xl select-all hover:scale-[1.01] transition-transform duration-300 pointer-events-auto"
                       />
                     )}
                   </div>
 
-                  <div className="w-full text-center mt-2">
+                  <div className="w-full text-center mt-2 shrink-0">
                     <span className="text-[8px] font-bold text-[#bccbb9]/40 tracking-widest uppercase mb-1 block">
                       EL SISTEMA PERMITE VISUALIZAR CAPTURAS DIRECTAS O DESCARGAR PDFS SEGURAS
                     </span>
-                    <span className="text-[8.5px] font-bold text-[#bccbb9]/40 tracking-widest uppercase">
+                    <span className="text-[8px] font-bold text-[#bccbb9]/40 tracking-widest uppercase block">
                       Deslice o pellizque la imagen para ampliar en dispositivos móviles si es necesario
                     </span>
                   </div>
                 </div>
 
                 {/* Right: Validation metadata and actions panel */}
-                <div className="lg:col-span-5 flex flex-col justify-between bg-zinc-900/30 border border-white/5 p-6 md:p-8 rounded-[2.5rem] relative">
-                  <div>
-                    <span className="text-[10px] font-black text-purple-400 uppercase tracking-wider block italic mb-4">
-                      📋 METADATOS Y REVISIÓN ADMINISTRATIVA
+                <div className="lg:col-span-5 flex flex-col justify-between bg-zinc-900/30 border border-white/5 p-4 md:p-5 rounded-[2rem] relative overflow-y-auto no-scrollbar min-h-0 lg:max-h-full">
+                  <div className="space-y-4">
+                    <span className="text-[9px] font-black text-purple-400 uppercase tracking-wider block italic">
+                      {isAdmin ? '📋 METADATOS Y REVISIÓN ADMINISTRATIVA' : '📋 DETALLES DE TRANSACCIÓN Y COMPROBANTE'}
                     </span>
 
                     {/* Metadata fields stacked details list */}
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       
                       {/* Remitente block */}
-                      <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex gap-3.5 items-center text-left">
-                        <div className="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
-                          <User className="w-5 h-5 text-purple-400" />
+                      <div className="bg-black/40 rounded-2xl p-3 border border-white/5 flex gap-3 items-center text-left">
+                        <div className="w-8 h-8 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0">
+                          <User className="w-4.5 h-4.5 text-purple-400" />
                         </div>
                         <div>
-                          <span className="text-[8.5px] font-black text-[#bccbb9]/40 tracking-wider block uppercase">CLIENTE / JUGADOR</span>
-                          <span className="text-sm font-black text-white uppercase italic tracking-wide mt-0.5 block">
+                          <span className="text-[8px] font-black text-[#bccbb9]/40 tracking-wider block uppercase">CLIENTE / JUGADOR</span>
+                          <span className="text-xs font-black text-white uppercase italic tracking-wide mt-0.5 block">
                             {viewingBookingReceipt.user}
                           </span>
                         </div>
                       </div>
 
-                      {/* Contact block with direct WhatsApp Link */}
-                      <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex gap-3.5 items-center text-left">
-                        <div className="w-9 h-9 rounded-xl bg-green-500/10 flex items-center justify-center shrink-0">
-                          <Share2 className="w-5 h-5 text-[#4be277]" />
+                      {/* Contact block with direct WhatsApp Link - Only visible to Admins as requested */}
+                      {isAdmin && (
+                        <div className="bg-black/40 rounded-2xl p-3 border border-white/5 flex gap-3 items-center text-left">
+                          <div className="w-8 h-8 rounded-xl bg-green-500/10 flex items-center justify-center shrink-0">
+                            <Share2 className="w-4.5 h-4.5 text-[#4be277]" />
+                          </div>
+                          <div className="flex-grow min-w-0">
+                            <span className="text-[8px] font-black text-[#bccbb9]/40 tracking-wider block uppercase">CONTACTO DEL JUGADOR</span>
+                            <span className="text-xs font-black text-white uppercase tracking-wide mt-0.5 block truncate">
+                              {viewingBookingReceipt.phone || '+51 987 654 321'}
+                            </span>
+                          </div>
+                          <a 
+                            href={`https://wa.me/${(viewingBookingReceipt.phone || '51987654321').replace(/[^0-9]/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2.5 py-1.5 bg-[#4be277]/10 hover:bg-[#4be277] text-[#4be277] hover:text-black font-black text-[9px] uppercase tracking-wider rounded-xl transition-all"
+                          >
+                            Chat
+                          </a>
                         </div>
-                        <div className="flex-grow min-w-0">
-                          <span className="text-[8.5px] font-black text-[#bccbb9]/40 tracking-wider block uppercase">CONTACTO DEL JUGADOR</span>
-                          <span className="text-xs font-black text-white uppercase tracking-wide mt-0.5 block truncate">
-                            {viewingBookingReceipt.phone || '+51 987 654 321'}
-                          </span>
-                        </div>
-                        <a 
-                          href={`https://wa.me/${(viewingBookingReceipt.phone || '51987654321').replace(/[^0-9]/g, '')}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-2 bg-[#4be277]/10 hover:bg-[#4be277] text-[#4be277] hover:text-black font-black text-[9px] uppercase tracking-wider rounded-xl transition-all"
-                        >
-                          Enviar chat
-                        </a>
-                      </div>
+                      )}
 
                       {/* Cancha block */}
-                      <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex gap-3.5 items-center text-left">
-                        <div className="w-9 h-9 rounded-xl bg-pink-500/10 flex items-center justify-center shrink-0">
-                          <MapPin className="w-5 h-5 text-pink-400" />
+                      <div className="bg-black/40 rounded-2xl p-3 border border-white/5 flex gap-3 items-center text-left">
+                        <div className="w-8 h-8 rounded-xl bg-pink-500/10 flex items-center justify-center shrink-0">
+                          <MapPin className="w-4.5 h-4.5 text-pink-400" />
                         </div>
                         <div>
-                          <span className="text-[8.5px] font-black text-[#bccbb9]/40 tracking-wider block uppercase">CANCHA RESERVADA</span>
+                          <span className="text-[8px] font-black text-[#bccbb9]/40 tracking-wider block uppercase">CANCHA RESERVADA</span>
                           <span className="text-xs font-black text-white uppercase tracking-wide mt-0.5 block">
                             {viewingBookingReceipt.field}
                           </span>
@@ -1979,90 +1877,82 @@ export default function MyBookingsView() {
                       </div>
 
                       {/* Fecha y hora block */}
-                      <div className="bg-black/40 rounded-2xl p-4 border border-white/5 flex gap-3.5 items-center text-left">
-                        <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-                          <Clock className="w-5 h-5 text-blue-400" />
+                      <div className="bg-black/40 rounded-2xl p-3 border border-white/5 flex gap-3 items-center text-left">
+                        <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                          <Clock className="w-4.5 h-4.5 text-blue-400" />
                         </div>
                         <div>
-                          <span className="text-[8.5px] font-black text-[#bccbb9]/40 tracking-wider block uppercase">FORMA Y HORARIO JUEGO</span>
+                          <span className="text-[8px] font-black text-[#bccbb9]/40 tracking-wider block uppercase">FORMA Y HORARIO JUEGO</span>
                           <span className="text-xs font-black text-amber-400 uppercase tracking-wide mt-0.5 block">
                             {viewingBookingReceipt.date} • {viewingBookingReceipt.time} Hs
                           </span>
                         </div>
                       </div>
 
-                      {/* Importe block */}
-                      <div className="bg-[#4be277]/5 rounded-2xl p-4 border border-[#4be277]/15 flex justify-between items-center text-left">
-                        <div className="flex gap-3.5 items-center">
-                          <div className="w-9 h-9 rounded-xl bg-[#4be277]/10 flex items-center justify-center shrink-0">
-                            <Sparkles className="w-5 h-5 text-[#4be277]" />
-                          </div>
-                          <div>
-                            <span className="text-[8.5px] font-black text-[#bccbb9]/40 tracking-wider block uppercase">IMPORTE DECLARADO</span>
-                            <span className="text-base font-black text-[#4be277] italic font-display block">
-                              {viewingBookingReceipt.amount || 'S/. 120.00'}
-                            </span>
-                          </div>
+                      {/* Importe block - Restructured beautifully without compression */}
+                      <div className="bg-[#4be277]/5 rounded-2xl p-4 border border-[#4be277]/15 flex flex-col justify-center items-center text-center space-y-2.5">
+                        <div className="text-center w-full">
+                          <span className="text-[10px] font-black text-[#4be277] uppercase tracking-[0.25em] block">IMPORTE DECLARADO</span>
+                          <span className="text-[8px] text-[#bccbb9]/30 font-black uppercase tracking-widest block mt-0.5">Sincronizado vía Plataforma</span>
                         </div>
-                        <div className="text-right font-mono text-[9px] text-zinc-500 bg-white/5 border border-white/5 px-2.5 py-1 rounded">
-                          Op. #827{viewingBookingReceipt.id || 'x'}91
+                        
+                        <div className="font-mono text-[9px] text-[#4be277]/80 bg-[#4be277]/10 border border-[#4be277]/15 px-3 py-1 rounded-xl uppercase tracking-wider font-bold">
+                          Transacción: Op. #{viewingBookingReceipt.id?.substring(0, 6).toUpperCase() || '827X91'}
                         </div>
-                      </div>
 
-                      {/* Anti-fraud audit guidelines notice */}
-                      <div className="bg-amber-500/5 p-4 rounded-2xl border border-amber-500/15 text-left space-y-1">
-                        <span className="text-[9.5px] font-black text-amber-500 uppercase tracking-wider block">⚠️ GUÍA DE REGISTRO SEGURO ElITE</span>
-                        <p className="text-[9px] font-semibold text-[#bccbb9]/60 uppercase tracking-wide leading-relaxed">
-                          Cerciórate primero de recibir la alerta correspondiente en la banca por celular. Verifica que el importe coincida al céntimo antes de oprimir el botón "Validar e Iniciar Turno".
-                        </p>
+                        <div>
+                          <span className="text-3xl font-black text-[#4be277] italic font-display tracking-tight block">
+                            {viewingBookingReceipt.amount || 'S/. 120.00'}
+                          </span>
+                        </div>
                       </div>
 
                     </div>
                   </div>
 
-                  {/* Actions for VIP Admin */}
-                  <div className="pt-6 border-t border-white/5 mt-6 space-y-3">
-                    
-                    {isAdmin && viewingBookingReceipt.status === 'pending_approval' ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button 
-                          onClick={() => {
-                            approvePayment(viewingBookingReceipt.id);
-                            setViewingBookingReceipt(null);
-                          }}
-                          className="h-14 bg-[#4be277] text-black hover:opacity-90 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(75,226,119,0.35)]"
-                        >
-                          <Check className="w-4 h-4 text-black" /> Validar y Confirmar Turno
-                        </button>
-                        <button 
-                          onClick={() => {
-                            rejectPayment(viewingBookingReceipt.id);
-                            setViewingBookingReceipt(null);
-                          }}
-                          className="h-14 bg-red-500/10 hover:bg-red-500 border border-red-500/20 text-red-400 hover:text-black rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2"
-                        >
-                          <X className="w-4 h-4" /> Rechazar Comprobante
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-white/[0.02] border border-white/5 text-center rounded-2xl">
-                        <p className="text-[10px] font-black text-[#4be277] uppercase tracking-widest italic flex items-center justify-center gap-1.5">
-                          ✓ TURNO YA VERIFICADO Y SINCRONIZADO EN SISTEMA
-                        </p>
-                      </div>
-                    )}
-
-                  </div>
+                  {/* Actions for VIP Admin - Only visible to admin */}
+                  {isAdmin && (
+                    <div className="pt-3 border-t border-white/5 mt-3 space-y-2.5 shrink-0">
+                      {viewingBookingReceipt.status === 'pending_approval' ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <button 
+                            onClick={() => {
+                              approvePayment(viewingBookingReceipt.id);
+                              setViewingBookingReceipt(null);
+                            }}
+                            className="h-12 bg-[#4be277] text-black hover:opacity-90 rounded-2xl font-black text-[9.5px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(75,226,119,0.35)]"
+                          >
+                            <Check className="w-4 h-4 text-black" /> Validar y Confirmar Turno
+                          </button>
+                          <button 
+                            onClick={() => {
+                              rejectPayment(viewingBookingReceipt.id);
+                              setViewingBookingReceipt(null);
+                            }}
+                            className="h-12 bg-red-500/10 hover:bg-red-500 border border-red-500/20 text-red-400 hover:text-black rounded-2xl font-black text-[9.5px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2"
+                          >
+                            <X className="w-4 h-4" /> Rechazar Comprobante
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-white/[0.02] border border-white/5 text-center rounded-2xl">
+                          <p className="text-[9.5px] font-black text-[#4be277] uppercase tracking-widest italic flex items-center justify-center gap-1.5">
+                            ✓ TURNO YA VERIFICADO Y SINCRONIZADO EN SISTEMA
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                 </div>
 
               </div>
 
               {/* Bottom Graceful close button */}
-              <div className="pt-6 border-t border-white/5">
+              <div className="pt-3 border-t border-white/5 shrink-0">
                 <button 
                   onClick={() => setViewingBookingReceipt(null)}
-                  className="w-full h-14 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/10 font-black text-[10px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2"
+                  className="w-full h-12 rounded-2xl bg-white/10 hover:bg-white/15 text-white border border-white/10 font-black text-[9.5px] uppercase tracking-widest transition-all italic flex items-center justify-center gap-2"
                 >
                   <ArrowRight className="w-4 h-4 rotate-180" /> REGRESAR A CONSOLA PRINCIPAL SIN CAMBIOS
                 </button>
@@ -2315,10 +2205,18 @@ TOTAL COBRADO FÍSICO: ${viewingOfficialTicket.amount || '$ 120.00'}
                       </span>
                     </div>
 
-                    <div className="p-5 text-center space-y-1">
+                    <div className="p-5 text-center space-y-2">
                       <p className="text-[7.5px] font-bold text-zinc-400 uppercase tracking-widest font-sans">
                         ★ OPERADOR DIGITAL REGISTRADO DE CAJA ★
                       </p>
+                      
+                      <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-150 text-[#155724] text-left text-[8px] space-y-1 font-mono uppercase">
+                        <span className="font-extrabold text-[#155724] block leading-none">⚽ EQUIPAMIENTO GENERAL INCLUIDO</span>
+                        <p className="leading-normal text-[7.5px] text-zinc-600 font-bold">
+                          La pelota oficial de juego y 6 chaquetas distintivas están incluidas con tu pago. Se agradece devolverlas tal como se entregaron en recepción.
+                        </p>
+                      </div>
+
                       <p className="text-[8px] font-bold text-zinc-400 leading-normal uppercase">
                         Presente este ticket en la recepción <br />
                         para habilitar las luces del campo de juego. <br />

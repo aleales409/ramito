@@ -1,6 +1,6 @@
 {
   "name": "Ramito Fut Show",
-  "description": "App oficial del Complejo Ramito Fut Show. Reserva de canchas de fútbol 5 de alta gama en un ambiente profesional.",
+  "description": "Aplicación web para Ramito Fut Show con Vite, React, TypeScript y Supabase.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
